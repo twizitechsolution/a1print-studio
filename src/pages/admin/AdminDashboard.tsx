@@ -279,8 +279,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
           {/* 4. FRAME CATALOG & EDITOR TAB */}
           {activeTab === 'catalog' && (
             <AdminCatalogManager
-              products={products}
               onOpenVisualEditor={(product) => setEditingTemplateProduct(product)}
+              onOpenTemplateEditor={(product) => setEditingTemplateProduct(product)}
             />
           )}
 

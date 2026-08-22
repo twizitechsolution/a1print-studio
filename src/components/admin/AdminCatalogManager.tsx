@@ -6,10 +6,13 @@ import { Tag, Plus, Edit2, Trash2, Flame, Sliders } from 'lucide-react';
 
 interface AdminCatalogManagerProps {
   onOpenTemplateEditor?: (product: Product) => void;
+  onOpenVisualEditor?: (product: Product) => void;
+  products?: Product[];
 }
 
 export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
   onOpenTemplateEditor,
+  onOpenVisualEditor,
 }) => {
   const { products, addProduct, updateProduct, deleteProduct } = useCartStore();
 
@@ -35,6 +38,14 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
     }
   };
 
+  const handleVisualWorkspaceClick = (product: Product) => {
+    if (onOpenVisualEditor) {
+      onOpenVisualEditor(product);
+    } else if (onOpenTemplateEditor) {
+      onOpenTemplateEditor(product);
+    }
+  };
+
   const toggleBestseller = (id: string, currentVal?: boolean) => {
     updateProduct(id, { bestseller: !currentVal });
   };
@@ -44,7 +55,7 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
   };
 
   return (
-    <div className="space-y-6 font-jost text-white">
+    <div className="space-y-6 font-jost text-white select-none">
       
       {/* Header & Add New Frame Button */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-[#121829] p-5 rounded-2xl border border-[#262E4A] shadow-xl">
@@ -140,22 +151,22 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
                       <div className="flex items-center justify-end gap-2">
                         {/* Configure Template Full Page Button */}
                         <button
-                          onClick={() => onOpenTemplateEditor && onOpenTemplateEditor(product)}
-                          className="px-3 py-1.5 bg-[#9333EA] hover:bg-purple-700 text-white font-bold rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                          onClick={() => handleVisualWorkspaceClick(product)}
+                          className="px-3.5 py-2 bg-[#9333EA] hover:bg-purple-700 text-white font-extrabold text-xs rounded-xl shadow-md transition-colors flex items-center gap-1.5 cursor-pointer"
                         >
                           <Sliders className="w-3.5 h-3.5" /> Visual Workspace
                         </button>
 
                         <button
                           onClick={() => handleOpenEditModal(product)}
-                          className="px-3 py-1.5 bg-[#1A2035] hover:bg-[#262E4A] text-white font-bold rounded-lg border border-[#262E4A] transition-colors flex items-center gap-1 cursor-pointer"
+                          className="px-3.5 py-2 bg-[#1A2035] hover:bg-[#262E4A] text-white font-extrabold text-xs rounded-xl border border-[#262E4A] transition-colors flex items-center gap-1.5 cursor-pointer"
                         >
                           <Edit2 className="w-3.5 h-3.5 text-[#3B82F6]" /> Edit Details
                         </button>
 
                         <button
                           onClick={() => deleteProduct(product.id)}
-                          className="p-1.5 text-rose-400 hover:text-rose-600 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer"
+                          className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-500/10 rounded-xl transition-colors cursor-pointer"
                           title="Delete Frame Product"
                         >
                           <Trash2 className="w-4 h-4" />
