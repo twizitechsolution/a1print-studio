@@ -55,9 +55,9 @@ export const PRODUCTS: Product[] = [
     categoryLabel: 'Birthday Gifts',
     rating: 5.0,
     reviewsCount: 24,
-    thumbnail: 'https://lovecraftbyse.com/wp-content/uploads/2026/02/personalized-brother-sister-photo-frame.webp',
+    thumbnail: 'https://lovecraftbyse.com/wp-content/uploads/2026/03/custom-birthday-collage-photo-frame-personalized-name-date-1.jpg',
     images: [
-      'https://lovecraftbyse.com/wp-content/uploads/2026/02/personalized-brother-sister-photo-frame.webp',
+      'https://lovecraftbyse.com/wp-content/uploads/2026/03/custom-birthday-collage-photo-frame-personalized-name-date-1.jpg',
     ],
     bestseller: true,
     onSale: true,

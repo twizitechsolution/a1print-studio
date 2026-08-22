@@ -33,7 +33,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onSelectProduct, onNavigate 
       itemsCount: '59 items',
       icon: '🎂',
       product: products[1],
-      image: 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?auto=format&fit=crop&q=80&w=800',
+      image: 'https://lovecraftbyse.com/wp-content/uploads/2026/03/custom-birthday-collage-photo-frame-personalized-name-date-1.jpg',
     },
     {
       id: 'firstyear',
@@ -41,8 +41,8 @@ export const HomePage: React.FC<HomePageProps> = ({ onSelectProduct, onNavigate 
       price: 'Rs. 699',
       itemsCount: '24 items',
       icon: '👶',
-      product: products[0],
-      image: 'https://lovecraftbyse.com/wp-content/uploads/2025/02/welcome-baby-boy-scaled.webp',
+      product: products[1],
+      image: 'https://lovecraftbyse.com/wp-content/uploads/2026/03/custom-birthday-collage-photo-frame-personalized-name-date-1.jpg',
     },
     {
       id: 'family',
