@@ -84,22 +84,52 @@ function getStoredData(): StoreData {
   // Purge legacy storage keys first to free up disk quota
   cleanupLegacyKeys();
 
+  let storedProducts: Product[] = [];
+  let storedItems: CartItem[] = [];
+  let storedOrders: Order[] = [];
+
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      memoryData = {
-        products: parsed.products && parsed.products.length > 0 ? parsed.products : INITIAL_PRODUCTS,
-        items: parsed.items || [],
-        orders: parsed.orders && parsed.orders.length > 0 ? parsed.orders : [defaultOrder],
-      };
-      return memoryData;
+      storedProducts = parsed.products || [];
+      storedItems = parsed.items || [];
+      storedOrders = parsed.orders || [];
     }
   } catch (e) {
     console.error('Failed to read store data:', e);
   }
 
-  memoryData = { products: INITIAL_PRODUCTS, items: [], orders: [defaultOrder] };
+  // GUARANTEE: INITIAL_PRODUCTS from code (all 3 core template frames) are ALWAYS present in the catalog!
+  const storedMap = new Map(storedProducts.map((p) => [p.id, p]));
+
+  // Merge INITIAL_PRODUCTS from src/data/products.ts with any saved admin customizations
+  const mergedProducts = INITIAL_PRODUCTS.map((initProd) => {
+    const stored = storedMap.get(initProd.id);
+    if (stored) {
+      return {
+        ...initProd,
+        ...stored,
+        photoSlots: stored.photoSlots && stored.photoSlots.length > 0 ? stored.photoSlots : initProd.photoSlots,
+        textZones: stored.textZones && stored.textZones.length > 0 ? stored.textZones : initProd.textZones,
+      };
+    }
+    return initProd;
+  });
+
+  // Add any custom admin-created products that aren't in INITIAL_PRODUCTS
+  const customAdminProducts = storedProducts.filter(
+    (sp) => !INITIAL_PRODUCTS.some((ip) => ip.id === sp.id)
+  );
+
+  const finalProducts = [...mergedProducts, ...customAdminProducts];
+
+  memoryData = {
+    products: finalProducts,
+    items: storedItems,
+    orders: storedOrders.length > 0 ? storedOrders : [defaultOrder],
+  };
+
   return memoryData;
 }
 
