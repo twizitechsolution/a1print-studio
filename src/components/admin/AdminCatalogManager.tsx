@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Product } from '../../types';
 import { useCartStore } from '../../store/useCartStore';
 import { AdminProductListingModal } from './AdminProductListingModal';
-import { Tag, Plus, Edit2, Trash2, Flame, Sliders } from 'lucide-react';
+import { Tag, Plus, Edit2, Trash2, Flame, Sliders, Download } from 'lucide-react';
 
 interface AdminCatalogManagerProps {
   onOpenTemplateEditor?: (product: Product) => void;
@@ -54,6 +54,19 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
     updateProduct(id, { onSale: !currentVal });
   };
 
+  const handleExportCatalogCode = () => {
+    const fileContent = `import { Product } from '../types';\n\nexport const PRODUCTS: Product[] = ${JSON.stringify(products, null, 2)};\n`;
+    const blob = new Blob([fileContent], { type: 'text/typescript' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'products.ts';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="space-y-6 font-jost text-white select-none">
       
@@ -68,12 +81,22 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
           </p>
         </div>
 
-        <button
-          onClick={handleOpenAddModal}
-          className="px-5 py-2.5 bg-[#3B82F6] hover:bg-blue-600 text-white font-bold text-xs rounded-xl shadow-lg transition-all flex items-center gap-2 shrink-0 cursor-pointer"
-        >
-          <Plus className="w-4 h-4" /> + Add New Frame Product
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExportCatalogCode}
+            className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-lg transition-all flex items-center gap-1.5 shrink-0 cursor-pointer"
+            title="Download products.ts code to commit to GitHub"
+          >
+            <Download className="w-4 h-4" /> Download Master products.ts Code
+          </button>
+
+          <button
+            onClick={handleOpenAddModal}
+            className="px-5 py-2.5 bg-[#3B82F6] hover:bg-blue-600 text-white font-bold text-xs rounded-xl shadow-lg transition-all flex items-center gap-2 shrink-0 cursor-pointer"
+          >
+            <Plus className="w-4 h-4" /> + Add New Frame Product
+          </button>
+        </div>
       </div>
 
       {/* Catalog Table */}

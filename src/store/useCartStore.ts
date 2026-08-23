@@ -176,10 +176,33 @@ function saveStoredData(data: StoreData) {
   }
 }
 
-// Global Event Listener for Real-Time Synchronization across components
+// Global BroadcastChannel & Event Listener for Real-Time Synchronization across components & tabs
+let broadcastChannel: BroadcastChannel | null = null;
+try {
+  if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+    broadcastChannel = new BroadcastChannel('a1print_store_channel');
+    broadcastChannel.onmessage = (event) => {
+      if (event.data && event.data.type === 'STORE_UPDATED' && event.data.payload) {
+        memoryData = event.data.payload;
+        saveStoredData(event.data.payload);
+        listeners.forEach((l) => l());
+      }
+    };
+  }
+} catch (e) {
+  console.warn('BroadcastChannel initialization fallback:', e);
+}
+
 const listeners = new Set<() => void>();
 function notifyListeners() {
   listeners.forEach((l) => l());
+  if (broadcastChannel && memoryData) {
+    try {
+      broadcastChannel.postMessage({ type: 'STORE_UPDATED', payload: memoryData });
+    } catch (e) {
+      console.warn('Broadcast postMessage fallback:', e);
+    }
+  }
 }
 
 export function useCartStore() {
