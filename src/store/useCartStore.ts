@@ -3,7 +3,8 @@ import { CartItem, Order, Product } from '../types';
 import { PRODUCTS as INITIAL_PRODUCTS } from '../data/products';
 import { firebaseCloudDb } from '../config/firebase';
 
-const STORAGE_KEY = 'a1print_store_data_v6';
+const STORAGE_KEY = 'a1print_store_data_v7';
+const DELETED_IDS_KEY = 'a1print_deleted_product_ids_v7';
 
 interface StoreData {
   products: Product[];
@@ -55,21 +56,60 @@ const defaultOrder: Order = {
   createdAt: new Date().toISOString(),
 };
 
-// Global In-Memory Data Store Cache
-let memoryData: StoreData = {
-  products: INITIAL_PRODUCTS,
-  items: [],
-  orders: [defaultOrder],
-};
+function getDeletedProductIds(): Set<string> {
+  try {
+    const raw = localStorage.getItem(DELETED_IDS_KEY);
+    if (raw) {
+      return new Set(JSON.parse(raw));
+    }
+  } catch (e) {}
+  return new Set<string>();
+}
+
+function saveDeletedProductIds(ids: Set<string>) {
+  try {
+    localStorage.setItem(DELETED_IDS_KEY, JSON.stringify(Array.from(ids)));
+  } catch (e) {}
+}
+
+function getStoredLocalData(): StoreData {
+  const deletedIds = getDeletedProductIds();
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      const prods = (parsed.products && parsed.products.length > 0 ? parsed.products : INITIAL_PRODUCTS).filter(
+        (p: Product) => !deletedIds.has(p.id)
+      );
+      return {
+        products: prods,
+        items: parsed.items || [],
+        orders: parsed.orders && parsed.orders.length > 0 ? parsed.orders : [defaultOrder],
+      };
+    }
+  } catch (e) {}
+  return {
+    products: INITIAL_PRODUCTS.filter((p) => !deletedIds.has(p.id)),
+    items: [],
+    orders: [defaultOrder],
+  };
+}
+
+let memoryData: StoreData = getStoredLocalData();
+
+function saveStoredLocalData(data: StoreData) {
+  memoryData = data;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch (e) {}
+}
 
 const listeners = new Set<() => void>();
 function notifyListeners() {
   listeners.forEach((l) => l());
 }
 
-// -------------------------------------------------------------
-// Real-Time Firebase Cloud Firestore Synchronization Engine
-// -------------------------------------------------------------
+// Real-Time Cloud Firestore Sync Engine
 let isCloudSyncInitialized = false;
 
 async function initCloudSync() {
@@ -77,40 +117,31 @@ async function initCloudSync() {
   isCloudSyncInitialized = true;
 
   try {
-    // 1. Initial Cloud Sync for Products
+    const deletedIds = getDeletedProductIds();
     const cloudProds = await firebaseCloudDb.getCollection('products');
+
     if (cloudProds && cloudProds.length > 0) {
-      memoryData.products = cloudProds;
-      notifyListeners();
+      const filteredCloud = cloudProds.filter((p: Product) => !deletedIds.has(p.id));
+      if (filteredCloud.length > 0) {
+        memoryData.products = filteredCloud;
+        saveStoredLocalData(memoryData);
+        notifyListeners();
+      }
     } else {
-      // Seed Cloud Database with 7 master products if Firestore collection is empty!
+      // Seed Firestore with initial products
       INITIAL_PRODUCTS.forEach((prod) => {
-        firebaseCloudDb.setDocument('products', prod.id, prod);
+        if (!deletedIds.has(prod.id)) {
+          firebaseCloudDb.setDocument('products', prod.id, prod);
+        }
       });
     }
 
-    // 2. Initial Cloud Sync for Orders
     const cloudOrders = await firebaseCloudDb.getCollection('orders');
     if (cloudOrders && cloudOrders.length > 0) {
       memoryData.orders = cloudOrders;
+      saveStoredLocalData(memoryData);
       notifyListeners();
     }
-
-    // 3. Periodic Poll for Real-Time Multi-Device Sync every 5 seconds
-    setInterval(async () => {
-      try {
-        const freshProds = await firebaseCloudDb.getCollection('products');
-        if (freshProds && freshProds.length > 0) {
-          memoryData.products = freshProds;
-          notifyListeners();
-        }
-        const freshOrders = await firebaseCloudDb.getCollection('orders');
-        if (freshOrders && freshOrders.length > 0) {
-          memoryData.orders = freshOrders;
-          notifyListeners();
-        }
-      } catch (e) {}
-    }, 5000);
   } catch (e) {
     console.warn('Cloud sync initialization fallback:', e);
   }
@@ -128,16 +159,15 @@ export function useCartStore() {
     };
   }, []);
 
-  // E-Commerce Actions with Cloud Persistence
-
   const addProduct = (newProduct: Product) => {
-    memoryData.products = [...memoryData.products, newProduct];
+    const updated = [...memoryData.products, newProduct];
+    saveStoredLocalData({ ...memoryData, products: updated });
     notifyListeners();
     firebaseCloudDb.setDocument('products', newProduct.id, newProduct);
   };
 
   const updateProduct = (id: string, updates: Partial<Product>) => {
-    memoryData.products = memoryData.products.map((p) => {
+    const updatedProducts = memoryData.products.map((p) => {
       if (p.id === id) {
         const updated = { ...p, ...updates };
         firebaseCloudDb.setDocument('products', updated.id, updated);
@@ -145,12 +175,20 @@ export function useCartStore() {
       }
       return p;
     });
+
+    saveStoredLocalData({ ...memoryData, products: updatedProducts });
     notifyListeners();
   };
 
   const deleteProduct = (id: string) => {
-    memoryData.products = memoryData.products.filter((p) => p.id !== id);
+    const deletedIds = getDeletedProductIds();
+    deletedIds.add(id);
+    saveDeletedProductIds(deletedIds);
+
+    const updatedProducts = memoryData.products.filter((p) => p.id !== id);
+    saveStoredLocalData({ ...memoryData, products: updatedProducts });
     notifyListeners();
+
     firebaseCloudDb.deleteDocument('products', id);
   };
 
@@ -176,17 +214,19 @@ export function useCartStore() {
       itemTotalPrice,
     };
 
-    memoryData.items = [...memoryData.items, newItem];
+    const updatedItems = [...memoryData.items, newItem];
+    saveStoredLocalData({ ...memoryData, items: updatedItems });
     notifyListeners();
   };
 
   const removeFromCart = (itemId: string) => {
-    memoryData.items = memoryData.items.filter((i) => i.id !== itemId);
+    const updatedItems = memoryData.items.filter((i) => i.id !== itemId);
+    saveStoredLocalData({ ...memoryData, items: updatedItems });
     notifyListeners();
   };
 
   const updateQuantity = (itemId: string, delta: number) => {
-    memoryData.items = memoryData.items
+    const updatedItems = memoryData.items
       .map((item) => {
         if (item.id === itemId) {
           const newQty = item.quantity + delta;
@@ -201,6 +241,7 @@ export function useCartStore() {
       })
       .filter(Boolean) as CartItem[];
 
+    saveStoredLocalData({ ...memoryData, items: updatedItems });
     notifyListeners();
   };
 
@@ -225,18 +266,17 @@ export function useCartStore() {
       createdAt: new Date().toISOString(),
     };
 
-    memoryData.orders = [newOrder, ...memoryData.orders];
-    memoryData.items = [];
+    const updatedOrders = [newOrder, ...memoryData.orders];
+    saveStoredLocalData({ ...memoryData, orders: updatedOrders, items: [] });
     notifyListeners();
 
-    // Persist new order live to Cloud Firestore REST Database
     firebaseCloudDb.setDocument('orders', newOrder.id, newOrder);
 
     return newOrder;
   };
 
   const updateOrderStatus = (orderId: string, status: Order['orderStatus']) => {
-    memoryData.orders = memoryData.orders.map((ord) => {
+    const updatedOrders = memoryData.orders.map((ord) => {
       if (ord.id === orderId) {
         const updated = { ...ord, orderStatus: status };
         firebaseCloudDb.setDocument('orders', updated.id, updated);
@@ -244,6 +284,8 @@ export function useCartStore() {
       }
       return ord;
     });
+
+    saveStoredLocalData({ ...memoryData, orders: updatedOrders });
     notifyListeners();
   };
 

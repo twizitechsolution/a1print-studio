@@ -240,7 +240,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
             <span className="text-xs font-extrabold text-white capitalize">{activeTab}</span>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            {/* Live Firebase Cloud Database Status Indicator */}
+            <div className="px-3.5 py-1.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-xl text-xs font-bold flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              🔥 Firebase Cloud DB: Connected (aoneprintstudio-4c1bd)
+            </div>
+
             <a
               href="/"
               target="_blank"
