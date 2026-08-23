@@ -136,6 +136,26 @@ export const AdminTemplateEditor: React.FC<AdminTemplateEditorProps> = ({
     }
   };
 
+  // Move Photo Slot Layer Position Left or Right
+  const movePhotoSlot = (index: number, direction: 'left' | 'right') => {
+    const targetIndex = direction === 'left' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= photoSlots.length) return;
+    const updated = [...photoSlots];
+    const [moved] = updated.splice(index, 1);
+    updated.splice(targetIndex, 0, moved);
+    setPhotoSlots(updated);
+  };
+
+  // Move Text Zone Layer Position Left or Right
+  const moveTextZone = (index: number, direction: 'left' | 'right') => {
+    const targetIndex = direction === 'left' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= textZones.length) return;
+    const updated = [...textZones];
+    const [moved] = updated.splice(index, 1);
+    updated.splice(targetIndex, 0, moved);
+    setTextZones(updated);
+  };
+
   // Smart Auto-Detect specifically for this frame's image
   const handleAutoDetectThisFrame = () => {
     setPhotoSlots([
@@ -341,32 +361,66 @@ export const AdminTemplateEditor: React.FC<AdminTemplateEditorProps> = ({
               <span className="text-gray-400 italic">No zones added yet. Click Add Photo Slot or Auto-Detect above!</span>
             )}
 
-            {photoSlots.map((slot) => (
-              <button
+            {photoSlots.map((slot, index) => (
+              <div
                 key={slot.id}
-                onClick={() => setActiveLayerId(slot.id)}
-                className={`px-3 py-1.5 rounded-lg font-bold text-xs transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                className={`px-2.5 py-1 rounded-lg font-bold text-xs transition-all flex items-center gap-1.5 shrink-0 ${
                   activeLayerId === slot.id
                     ? 'bg-[#2563EB] text-white shadow-xs'
-                    : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                    : 'bg-white text-gray-700 border border-gray-200'
                 }`}
               >
-                📷 {slot.label}
-              </button>
+                <button
+                  onClick={() => movePhotoSlot(index, 'left')}
+                  disabled={index === 0}
+                  className="hover:text-amber-300 disabled:opacity-30 cursor-pointer"
+                  title="Move Layer Left"
+                >
+                  ◀
+                </button>
+                <span onClick={() => setActiveLayerId(slot.id)} className="cursor-pointer">
+                  📷 {slot.label}
+                </span>
+                <button
+                  onClick={() => movePhotoSlot(index, 'right')}
+                  disabled={index === photoSlots.length - 1}
+                  className="hover:text-amber-300 disabled:opacity-30 cursor-pointer"
+                  title="Move Layer Right"
+                >
+                  ▶
+                </button>
+              </div>
             ))}
 
-            {textZones.map((zone) => (
-              <button
+            {textZones.map((zone, index) => (
+              <div
                 key={zone.id}
-                onClick={() => setActiveLayerId(zone.id)}
-                className={`px-3 py-1.5 rounded-lg font-bold text-xs transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                className={`px-2.5 py-1 rounded-lg font-bold text-xs transition-all flex items-center gap-1.5 shrink-0 ${
                   activeLayerId === zone.id
                     ? 'bg-[#9333EA] text-white shadow-xs'
-                    : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                    : 'bg-white text-gray-700 border border-gray-200'
                 }`}
               >
-                🔤 {zone.label}
-              </button>
+                <button
+                  onClick={() => moveTextZone(index, 'left')}
+                  disabled={index === 0}
+                  className="hover:text-amber-300 disabled:opacity-30 cursor-pointer"
+                  title="Move Layer Left"
+                >
+                  ◀
+                </button>
+                <span onClick={() => setActiveLayerId(zone.id)} className="cursor-pointer">
+                  🔤 {zone.label}
+                </span>
+                <button
+                  onClick={() => moveTextZone(index, 'right')}
+                  disabled={index === textZones.length - 1}
+                  className="hover:text-amber-300 disabled:opacity-30 cursor-pointer"
+                  title="Move Layer Right"
+                >
+                  ▶
+                </button>
+              </div>
             ))}
           </div>
 

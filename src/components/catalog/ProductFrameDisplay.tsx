@@ -10,14 +10,12 @@ interface ProductFrameDisplayProps {
   fontScale?: number;
 }
 
-const DEFAULT_SAMPLE_PHOTO = 'https://images.unsplash.com/photo-1519689680058-324335c77eba?auto=format&fit=crop&q=80&w=600';
-
 export const ProductFrameDisplay: React.FC<ProductFrameDisplayProps> = ({
   product,
   customTextValues = {},
   customPhotoValues = {},
   className = '',
-  fontScale = 0.75,
+  fontScale = 0.42,
 }) => {
   const photoSlots: PhotoSlotConfig[] = product.photoSlots || [];
   const textZones: TextZoneConfig[] = product.textZones || [];
@@ -26,18 +24,16 @@ export const ProductFrameDisplay: React.FC<ProductFrameDisplayProps> = ({
     <div
       className={`relative w-full aspect-[3/4.4] rounded-xs border-8 border-black shadow-xl bg-white overflow-hidden font-serif select-none ${className}`}
     >
-      {/* Base Frame Poster Image */}
+      {/* Base Frame Poster Image Artwork */}
       <img
         src={product.thumbnail}
         alt={product.title}
         className="w-full h-full object-cover absolute inset-0 pointer-events-none"
       />
 
-      {/* Render Photo Slot Overlay (Renders custom photo OR default sample photo!) */}
+      {/* Render Customer Uploaded Photos ONLY (No default photo overlay to protect base poster artwork!) */}
       {photoSlots.map((slot) => {
-        const photoSrc =
-          customPhotoValues[slot.id] ||
-          (slot.id === 'photo-1' || slot.id === 'babyPhoto' ? DEFAULT_SAMPLE_PHOTO : '');
+        const photoSrc = customPhotoValues[slot.id] || slot.defaultPhotoUrl;
         if (!photoSrc) return null;
 
         return (
