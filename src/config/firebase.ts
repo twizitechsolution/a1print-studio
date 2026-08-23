@@ -1,11 +1,21 @@
-// A1print Studio Cloud Firestore REST Database Client
-// Provides 100% Real-Time Cloud Database Persistence without external package bloat!
+// A1print Studio Live Firebase Cloud Database Client
+// Connected to Official User Firebase Project: aoneprintstudio-4c1bd
 
-const FIREBASE_PROJECT_ID = 'a1print-studio-app';
+export const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBmyIAGv2y7UVqrIIOhQdllnrEOwJ8Purk",
+  authDomain: "aoneprintstudio-4c1bd.firebaseapp.com",
+  projectId: "aoneprintstudio-4c1bd",
+  storageBucket: "aoneprintstudio-4c1bd.firebasestorage.app",
+  messagingSenderId: "551063939028",
+  appId: "1:551063939028:web:1ba31f8cccaa3d84419841",
+  measurementId: "G-WGX8K53VN9"
+};
+
+const FIREBASE_PROJECT_ID = FIREBASE_CONFIG.projectId;
 const FIRESTORE_BASE_URL = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents`;
 
 export const firebaseCloudDb = {
-  // Read all documents in a collection
+  // Read all documents in a collection from live Firebase Firestore
   async getCollection(collectionName: string): Promise<any[]> {
     try {
       const res = await fetch(`${FIRESTORE_BASE_URL}/${collectionName}`);
@@ -29,7 +39,7 @@ export const firebaseCloudDb = {
     }
   },
 
-  // Write a document to Cloud Firestore
+  // Write a document to live Firebase Firestore
   async setDocument(collectionName: string, docId: string, payload: any): Promise<boolean> {
     try {
       const body = {
@@ -53,7 +63,7 @@ export const firebaseCloudDb = {
     }
   },
 
-  // Delete a document from Cloud Firestore
+  // Delete a document from live Firebase Firestore
   async deleteDocument(collectionName: string, docId: string): Promise<boolean> {
     try {
       const res = await fetch(`${FIRESTORE_BASE_URL}/${collectionName}/${docId}`, {
