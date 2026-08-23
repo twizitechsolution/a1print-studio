@@ -136,24 +136,23 @@ export const AdminTemplateEditor: React.FC<AdminTemplateEditorProps> = ({
     }
   };
 
-  // Move Photo Slot Layer Position Left or Right
-  const movePhotoSlot = (index: number, direction: 'left' | 'right') => {
-    const targetIndex = direction === 'left' ? index - 1 : index + 1;
-    if (targetIndex < 0 || targetIndex >= photoSlots.length) return;
-    const updated = [...photoSlots];
-    const [moved] = updated.splice(index, 1);
-    updated.splice(targetIndex, 0, moved);
-    setPhotoSlots(updated);
-  };
+  // Unified Layer Order State (Allows intermixing photo slots and text zones in ANY sequence!)
+  const [layerOrder, setLayerOrder] = useState<string[]>(() => {
+    const photos = (product.photoSlots || []).map((p) => p.id);
+    const texts = (product.textZones || []).map((t) => t.id);
+    return [...photos, ...texts];
+  });
 
-  // Move Text Zone Layer Position Left or Right
-  const moveTextZone = (index: number, direction: 'left' | 'right') => {
-    const targetIndex = direction === 'left' ? index - 1 : index + 1;
-    if (targetIndex < 0 || targetIndex >= textZones.length) return;
-    const updated = [...textZones];
-    const [moved] = updated.splice(index, 1);
+  const moveLayer = (id: string, direction: 'left' | 'right') => {
+    const currentIndex = layerOrder.indexOf(id);
+    if (currentIndex === -1) return;
+    const targetIndex = direction === 'left' ? currentIndex - 1 : currentIndex + 1;
+    if (targetIndex < 0 || targetIndex >= layerOrder.length) return;
+
+    const updated = [...layerOrder];
+    const [moved] = updated.splice(currentIndex, 1);
     updated.splice(targetIndex, 0, moved);
-    setTextZones(updated);
+    setLayerOrder(updated);
   };
 
   // Smart Auto-Detect specifically for this frame's image
@@ -255,11 +254,18 @@ export const AdminTemplateEditor: React.FC<AdminTemplateEditorProps> = ({
 
   // Save Template Config & Sync Live Directly to Product Object
   const handleSaveTemplateConfig = () => {
+    const sortedPhotos = [...photoSlots].sort(
+      (a, b) => layerOrder.indexOf(a.id) - layerOrder.indexOf(b.id)
+    );
+    const sortedTexts = [...textZones].sort(
+      (a, b) => layerOrder.indexOf(a.id) - layerOrder.indexOf(b.id)
+    );
+
     updateProduct(product.id, {
       thumbnail: baseFrameUrl,
       images: [baseFrameUrl],
-      photoSlots,
-      textZones,
+      photoSlots: sortedPhotos,
+      textZones: sortedTexts,
     });
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 3000);
@@ -361,67 +367,48 @@ export const AdminTemplateEditor: React.FC<AdminTemplateEditorProps> = ({
               <span className="text-gray-400 italic">No zones added yet. Click Add Photo Slot or Auto-Detect above!</span>
             )}
 
-            {photoSlots.map((slot, index) => (
-              <div
-                key={slot.id}
-                className={`px-2.5 py-1 rounded-lg font-bold text-xs transition-all flex items-center gap-1.5 shrink-0 ${
-                  activeLayerId === slot.id
-                    ? 'bg-[#2563EB] text-white shadow-xs'
-                    : 'bg-white text-gray-700 border border-gray-200'
-                }`}
-              >
-                <button
-                  onClick={() => movePhotoSlot(index, 'left')}
-                  disabled={index === 0}
-                  className="hover:text-amber-300 disabled:opacity-30 cursor-pointer"
-                  title="Move Layer Left"
-                >
-                  ◀
-                </button>
-                <span onClick={() => setActiveLayerId(slot.id)} className="cursor-pointer">
-                  📷 {slot.label}
-                </span>
-                <button
-                  onClick={() => movePhotoSlot(index, 'right')}
-                  disabled={index === photoSlots.length - 1}
-                  className="hover:text-amber-300 disabled:opacity-30 cursor-pointer"
-                  title="Move Layer Right"
-                >
-                  ▶
-                </button>
-              </div>
-            ))}
+            {layerOrder.map((layerId, index) => {
+              const photo = photoSlots.find((p) => p.id === layerId);
+              const text = textZones.find((t) => t.id === layerId);
+              if (!photo && !text) return null;
 
-            {textZones.map((zone, index) => (
-              <div
-                key={zone.id}
-                className={`px-2.5 py-1 rounded-lg font-bold text-xs transition-all flex items-center gap-1.5 shrink-0 ${
-                  activeLayerId === zone.id
-                    ? 'bg-[#9333EA] text-white shadow-xs'
-                    : 'bg-white text-gray-700 border border-gray-200'
-                }`}
-              >
-                <button
-                  onClick={() => moveTextZone(index, 'left')}
-                  disabled={index === 0}
-                  className="hover:text-amber-300 disabled:opacity-30 cursor-pointer"
-                  title="Move Layer Left"
+              const isPhoto = !!photo;
+              const label = photo ? photo.label : text!.label;
+              const isActive = activeLayerId === layerId;
+
+              return (
+                <div
+                  key={layerId}
+                  className={`px-2.5 py-1 rounded-lg font-bold text-xs transition-all flex items-center gap-1.5 shrink-0 ${
+                    isActive
+                      ? isPhoto
+                        ? 'bg-[#2563EB] text-white shadow-xs'
+                        : 'bg-[#9333EA] text-white shadow-xs'
+                      : 'bg-white text-gray-700 border border-gray-200'
+                  }`}
                 >
-                  ◀
-                </button>
-                <span onClick={() => setActiveLayerId(zone.id)} className="cursor-pointer">
-                  🔤 {zone.label}
-                </span>
-                <button
-                  onClick={() => moveTextZone(index, 'right')}
-                  disabled={index === textZones.length - 1}
-                  className="hover:text-amber-300 disabled:opacity-30 cursor-pointer"
-                  title="Move Layer Right"
-                >
-                  ▶
-                </button>
-              </div>
-            ))}
+                  <button
+                    onClick={() => moveLayer(layerId, 'left')}
+                    disabled={index === 0}
+                    className="hover:text-amber-300 disabled:opacity-30 cursor-pointer"
+                    title="Move Layer Left"
+                  >
+                    ◀
+                  </button>
+                  <span onClick={() => setActiveLayerId(layerId)} className="cursor-pointer">
+                    {isPhoto ? `📷 ${label}` : `🔤 ${label}`}
+                  </span>
+                  <button
+                    onClick={() => moveLayer(layerId, 'right')}
+                    disabled={index === layerOrder.length - 1}
+                    className="hover:text-amber-300 disabled:opacity-30 cursor-pointer"
+                    title="Move Layer Right"
+                  >
+                    ▶
+                  </button>
+                </div>
+              );
+            })}
           </div>
 
           {/* Main Interactive Canvas Workspace */}
