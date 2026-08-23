@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Product } from '../types';
 import { useCartStore } from '../store/useCartStore';
+import { PRODUCTS as INITIAL_PRODUCTS } from '../data/products';
 import { ProductCard } from '../components/catalog/ProductCard';
 import { ProductGrid } from '../components/catalog/ProductGrid';
 import { ProductFrameDisplay } from '../components/catalog/ProductFrameDisplay';
@@ -13,7 +14,8 @@ interface HomePageProps {
 
 export const HomePage: React.FC<HomePageProps> = ({ onSelectProduct, onNavigate }) => {
   const { products } = useCartStore();
-  const featuredProducts = products.slice(0, 3);
+  const safeProducts = (products && products.length > 0) ? products : INITIAL_PRODUCTS;
+  const featuredProducts = safeProducts.slice(0, 3);
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
 
   const categoriesList = [
@@ -23,7 +25,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onSelectProduct, onNavigate 
       price: 'Rs. 699',
       itemsCount: '85 items',
       icon: '👶',
-      product: products[0],
+      product: safeProducts[0] || INITIAL_PRODUCTS[0],
       image: 'https://lovecraftbyse.com/wp-content/uploads/2025/02/welcome-baby-boy-scaled.webp',
     },
     {
@@ -32,7 +34,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onSelectProduct, onNavigate 
       price: 'Rs. 699',
       itemsCount: '59 items',
       icon: '🎂',
-      product: products[1],
+      product: safeProducts[1] || INITIAL_PRODUCTS[1] || INITIAL_PRODUCTS[0],
       image: 'https://lovecraftbyse.com/wp-content/uploads/2026/03/custom-birthday-collage-photo-frame-personalized-name-date-1.jpg',
     },
     {
@@ -41,7 +43,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onSelectProduct, onNavigate 
       price: 'Rs. 699',
       itemsCount: '24 items',
       icon: '👶',
-      product: products[1],
+      product: safeProducts[1] || INITIAL_PRODUCTS[1] || INITIAL_PRODUCTS[0],
       image: 'https://lovecraftbyse.com/wp-content/uploads/2026/03/custom-birthday-collage-photo-frame-personalized-name-date-1.jpg',
     },
     {
@@ -50,7 +52,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onSelectProduct, onNavigate 
       price: 'Rs. 699',
       itemsCount: '19 items',
       icon: '🎁',
-      product: products[2],
+      product: safeProducts[2] || INITIAL_PRODUCTS[2] || INITIAL_PRODUCTS[0],
       image: 'https://lovecraftbyse.com/wp-content/uploads/2026/02/personalized-dad-heartbeat-frame-multiple-photos.webp-scaled.webp',
     },
   ];

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Product, CartItem, Order } from './types';
 import { useCartStore } from './store/useCartStore';
+import { PRODUCTS as INITIAL_PRODUCTS } from './data/products';
 import { compressImageBase64 } from './utils/imageCompressor';
 
 import { Header } from './components/layout/Header';
@@ -43,7 +44,7 @@ export const App: React.FC = () => {
   } = useCartStore();
 
   // Default initial product if selectedProduct is null
-  const activeProduct = selectedProduct || products[0];
+  const activeProduct = selectedProduct || (products && products.length > 0 ? products[0] : INITIAL_PRODUCTS[0]);
 
   useEffect(() => {
     const handlePopState = () => {

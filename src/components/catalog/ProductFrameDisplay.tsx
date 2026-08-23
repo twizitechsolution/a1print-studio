@@ -17,6 +17,7 @@ export const ProductFrameDisplay: React.FC<ProductFrameDisplayProps> = ({
   className = '',
   fontScale = 0.42,
 }) => {
+  if (!product) return null;
   const photoSlots: PhotoSlotConfig[] = product.photoSlots || [];
   const textZones: TextZoneConfig[] = product.textZones || [];
 

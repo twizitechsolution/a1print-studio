@@ -12,7 +12,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   product,
   onSelectProduct,
 }) => {
-  const defaultSize = product.sizes[0] || { price: 699, originalPrice: 999 };
+  if (!product) return null;
+  const defaultSize = (product.sizes && product.sizes[0]) || { price: 699, originalPrice: 999 };
 
   return (
     <div 
