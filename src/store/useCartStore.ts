@@ -118,22 +118,35 @@ async function initCloudSync() {
 
   try {
     const deletedIds = getDeletedProductIds();
+
+    // 1. Sync all local memory products to Cloud Firestore so new custom frames are saved in Cloud Database!
+    memoryData.products.forEach((prod) => {
+      if (!deletedIds.has(prod.id)) {
+        firebaseCloudDb.setDocument('products', prod.id, prod);
+      }
+    });
+
+    // 2. Fetch fresh Cloud Firestore catalog
     const cloudProds = await firebaseCloudDb.getCollection('products');
 
     if (cloudProds && cloudProds.length > 0) {
       const filteredCloud = cloudProds.filter((p: Product) => !deletedIds.has(p.id));
       if (filteredCloud.length > 0) {
-        memoryData.products = filteredCloud;
+        // Merge cloud products with local memory so zero products are lost
+        const merged = [...memoryData.products];
+        filteredCloud.forEach((cp) => {
+          const idx = merged.findIndex((mp) => mp.id === cp.id);
+          if (idx !== -1) {
+            merged[idx] = cp;
+          } else {
+            merged.push(cp);
+          }
+        });
+
+        memoryData.products = merged;
         saveStoredLocalData(memoryData);
         notifyListeners();
       }
-    } else {
-      // Seed Firestore with initial products
-      INITIAL_PRODUCTS.forEach((prod) => {
-        if (!deletedIds.has(prod.id)) {
-          firebaseCloudDb.setDocument('products', prod.id, prod);
-        }
-      });
     }
 
     const cloudOrders = await firebaseCloudDb.getCollection('orders');

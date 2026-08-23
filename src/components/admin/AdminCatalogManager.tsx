@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { Product } from '../../types';
-import { useCartStore } from '../../store/useCartStore';
-import { AdminProductListingModal } from './AdminProductListingModal';
-import { Tag, Plus, Edit2, Trash2, Flame, Sliders, Download } from 'lucide-react';
+import { Tag, Plus, Edit2, Trash2, Flame, Sliders, Download, Cloud } from 'lucide-react';
+import { firebaseCloudDb } from '../../config/firebase';
 
 interface AdminCatalogManagerProps {
   onOpenTemplateEditor?: (product: Product) => void;
@@ -54,6 +53,21 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
     updateProduct(id, { onSale: !currentVal });
   };
 
+  const [syncStatus, setSyncStatus] = useState<string>('');
+
+  const handleSyncToCloud = async () => {
+    setSyncStatus('Syncing all frames to Cloud Firebase...');
+    try {
+      for (const prod of products) {
+        await firebaseCloudDb.setDocument('products', prod.id, prod);
+      }
+      setSyncStatus(`✔ Successfully pushed ${products.length} frames to Cloud Firebase!`);
+      setTimeout(() => setSyncStatus(''), 5000);
+    } catch (e) {
+      setSyncStatus('Sync error. Please try again.');
+    }
+  };
+
   const handleExportCatalogCode = () => {
     const fileContent = `import { Product } from '../types';\n\nexport const PRODUCTS: Product[] = ${JSON.stringify(products, null, 2)};\n`;
     const blob = new Blob([fileContent], { type: 'text/typescript' });
@@ -70,6 +84,13 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
   return (
     <div className="space-y-6 font-jost text-white select-none">
       
+      {/* Sync Status Banner */}
+      {syncStatus && (
+        <div className="p-3 bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-bold text-xs rounded-xl flex items-center justify-between animate-fade-in">
+          <span>{syncStatus}</span>
+        </div>
+      )}
+
       {/* Header & Add New Frame Button */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-[#121829] p-5 rounded-2xl border border-[#262E4A] shadow-xl">
         <div>
@@ -81,7 +102,15 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+          <button
+            onClick={handleSyncToCloud}
+            className="px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs rounded-xl shadow-lg transition-all flex items-center gap-1.5 shrink-0 cursor-pointer"
+            title="Upload all local frames to live Firebase Cloud Database"
+          >
+            <Cloud className="w-4 h-4" /> Push All Frames to Firebase Cloud
+          </button>
+
           <button
             onClick={handleExportCatalogCode}
             className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-lg transition-all flex items-center gap-1.5 shrink-0 cursor-pointer"
