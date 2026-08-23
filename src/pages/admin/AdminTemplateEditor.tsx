@@ -35,6 +35,7 @@ export const AdminTemplateEditor: React.FC<AdminTemplateEditorProps> = ({
   product,
   onBack,
 }) => {
+  if (!product) return null;
   const { updateProduct } = useCartStore();
 
   const [baseFrameUrl, setBaseFrameUrl] = useState<string>(
