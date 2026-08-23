@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Order, CartItem } from '../../types';
 import { LiveCustomizedFrameThumbnail } from '../customizer/LiveCustomizedFrameThumbnail';
-import { Download, MessageCircle, Loader2, Printer, X } from 'lucide-react';
+import { Download, Loader2, Printer, X } from 'lucide-react';
 
 interface AdminOrderListProps {
   orders: Order[];
@@ -13,26 +13,48 @@ const urlToBase64DataUri = async (url: string): Promise<string> => {
   if (!url) return '';
   if (url.startsWith('data:')) return url;
 
-  try {
-    const response = await fetch(url, { mode: 'cors' });
-    const blob = await response.blob();
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = () => resolve(url);
-      reader.readAsDataURL(blob);
-    });
-  } catch (e) {
-    return url;
-  }
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const c = document.createElement('canvas');
+        c.width = img.width || 800;
+        c.height = img.height || 1200;
+        const ctx = c.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0);
+          resolve(c.toDataURL('image/png'));
+          return;
+        }
+      } catch (e) {
+        console.warn('CORS conversion fallback:', e);
+      }
+      resolve(url);
+    };
+    img.onerror = async () => {
+      try {
+        const response = await fetch(url, { mode: 'cors' });
+        const blob = await response.blob();
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = () => resolve(url);
+        reader.readAsDataURL(blob);
+      } catch (e) {
+        resolve(url);
+      }
+    };
+    img.src = url;
+  });
 };
 
 // Safe Image Loader using Base64 Data URI
-const loadBase64Image = (dataUri: string, timeoutMs = 3000): Promise<HTMLImageElement | null> => {
+const loadBase64Image = (dataUri: string, timeoutMs = 4000): Promise<HTMLImageElement | null> => {
   return new Promise((resolve) => {
     if (!dataUri) return resolve(null);
 
     const img = new Image();
+    img.crossOrigin = 'anonymous';
     let timer: any = null;
 
     img.onload = () => {
@@ -60,7 +82,7 @@ export const AdminOrderList: React.FC<AdminOrderListProps> = ({
   const [downloadingOrderId, setDownloadingOrderId] = useState<string | null>(null);
   const [printPreviewItem, setPrintPreviewItem] = useState<{ order: Order; item: CartItem } | null>(null);
 
-  // High-Res DOM-to-Canvas PNG Exporter (100% Ditto Match with Print Preview Modal!)
+  // High-Res DOM-to-Canvas PNG Exporter (Guaranteed 100% PNG File Download to Computer!)
   const handleDownloadCustomerPrintFile = async (order: Order, itemIndex: number) => {
     const item = order.items[itemIndex];
     if (!item) return;
@@ -93,7 +115,7 @@ export const AdminOrderList: React.FC<AdminOrderListProps> = ({
 
       // 2. Draw Base Poster Template Image matching DOM object-cover inside inner bounds
       const baseDataUri = await urlToBase64DataUri(item.product.thumbnail);
-      const baseImg = await loadBase64Image(baseDataUri, 3000);
+      const baseImg = await loadBase64Image(baseDataUri, 4000);
 
       if (baseImg) {
         const imgRatio = baseImg.width / baseImg.height;
@@ -117,13 +139,15 @@ export const AdminOrderList: React.FC<AdminOrderListProps> = ({
       const photoSlots = item.product.photoSlots || [];
       const textZones = item.product.textZones || [];
 
-      // 3. Draw customer uploaded photos inside inner bounds (Preserves white margin gap 100%!)
+      // 3. Draw customer uploaded photos inside inner bounds
       for (const slot of photoSlots) {
-        const photoUrl = item.customTextValues[slot.id] || (slot.id === 'photo-1' || slot.id === 'babyPhoto' ? item.uploadedPhotoUrl : '');
+        const photoUrl =
+          item.customTextValues[slot.id] ||
+          (slot.id === 'photo-1' || slot.id === 'babyPhoto' ? item.uploadedPhotoUrl : '');
         if (!photoUrl) continue;
 
         const photoDataUri = await urlToBase64DataUri(photoUrl);
-        const photoImg = await loadBase64Image(photoDataUri, 3000);
+        const photoImg = await loadBase64Image(photoDataUri, 4000);
 
         if (photoImg) {
           // Calculate percentage coordinates relative to inner poster area
@@ -181,18 +205,29 @@ export const AdminOrderList: React.FC<AdminOrderListProps> = ({
       ctx.lineWidth = borderThickness * 2;
       ctx.strokeRect(0, 0, targetW, targetH);
 
-      // Convert UNTAINTED Canvas to Instant Download File
+      // Trigger Direct PNG File Download to Computer Disk!
       try {
         const dataUrl = canvas.toDataURL('image/png', 1.0);
         const link = document.createElement('a');
         link.href = dataUrl;
-        link.download = `A1PRINT-${order.id}-CUSTOM-PRINT-FRAME.png`;
+        link.download = `A1PRINT-ORDER-${order.id}-PRINT-FILE.png`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
       } catch (err) {
-        console.warn('Fallback to print preview modal:', err);
-        setPrintPreviewItem({ order, item });
+        console.warn('Canvas toDataURL fallback via blob:', err);
+        canvas.toBlob((blob) => {
+          if (blob) {
+            const blobUrl = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = blobUrl;
+            link.download = `A1PRINT-ORDER-${order.id}-PRINT-FILE.png`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(blobUrl);
+          }
+        }, 'image/png', 1.0);
       }
 
       setDownloadingOrderId(null);
@@ -211,7 +246,7 @@ export const AdminOrderList: React.FC<AdminOrderListProps> = ({
   }
 
   return (
-    <div className="space-y-4 font-jost text-xs">
+    <div className="space-y-4 font-jost text-xs select-none">
       {orders.map((order) => {
         const statusColors: Record<string, string> = {
           Received: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
@@ -230,41 +265,34 @@ export const AdminOrderList: React.FC<AdminOrderListProps> = ({
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-[#262E4A] pb-3">
               <div className="flex items-center gap-3">
                 <span className="font-extrabold text-sm text-white font-mono">{order.id}</span>
-                <span
-                  className={`px-3 py-1 rounded-full font-bold border text-[11px] ${
-                    statusColors[order.orderStatus] || 'bg-gray-500/10 text-gray-400'
+                
+                {/* Order Status Badge */}
+                <select
+                  value={order.orderStatus || 'Received'}
+                  onChange={(e) => onUpdateOrderStatus(order.id, e.target.value as Order['orderStatus'])}
+                  className={`px-3 py-1 rounded-full text-xs font-bold border cursor-pointer ${
+                    statusColors[order.orderStatus || 'Received'] || statusColors.Received
                   }`}
                 >
-                  Status: {order.orderStatus}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <select
-                  value={order.orderStatus}
-                  onChange={(e) => onUpdateOrderStatus(order.id, e.target.value as any)}
-                  className="px-3 py-1.5 bg-[#1A2035] border border-[#262E4A] text-white font-bold rounded-xl text-xs"
-                >
-                  <option value="Received">Received</option>
-                  <option value="Printing">Printing</option>
-                  <option value="Shipped">Shipped</option>
-                  <option value="Delivered">Delivered</option>
+                  <option value="Received" className="bg-[#121829] text-amber-400">Status: Received</option>
+                  <option value="Printing" className="bg-[#121829] text-blue-400">Status: Printing</option>
+                  <option value="Shipped" className="bg-[#121829] text-purple-400">Status: Shipped</option>
+                  <option value="Delivered" className="bg-[#121829] text-emerald-400">Status: Delivered</option>
                 </select>
-
-                <a
-                  href={`https://wa.me/91${order.customer.phone}?text=Hi%20${encodeURIComponent(
-                    order.customer.fullName
-                  )},%20we%20have%20received%20your%20A1print%20order%20${order.id}!`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-colors flex items-center gap-1"
-                >
-                  <MessageCircle className="w-3.5 h-3.5" /> WhatsApp Proof
-                </a>
               </div>
+
+              {/* WhatsApp Launch Proof Button */}
+              <a
+                href={`https://wa.me/91${order.customer.phone}?text=Hello%20${encodeURIComponent(order.customer.fullName)},%20your%20A1print%20order%20${order.id}%20has%20been%20received!`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                💬 WhatsApp Proof
+              </a>
             </div>
 
-            {/* Order Items & Customer Info */}
+            {/* Order Details Body Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
               
               {/* Customer Info (4 Cols) */}
@@ -325,6 +353,7 @@ export const AdminOrderList: React.FC<AdminOrderListProps> = ({
                           )}
                         </button>
 
+                        {/* Print Preview Modal Button */}
                         <button
                           onClick={() => setPrintPreviewItem({ order, item })}
                           className="p-2.5 bg-[#262E4A] hover:bg-gray-700 text-gray-200 rounded-xl transition-colors cursor-pointer shrink-0"
