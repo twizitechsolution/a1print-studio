@@ -1,16 +1,7 @@
 import { useState, useEffect } from 'react';
 import { CartItem, Order, Product } from '../types';
 import { PRODUCTS as INITIAL_PRODUCTS } from '../data/products';
-import { db } from '../config/firebase';
-import {
-  collection,
-  doc,
-  setDoc,
-  deleteDoc,
-  onSnapshot,
-  getDocs,
-  writeBatch,
-} from 'firebase/firestore';
+import { firebaseCloudDb } from '../config/firebase';
 
 const STORAGE_KEY = 'a1print_store_data_v6';
 
@@ -77,96 +68,51 @@ function notifyListeners() {
 }
 
 // -------------------------------------------------------------
-// Real-Time Firebase Firestore Synchronization
+// Real-Time Firebase Cloud Firestore Synchronization Engine
 // -------------------------------------------------------------
-let isFirebaseSubscribed = false;
+let isCloudSyncInitialized = false;
 
-function initFirebaseSync() {
-  if (isFirebaseSubscribed) return;
-  isFirebaseSubscribed = true;
+async function initCloudSync() {
+  if (isCloudSyncInitialized) return;
+  isCloudSyncInitialized = true;
 
   try {
-    // 1. Listen to Real-Time Product Catalog Updates from Cloud Firestore
-    const productsRef = collection(db, 'products');
-    onSnapshot(
-      productsRef,
-      (snapshot) => {
-        if (!snapshot.empty) {
-          const cloudProducts: Product[] = snapshot.docs.map((docSnap) => docSnap.data() as Product);
-          memoryData.products = cloudProducts;
-          notifyListeners();
-        } else {
-          // If Firestore collection is empty, seed initial 7 products into Firestore!
-          seedFirestoreProducts();
-        }
-      },
-      (error) => {
-        console.warn('Firestore Products onSnapshot fallback:', error);
-      }
-    );
+    // 1. Initial Cloud Sync for Products
+    const cloudProds = await firebaseCloudDb.getCollection('products');
+    if (cloudProds && cloudProds.length > 0) {
+      memoryData.products = cloudProds;
+      notifyListeners();
+    } else {
+      // Seed Cloud Database with 7 master products if Firestore collection is empty!
+      INITIAL_PRODUCTS.forEach((prod) => {
+        firebaseCloudDb.setDocument('products', prod.id, prod);
+      });
+    }
 
-    // 2. Listen to Real-Time Orders Queue from Cloud Firestore
-    const ordersRef = collection(db, 'orders');
-    onSnapshot(
-      ordersRef,
-      (snapshot) => {
-        if (!snapshot.empty) {
-          const cloudOrders: Order[] = snapshot.docs.map((docSnap) => docSnap.data() as Order);
-          memoryData.orders = cloudOrders;
+    // 2. Initial Cloud Sync for Orders
+    const cloudOrders = await firebaseCloudDb.getCollection('orders');
+    if (cloudOrders && cloudOrders.length > 0) {
+      memoryData.orders = cloudOrders;
+      notifyListeners();
+    }
+
+    // 3. Periodic Poll for Real-Time Multi-Device Sync every 5 seconds
+    setInterval(async () => {
+      try {
+        const freshProds = await firebaseCloudDb.getCollection('products');
+        if (freshProds && freshProds.length > 0) {
+          memoryData.products = freshProds;
           notifyListeners();
         }
-      },
-      (error) => {
-        console.warn('Firestore Orders onSnapshot fallback:', error);
-      }
-    );
-  } catch (err) {
-    console.warn('Firebase sync setup fallback to memory/local:', err);
-  }
-}
-
-// Seed all master products into Cloud Firestore if collection is empty
-async function seedFirestoreProducts() {
-  try {
-    const batch = writeBatch(db);
-    INITIAL_PRODUCTS.forEach((prod) => {
-      const pRef = doc(db, 'products', prod.id);
-      batch.set(pRef, prod);
-    });
-    await batch.commit();
-    console.log('Successfully seeded 7 master custom frame products into Cloud Firestore!');
+        const freshOrders = await firebaseCloudDb.getCollection('orders');
+        if (freshOrders && freshOrders.length > 0) {
+          memoryData.orders = freshOrders;
+          notifyListeners();
+        }
+      } catch (e) {}
+    }, 5000);
   } catch (e) {
-    console.warn('Firestore seed warning:', e);
-  }
-}
-
-// Write a single product to Cloud Firestore
-async function syncProductToCloud(product: Product) {
-  try {
-    const pRef = doc(db, 'products', product.id);
-    await setDoc(pRef, product, { merge: true });
-  } catch (e) {
-    console.warn('Cloud sync product error:', e);
-  }
-}
-
-// Delete a single product from Cloud Firestore
-async function deleteProductFromCloud(productId: string) {
-  try {
-    const pRef = doc(db, 'products', productId);
-    await deleteDoc(pRef);
-  } catch (e) {
-    console.warn('Cloud delete product error:', e);
-  }
-}
-
-// Write a single order to Cloud Firestore
-async function syncOrderToCloud(order: Order) {
-  try {
-    const oRef = doc(db, 'orders', order.id);
-    await setDoc(oRef, order, { merge: true });
-  } catch (e) {
-    console.warn('Cloud sync order error:', e);
+    console.warn('Cloud sync initialization fallback:', e);
   }
 }
 
@@ -174,7 +120,7 @@ export function useCartStore() {
   const [store, setStore] = useState<StoreData>(memoryData);
 
   useEffect(() => {
-    initFirebaseSync();
+    initCloudSync();
     const listener = () => setStore({ ...memoryData });
     listeners.add(listener);
     return () => {
@@ -182,19 +128,19 @@ export function useCartStore() {
     };
   }, []);
 
-  // E-Commerce Actions with Real-Time Cloud Firestore Persistence
+  // E-Commerce Actions with Cloud Persistence
 
   const addProduct = (newProduct: Product) => {
     memoryData.products = [...memoryData.products, newProduct];
     notifyListeners();
-    syncProductToCloud(newProduct);
+    firebaseCloudDb.setDocument('products', newProduct.id, newProduct);
   };
 
   const updateProduct = (id: string, updates: Partial<Product>) => {
     memoryData.products = memoryData.products.map((p) => {
       if (p.id === id) {
         const updated = { ...p, ...updates };
-        syncProductToCloud(updated);
+        firebaseCloudDb.setDocument('products', updated.id, updated);
         return updated;
       }
       return p;
@@ -205,7 +151,7 @@ export function useCartStore() {
   const deleteProduct = (id: string) => {
     memoryData.products = memoryData.products.filter((p) => p.id !== id);
     notifyListeners();
-    deleteProductFromCloud(id);
+    firebaseCloudDb.deleteDocument('products', id);
   };
 
   const addToCart = (
@@ -283,8 +229,8 @@ export function useCartStore() {
     memoryData.items = [];
     notifyListeners();
 
-    // Persist new order live to Cloud Firestore
-    syncOrderToCloud(newOrder);
+    // Persist new order live to Cloud Firestore REST Database
+    firebaseCloudDb.setDocument('orders', newOrder.id, newOrder);
 
     return newOrder;
   };
@@ -293,7 +239,7 @@ export function useCartStore() {
     memoryData.orders = memoryData.orders.map((ord) => {
       if (ord.id === orderId) {
         const updated = { ...ord, orderStatus: status };
-        syncOrderToCloud(updated);
+        firebaseCloudDb.setDocument('orders', updated.id, updated);
         return updated;
       }
       return ord;
