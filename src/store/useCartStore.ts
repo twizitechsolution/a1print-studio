@@ -1,6 +1,16 @@
 import { useState, useEffect } from 'react';
 import { CartItem, Order, Product } from '../types';
 import { PRODUCTS as INITIAL_PRODUCTS } from '../data/products';
+import { db } from '../config/firebase';
+import {
+  collection,
+  doc,
+  setDoc,
+  deleteDoc,
+  onSnapshot,
+  getDocs,
+  writeBatch,
+} from 'firebase/firestore';
 
 const STORAGE_KEY = 'a1print_store_data_v6';
 
@@ -54,266 +64,250 @@ const defaultOrder: Order = {
   createdAt: new Date().toISOString(),
 };
 
-// Automatic Legacy Storage Key Purger (Reclaims 100% of browser localStorage 5MB quota!)
-function cleanupLegacyKeys() {
-  try {
-    const keysToRemove: string[] = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith('a1print_store_data_') && key !== STORAGE_KEY) {
-        keysToRemove.push(key);
-      }
-    }
-    keysToRemove.forEach((k) => {
-      console.log('Purging legacy storage key to free up quota:', k);
-      localStorage.removeItem(k);
-    });
-  } catch (e) {
-    console.warn('Failed to cleanup legacy storage keys:', e);
-  }
-}
-
-// Global In-Memory Store Cache (Guarantees zero state loss in active JavaScript memory!)
-let memoryData: StoreData | null = null;
-
-function getStoredData(): StoreData {
-  if (memoryData) {
-    return memoryData;
-  }
-
-  // Purge legacy storage keys first to free up disk quota
-  cleanupLegacyKeys();
-
-  let storedProducts: Product[] = [];
-  let storedItems: CartItem[] = [];
-  let storedOrders: Order[] = [];
-
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      storedProducts = parsed.products || [];
-      storedItems = parsed.items || [];
-      storedOrders = parsed.orders || [];
-    }
-  } catch (e) {
-    console.error('Failed to read store data:', e);
-  }
-
-  // GUARANTEE: INITIAL_PRODUCTS from code (all 3 core template frames) are ALWAYS present in the catalog!
-  const storedMap = new Map(storedProducts.map((p) => [p.id, p]));
-
-  // Merge INITIAL_PRODUCTS from src/data/products.ts with any saved admin customizations
-  const mergedProducts = INITIAL_PRODUCTS.map((initProd) => {
-    const stored = storedMap.get(initProd.id);
-    if (stored) {
-      return {
-        ...initProd,
-        ...stored,
-        photoSlots: stored.photoSlots && stored.photoSlots.length > 0 ? stored.photoSlots : initProd.photoSlots,
-        textZones: stored.textZones && stored.textZones.length > 0 ? stored.textZones : initProd.textZones,
-      };
-    }
-    return initProd;
-  });
-
-  // Add any custom admin-created products that aren't in INITIAL_PRODUCTS
-  const customAdminProducts = storedProducts.filter(
-    (sp) => !INITIAL_PRODUCTS.some((ip) => ip.id === sp.id)
-  );
-
-  const finalProducts = [...mergedProducts, ...customAdminProducts];
-
-  memoryData = {
-    products: finalProducts,
-    items: storedItems,
-    orders: storedOrders.length > 0 ? storedOrders : [defaultOrder],
-  };
-
-  return memoryData;
-}
-
-function saveStoredData(data: StoreData) {
-  // Always update in-memory state FIRST!
-  memoryData = data;
-
-  cleanupLegacyKeys();
-
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  } catch (e) {
-    console.warn('localStorage quota exceeded, performing quota-proof disk sanitization:', e);
-    try {
-      // Strip heavy customizedFramePreviewUrl strings and truncate non-essential blobs for disk persistence
-      const sanitizedItems = data.items.map((item) => ({
-        ...item,
-        customizedFramePreviewUrl: undefined,
-      }));
-
-      const sanitizedProducts = data.products.map((p) => ({
-        ...p,
-        images: p.images ? [p.thumbnail] : [],
-      }));
-
-      const sanitizedOrders = data.orders.slice(0, 30).map((ord) => ({
-        ...ord,
-        items: ord.items.map((item) => ({
-          ...item,
-          customizedFramePreviewUrl: undefined,
-        })),
-      }));
-
-      const sanitizedData: StoreData = {
-        products: sanitizedProducts,
-        items: sanitizedItems,
-        orders: sanitizedOrders,
-      };
-
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitizedData));
-    } catch (err) {
-      console.error('Failed to save sanitized store data:', err);
-    }
-  }
-}
-
-// Global BroadcastChannel & Event Listener for Real-Time Synchronization across components & tabs
-let broadcastChannel: BroadcastChannel | null = null;
-try {
-  if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
-    broadcastChannel = new BroadcastChannel('a1print_store_channel');
-    broadcastChannel.onmessage = (event) => {
-      if (event.data && event.data.type === 'STORE_UPDATED' && event.data.payload) {
-        memoryData = event.data.payload;
-        saveStoredData(event.data.payload);
-        listeners.forEach((l) => l());
-      }
-    };
-  }
-} catch (e) {
-  console.warn('BroadcastChannel initialization fallback:', e);
-}
+// Global In-Memory Data Store Cache
+let memoryData: StoreData = {
+  products: INITIAL_PRODUCTS,
+  items: [],
+  orders: [defaultOrder],
+};
 
 const listeners = new Set<() => void>();
 function notifyListeners() {
   listeners.forEach((l) => l());
-  if (broadcastChannel && memoryData) {
-    try {
-      broadcastChannel.postMessage({ type: 'STORE_UPDATED', payload: memoryData });
-    } catch (e) {
-      console.warn('Broadcast postMessage fallback:', e);
-    }
+}
+
+// -------------------------------------------------------------
+// Real-Time Firebase Firestore Synchronization
+// -------------------------------------------------------------
+let isFirebaseSubscribed = false;
+
+function initFirebaseSync() {
+  if (isFirebaseSubscribed) return;
+  isFirebaseSubscribed = true;
+
+  try {
+    // 1. Listen to Real-Time Product Catalog Updates from Cloud Firestore
+    const productsRef = collection(db, 'products');
+    onSnapshot(
+      productsRef,
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const cloudProducts: Product[] = snapshot.docs.map((docSnap) => docSnap.data() as Product);
+          memoryData.products = cloudProducts;
+          notifyListeners();
+        } else {
+          // If Firestore collection is empty, seed initial 7 products into Firestore!
+          seedFirestoreProducts();
+        }
+      },
+      (error) => {
+        console.warn('Firestore Products onSnapshot fallback:', error);
+      }
+    );
+
+    // 2. Listen to Real-Time Orders Queue from Cloud Firestore
+    const ordersRef = collection(db, 'orders');
+    onSnapshot(
+      ordersRef,
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const cloudOrders: Order[] = snapshot.docs.map((docSnap) => docSnap.data() as Order);
+          memoryData.orders = cloudOrders;
+          notifyListeners();
+        }
+      },
+      (error) => {
+        console.warn('Firestore Orders onSnapshot fallback:', error);
+      }
+    );
+  } catch (err) {
+    console.warn('Firebase sync setup fallback to memory/local:', err);
+  }
+}
+
+// Seed all master products into Cloud Firestore if collection is empty
+async function seedFirestoreProducts() {
+  try {
+    const batch = writeBatch(db);
+    INITIAL_PRODUCTS.forEach((prod) => {
+      const pRef = doc(db, 'products', prod.id);
+      batch.set(pRef, prod);
+    });
+    await batch.commit();
+    console.log('Successfully seeded 7 master custom frame products into Cloud Firestore!');
+  } catch (e) {
+    console.warn('Firestore seed warning:', e);
+  }
+}
+
+// Write a single product to Cloud Firestore
+async function syncProductToCloud(product: Product) {
+  try {
+    const pRef = doc(db, 'products', product.id);
+    await setDoc(pRef, product, { merge: true });
+  } catch (e) {
+    console.warn('Cloud sync product error:', e);
+  }
+}
+
+// Delete a single product from Cloud Firestore
+async function deleteProductFromCloud(productId: string) {
+  try {
+    const pRef = doc(db, 'products', productId);
+    await deleteDoc(pRef);
+  } catch (e) {
+    console.warn('Cloud delete product error:', e);
+  }
+}
+
+// Write a single order to Cloud Firestore
+async function syncOrderToCloud(order: Order) {
+  try {
+    const oRef = doc(db, 'orders', order.id);
+    await setDoc(oRef, order, { merge: true });
+  } catch (e) {
+    console.warn('Cloud sync order error:', e);
   }
 }
 
 export function useCartStore() {
-  const [data, setData] = useState<StoreData>(getStoredData());
+  const [store, setStore] = useState<StoreData>(memoryData);
 
   useEffect(() => {
-    const listener = () => setData(getStoredData());
+    initFirebaseSync();
+    const listener = () => setStore({ ...memoryData });
     listeners.add(listener);
     return () => {
       listeners.delete(listener);
     };
   }, []);
 
-  const updateStore = (updater: (prev: StoreData) => StoreData) => {
-    const current = getStoredData();
-    const next = updater(current);
-    saveStoredData(next);
-    setData(next);
+  // E-Commerce Actions with Real-Time Cloud Firestore Persistence
+
+  const addProduct = (newProduct: Product) => {
+    memoryData.products = [...memoryData.products, newProduct];
+    notifyListeners();
+    syncProductToCloud(newProduct);
+  };
+
+  const updateProduct = (id: string, updates: Partial<Product>) => {
+    memoryData.products = memoryData.products.map((p) => {
+      if (p.id === id) {
+        const updated = { ...p, ...updates };
+        syncProductToCloud(updated);
+        return updated;
+      }
+      return p;
+    });
     notifyListeners();
   };
 
-  const addProduct = (newProd: Product) => {
-    updateStore((prev) => ({
-      ...prev,
-      products: [newProd, ...prev.products.filter((p) => p.id !== newProd.id)],
-    }));
-  };
-
-  const updateProduct = (id: string, updated: Partial<Product>) => {
-    updateStore((prev) => ({
-      ...prev,
-      products: prev.products.map((p) => (p.id === id ? { ...p, ...updated } : p)),
-    }));
-  };
-
   const deleteProduct = (id: string) => {
-    updateStore((prev) => ({
-      ...prev,
-      products: prev.products.filter((p) => p.id !== id),
-    }));
+    memoryData.products = memoryData.products.filter((p) => p.id !== id);
+    notifyListeners();
+    deleteProductFromCloud(id);
   };
 
-  const addToCart = (itemData: Omit<CartItem, 'id'>) => {
+  const addToCart = (
+    product: Product,
+    selectedSize: Product['sizes'][0],
+    selectedFrame: Product['frames'][0],
+    uploadedPhotoUrl: string,
+    customTextValues: Record<string, string>,
+    quantity = 1,
+    customizedFramePreviewUrl?: string
+  ) => {
+    const itemTotalPrice = selectedSize.price * quantity;
     const newItem: CartItem = {
-      ...itemData,
-      id: `cart-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id: `cart-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      product,
+      selectedSize,
+      selectedFrame,
+      uploadedPhotoUrl,
+      customizedFramePreviewUrl,
+      customTextValues,
+      quantity,
+      itemTotalPrice,
     };
-    updateStore((prev) => ({
-      ...prev,
-      items: [...prev.items, newItem],
-    }));
+
+    memoryData.items = [...memoryData.items, newItem];
+    notifyListeners();
   };
 
-  const removeFromCart = (id: string) => {
-    updateStore((prev) => ({
-      ...prev,
-      items: prev.items.filter((item) => item.id !== id),
-    }));
+  const removeFromCart = (itemId: string) => {
+    memoryData.items = memoryData.items.filter((i) => i.id !== itemId);
+    notifyListeners();
   };
 
-  const updateQuantity = (id: string, quantity: number) => {
-    if (quantity <= 0) {
-      removeFromCart(id);
-      return;
-    }
-    updateStore((prev) => ({
-      ...prev,
-      items: prev.items.map((item) =>
-        item.id === id
-          ? {
-              ...item,
-              quantity,
-              itemTotalPrice: item.selectedSize.price * quantity,
-            }
-          : item
-      ),
-    }));
+  const updateQuantity = (itemId: string, delta: number) => {
+    memoryData.items = memoryData.items
+      .map((item) => {
+        if (item.id === itemId) {
+          const newQty = item.quantity + delta;
+          if (newQty <= 0) return null;
+          return {
+            ...item,
+            quantity: newQty,
+            itemTotalPrice: item.selectedSize.price * newQty,
+          };
+        }
+        return item;
+      })
+      .filter(Boolean) as CartItem[];
+
+    notifyListeners();
   };
 
-  const placeOrder = (orderData: Omit<Order, 'id' | 'createdAt'>): Order => {
+  const placeOrder = (
+    customer: Order['customer'],
+    paymentMethod: Order['paymentMethod']
+  ): Order => {
+    const subtotal = memoryData.items.reduce((sum, item) => sum + item.itemTotalPrice, 0);
+    const total = subtotal;
+
     const newOrder: Order = {
-      ...orderData,
       id: `ORD-${Math.floor(100000 + Math.random() * 900000)}`,
+      customer,
+      items: [...memoryData.items],
+      subtotal,
+      discount: 0,
+      shipping: 0,
+      total,
+      paymentMethod,
+      paymentStatus: paymentMethod === 'COD' ? 'COD' : 'Paid',
+      orderStatus: 'Received',
       createdAt: new Date().toISOString(),
     };
 
-    updateStore((prev) => ({
-      ...prev,
-      orders: [newOrder, ...prev.orders],
-      items: [], // Clear cart
-    }));
+    memoryData.orders = [newOrder, ...memoryData.orders];
+    memoryData.items = [];
+    notifyListeners();
+
+    // Persist new order live to Cloud Firestore
+    syncOrderToCloud(newOrder);
 
     return newOrder;
   };
 
   const updateOrderStatus = (orderId: string, status: Order['orderStatus']) => {
-    updateStore((prev) => ({
-      ...prev,
-      orders: prev.orders.map((order) =>
-        order.id === orderId ? { ...order, orderStatus: status } : order
-      ),
-    }));
+    memoryData.orders = memoryData.orders.map((ord) => {
+      if (ord.id === orderId) {
+        const updated = { ...ord, orderStatus: status };
+        syncOrderToCloud(updated);
+        return updated;
+      }
+      return ord;
+    });
+    notifyListeners();
   };
 
-  const subtotal = data.items.reduce((sum, item) => sum + item.itemTotalPrice, 0);
-  const totalItems = data.items.reduce((sum, item) => sum + item.quantity, 0);
+  const subtotal = store.items.reduce((sum, item) => sum + item.itemTotalPrice, 0);
+  const totalItems = store.items.reduce((sum, item) => sum + item.quantity, 0);
 
   return {
-    products: data.products,
-    items: data.items,
-    orders: data.orders,
+    products: store.products,
+    items: store.items,
+    orders: store.orders,
     addProduct,
     updateProduct,
     deleteProduct,
