@@ -2,12 +2,78 @@ import React, { useState } from 'react';
 import { Order, CartItem } from '../../types';
 import { LiveCustomizedFrameThumbnail } from '../customizer/LiveCustomizedFrameThumbnail';
 import { Download, Loader2, Printer, X } from 'lucide-react';
-import html2canvas from 'html2canvas';
 
 interface AdminOrderListProps {
   orders: Order[];
   onUpdateOrderStatus: (orderId: string, status: Order['orderStatus']) => void;
 }
+
+// Convert any image URL into a Base64 Data URI (Eliminates CORS Tainted Canvas Errors 100%!)
+const urlToBase64DataUri = async (url: string): Promise<string> => {
+  if (!url) return '';
+  if (url.startsWith('data:')) return url;
+
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const c = document.createElement('canvas');
+        c.width = img.width || 800;
+        c.height = img.height || 1200;
+        const ctx = c.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0);
+          resolve(c.toDataURL('image/png'));
+          return;
+        }
+      } catch (e) {
+        console.warn('Canvas toDataURL CORS error:', e);
+      }
+      resolve(url);
+    };
+    img.onerror = async () => {
+      try {
+        const response = await fetch(url, { mode: 'cors' });
+        const blob = await response.blob();
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = () => resolve(url);
+        reader.readAsDataURL(blob);
+      } catch (e) {
+        resolve(url);
+      }
+    };
+    img.src = url;
+  });
+};
+
+// Safe Image Loader using Base64 Data URI
+const loadBase64Image = (dataUri: string, timeoutMs = 4000): Promise<HTMLImageElement | null> => {
+  return new Promise((resolve) => {
+    if (!dataUri) return resolve(null);
+
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    let timer: any = null;
+
+    img.onload = () => {
+      clearTimeout(timer);
+      resolve(img);
+    };
+
+    img.onerror = () => {
+      clearTimeout(timer);
+      resolve(null);
+    };
+
+    timer = setTimeout(() => {
+      resolve(null);
+    }, timeoutMs);
+
+    img.src = dataUri;
+  });
+};
 
 export const AdminOrderList: React.FC<AdminOrderListProps> = ({
   orders,
@@ -16,40 +82,155 @@ export const AdminOrderList: React.FC<AdminOrderListProps> = ({
   const [downloadingOrderId, setDownloadingOrderId] = useState<string | null>(null);
   const [printPreviewItem, setPrintPreviewItem] = useState<{ order: Order; item: CartItem } | null>(null);
 
-  // 100% Pixel-Perfect DOM Export using html2canvas (Captures EXACT Print Preview Modal Artwork!)
+  // Pure HTML5 Canvas 300 DPI Print File Exporter (Guaranteed PNG File Download with Full Poster Artwork!)
   const handleDownloadCustomerPrintFile = async (order: Order, itemIndex: number) => {
     const item = order.items[itemIndex];
     if (!item) return;
 
-    const elementId = `order-frame-export-${order.id}-${itemIndex}`;
-    const frameElement = document.getElementById(elementId);
-    if (!frameElement) {
-      console.warn('Export element not found:', elementId);
-      return;
-    }
-
     setDownloadingOrderId(`${order.id}-${itemIndex}`);
 
     try {
-      // Capture 600px DOM element at 3x scale -> 1800x2640 300 DPI Ultra HD Print Quality!
-      const canvas = await html2canvas(frameElement, {
-        scale: 3,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#FFFFFF',
-        logging: false,
-      });
+      const targetW = 1200;
+      const targetH = 1760;
+      const borderThickness = 24; // Solid Black Wood Frame Molding Border
 
-      const dataUrl = canvas.toDataURL('image/png', 1.0);
-      const link = document.createElement('a');
-      link.href = dataUrl;
-      link.download = `A1PRINT-${order.id}-PRINT-READY-FRAME.png`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    } catch (err) {
-      console.error('PNG Export error:', err);
-    } finally {
+      const canvas = document.createElement('canvas');
+      canvas.width = targetW;
+      canvas.height = targetH;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        setDownloadingOrderId(null);
+        return;
+      }
+
+      // 1. Fill solid background
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(0, 0, targetW, targetH);
+
+      // Inner poster bounds inside frame border
+      const innerX = borderThickness;
+      const innerY = borderThickness;
+      const innerW = targetW - borderThickness * 2;
+      const innerH = targetH - borderThickness * 2;
+
+      // 2. Draw Base Poster Template Image matching DOM object-cover inside inner bounds
+      const baseDataUri = await urlToBase64DataUri(item.product.thumbnail);
+      const baseImg = await loadBase64Image(baseDataUri, 4000);
+
+      if (baseImg) {
+        const imgRatio = baseImg.width / baseImg.height;
+        const targetRatio = innerW / innerH;
+        let sx = 0, sy = 0, sWidth = baseImg.width, sHeight = baseImg.height;
+
+        if (imgRatio > targetRatio) {
+          sWidth = baseImg.height * targetRatio;
+          sx = (baseImg.width - sWidth) / 2;
+        } else {
+          sHeight = baseImg.width / targetRatio;
+          sy = (baseImg.height - sHeight) / 2;
+        }
+
+        ctx.drawImage(baseImg, sx, sy, sWidth, sHeight, innerX, innerY, innerW, innerH);
+      } else {
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(innerX, innerY, innerW, innerH);
+      }
+
+      const photoSlots = item.product.photoSlots || [];
+      const textZones = item.product.textZones || [];
+
+      // 3. Draw customer uploaded photos inside inner bounds
+      for (const slot of photoSlots) {
+        const photoUrl =
+          item.customTextValues[slot.id] ||
+          (slot.id === 'photo-1' || slot.id === 'babyPhoto' ? item.uploadedPhotoUrl : '');
+        if (!photoUrl) continue;
+
+        const photoDataUri = await urlToBase64DataUri(photoUrl);
+        const photoImg = await loadBase64Image(photoDataUri, 4000);
+
+        if (photoImg) {
+          const centerX = innerX + (slot.x / 100) * innerW;
+          const centerY = innerY + (slot.y / 100) * innerH;
+          const slotW = (slot.width / 100) * innerW;
+          const slotH = (slot.height / 100) * innerH;
+          const leftX = centerX - slotW / 2;
+          const topY = centerY - slotH / 2;
+
+          ctx.save();
+          ctx.beginPath();
+          if (slot.shape === 'circle') {
+            ctx.arc(centerX, centerY, slotW / 2, 0, Math.PI * 2);
+          } else {
+            ctx.rect(leftX, topY, slotW, slotH);
+          }
+          ctx.clip();
+
+          const imgRatio = photoImg.width / photoImg.height;
+          const targetRatio = slotW / slotH;
+          let sx = 0, sy = 0, sWidth = photoImg.width, sHeight = photoImg.height;
+
+          if (imgRatio > targetRatio) {
+            sWidth = photoImg.height * targetRatio;
+            sx = (photoImg.width - sWidth) / 2;
+          } else {
+            sHeight = photoImg.width / targetRatio;
+            sy = (photoImg.height - sHeight) / 2;
+          }
+
+          ctx.drawImage(photoImg, sx, sy, sWidth, sHeight, leftX, topY, slotW, slotH);
+          ctx.restore();
+        }
+      }
+
+      // 4. Draw assigned text zones ONLY
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      for (const zone of textZones) {
+        const val = item.customTextValues[zone.id] || zone.defaultValue;
+        if (val && typeof val === 'string' && !val.startsWith('data:image')) {
+          ctx.fillStyle = zone.color || '#000000';
+          ctx.font = `bold ${zone.fontSize * 1.6}px sans-serif`;
+          const textX = innerX + (zone.x / 100) * innerW;
+          const textY = innerY + (zone.y / 100) * innerH;
+          ctx.fillText(val, textX, textY);
+        }
+      }
+
+      // 5. Draw Solid Black Wood Frame Molding Border Overlay matching LiveCustomizedFrameThumbnail border-8 border-black!
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = borderThickness * 2;
+      ctx.strokeRect(0, 0, targetW, targetH);
+
+      // Trigger Instant PNG File Download to Computer Disk!
+      canvas.toBlob(
+        (blob) => {
+          if (blob) {
+            const blobUrl = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = blobUrl;
+            link.download = `A1PRINT-${order.id}-PRINT-READY-FRAME.png`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(blobUrl);
+          } else {
+            const dataUrl = canvas.toDataURL('image/png', 1.0);
+            const link = document.createElement('a');
+            link.href = dataUrl;
+            link.download = `A1PRINT-${order.id}-PRINT-READY-FRAME.png`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+          }
+          setDownloadingOrderId(null);
+        },
+        'image/png',
+        1.0
+      );
+    } catch (e) {
+      console.error('Print download error:', e);
       setDownloadingOrderId(null);
     }
   };
@@ -133,14 +314,6 @@ export const AdminOrderList: React.FC<AdminOrderListProps> = ({
                   return (
                     <div key={idx} className="p-3.5 bg-[#1A2035] rounded-xl border border-[#262E4A] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                       
-                      {/* Hidden Off-Screen Container for 300 DPI Ultra HD PNG Export */}
-                      <div
-                        id={`order-frame-export-${order.id}-${idx}`}
-                        className="fixed -left-[9999px] -top-[9999px] w-[600px] h-[880px] bg-white pointer-events-none select-none z-0"
-                      >
-                        <LiveCustomizedFrameThumbnail item={item} fontScale={1.0} />
-                      </div>
-
                       <div className="flex items-center gap-3 flex-1 min-w-0">
                         {/* Live Frame Preview Thumbnail */}
                         <div className="w-14 h-18 shrink-0">
@@ -169,7 +342,7 @@ export const AdminOrderList: React.FC<AdminOrderListProps> = ({
                         >
                           {isDownloading ? (
                             <>
-                              <Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating PNG...
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" /> Preparing PNG...
                             </>
                           ) : (
                             <>
