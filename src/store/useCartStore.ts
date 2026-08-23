@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { CartItem, Order, Product } from '../types';
 import { PRODUCTS as INITIAL_PRODUCTS } from '../data/products';
 
-const STORAGE_KEY = 'a1print_store_data_v5';
+const STORAGE_KEY = 'a1print_store_data_v6';
 
 interface StoreData {
   products: Product[];
