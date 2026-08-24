@@ -5,6 +5,7 @@ import { generateHighResPrintFile } from '../../utils/printExporter';
 import { Eye, ArrowRight, Image as ImageIcon, Sparkles, Loader2, X, ShieldCheck, Truck, CreditCard, RefreshCw, Star, Tag, Clock, Flame, Wand2 } from 'lucide-react';
 import { InteractiveCalendarZone } from './InteractiveCalendarZone';
 import { getRandomBirthdayMessage } from '../../data/messageBank';
+import { getFrameShapeStyles } from '../../utils/shapeStyles';
 
 interface UniversalFrameCustomizerProps {
   template: UniversalFrameTemplate;
@@ -286,22 +287,19 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
               const photoSrc = photoValues[slot.id];
               if (!photoSrc) return null; // Transparent layer: Allows base poster sample artwork to show through!
 
+              const shapeStyles = getFrameShapeStyles(slot.shape);
+
               return (
                 <div
                   key={slot.id}
-                  className={`absolute overflow-hidden p-0 border-0 shadow-xs bg-transparent ${
-                    slot.shape === 'circle'
-                      ? 'rounded-full'
-                      : slot.shape === 'rounded'
-                      ? 'rounded-xl'
-                      : 'rounded-none'
-                  }`}
+                  className="absolute overflow-hidden p-0 border-0 shadow-xs bg-transparent"
                   style={{
                     left: `${slot.x}%`,
                     top: `${slot.y}%`,
                     width: `${slot.width}%`,
                     height: `${slot.height}%`,
                     transform: 'translate(-50%, -50%)',
+                    ...shapeStyles,
                   }}
                 >
                   <img src={photoSrc} alt={slot.label} className="w-full h-full object-cover rounded-[inherit]" />
@@ -351,15 +349,17 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
               return (
                 <div
                   key={zone.id}
-                  className="absolute transform -translate-x-1/2 -translate-y-1/2 whitespace-nowrap"
+                  className="absolute transform -translate-x-1/2 -translate-y-1/2 whitespace-pre-wrap break-words leading-tight"
                   style={{
                     left: `${zone.x}%`,
                     top: `${zone.y}%`,
+                    width: zone.maxWidth ? `${zone.maxWidth}%` : '85%',
+                    maxWidth: zone.maxWidth ? `${zone.maxWidth}%` : '85%',
                     color: zone.color,
                     fontFamily: zone.fontFamily,
                     fontSize: `${zone.fontSize * 0.75}px`,
                     fontWeight: 'bold',
-                    textAlign: zone.align,
+                    textAlign: zone.align || 'center',
                   }}
                 >
                   {val}

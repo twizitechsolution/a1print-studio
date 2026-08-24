@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Product } from '../../types';
-import { PhotoSlotConfig, TextZoneConfig } from '../../types/template';
+import { PhotoSlotConfig, TextZoneConfig, UniversalFrameTemplate } from '../../types/template';
+import { getFrameShapeStyles } from '../../utils/shapeStyles';
 import { useCartStore } from '../../store/useCartStore';
 import { compressImageBase64 } from '../../utils/imageCompressor';
 import {
@@ -432,6 +433,8 @@ export const AdminTemplateEditor: React.FC<AdminTemplateEditorProps> = ({
               {/* Rendered Photo Slots (Exclusively for this product!) */}
               {photoSlots.map((slot) => {
                 const isActive = activeLayerId === slot.id;
+                const shapeStyles = getFrameShapeStyles(slot.shape);
+
                 return (
                   <div
                     key={slot.id}
@@ -444,12 +447,6 @@ export const AdminTemplateEditor: React.FC<AdminTemplateEditorProps> = ({
                       isActive
                         ? 'border-2 border-[#2563EB] ring-4 ring-blue-500/40 z-30'
                         : 'border-2 border-dashed border-sky-400/80 hover:border-sky-500 z-20'
-                    } ${
-                      slot.shape === 'circle'
-                        ? 'rounded-full'
-                        : slot.shape === 'rounded'
-                        ? 'rounded-xl'
-                        : 'rounded-none'
                     }`}
                     style={{
                       left: `${slot.x}%`,
@@ -457,6 +454,7 @@ export const AdminTemplateEditor: React.FC<AdminTemplateEditorProps> = ({
                       width: `${slot.width}%`,
                       height: `${slot.height}%`,
                       transform: 'translate(-50%, -50%)',
+                      ...shapeStyles,
                     }}
                   >
                     <div className="w-full h-full overflow-hidden flex items-center justify-center rounded-[inherit] bg-blue-500/10 backdrop-blur-2xs">
@@ -490,7 +488,7 @@ export const AdminTemplateEditor: React.FC<AdminTemplateEditorProps> = ({
                       setActiveLayerId(zone.id);
                       setIsDragging(true);
                     }}
-                    className={`absolute cursor-grab active:cursor-grabbing transition-all px-1.5 py-0.5 rounded-md ${
+                    className={`absolute cursor-grab active:cursor-grabbing transition-all px-1.5 py-0.5 rounded-md whitespace-pre-wrap break-words leading-tight ${
                       isActive
                         ? 'border-2 border-[#9333EA] bg-purple-500/20 z-30 ring-2 ring-purple-500/40'
                         : 'hover:border border-dashed border-gray-400 z-20'
@@ -498,12 +496,14 @@ export const AdminTemplateEditor: React.FC<AdminTemplateEditorProps> = ({
                     style={{
                       left: `${zone.x}%`,
                       top: `${zone.y}%`,
+                      width: zone.maxWidth ? `${zone.maxWidth}%` : '85%',
+                      maxWidth: zone.maxWidth ? `${zone.maxWidth}%` : '85%',
                       transform: 'translate(-50%, -50%)',
                       color: zone.color,
                       fontFamily: zone.fontFamily,
                       fontSize: `${zone.fontSize * 0.7}px`,
                       fontWeight: 'bold',
-                      textAlign: zone.align,
+                      textAlign: zone.align || 'center',
                     }}
                   >
                     {zone.defaultValue}
@@ -698,9 +698,20 @@ export const AdminTemplateEditor: React.FC<AdminTemplateEditorProps> = ({
                     }
                     className="w-full px-3 py-2.5 bg-gray-50 border border-gray-300 rounded-xl font-bold"
                   >
-                    <option value="rectangle">Square / Rectangle Cutout</option>
-                    <option value="circle">Auto Circle Cutout</option>
-                    <option value="rounded">Rounded Box Cutout</option>
+                    <option value="rectangle">Square / Rectangle Frame</option>
+                    <option value="circle">Circle Frame</option>
+                    <option value="rounded">Rounded Rectangle Frame</option>
+                    <option value="oval">Oval Frame</option>
+                    <option value="heart">Heart Frame ❤️</option>
+                    <option value="star">Star Frame ⭐</option>
+                    <option value="triangle">Triangle Frame</option>
+                    <option value="diamond">Diamond Frame</option>
+                    <option value="hexagon">Hexagon Frame</option>
+                    <option value="pentagon">Pentagon Frame</option>
+                    <option value="arch">Arch Frame</option>
+                    <option value="shield">Shield Frame</option>
+                    <option value="cloud">Cloud Frame</option>
+                    <option value="polaroid">Polaroid Frame</option>
                   </select>
                 </div>
 
@@ -722,24 +733,50 @@ export const AdminTemplateEditor: React.FC<AdminTemplateEditorProps> = ({
                 </div>
 
                 <div className="space-y-1">
-                  <label className="font-bold text-gray-700">Default Value :</label>
-                  <input
-                    type="text"
+                  <label className="font-bold text-gray-700">Default Value / Paragraph Text :</label>
+                  <textarea
+                    rows={3}
                     value={selectedText.defaultValue}
                     onChange={(e) =>
                       setTextZones(
                         textZones.map((t) => (t.id === activeLayerId ? { ...t, defaultValue: e.target.value } : t))
                       )
                     }
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-xl font-bold"
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-xl font-bold text-xs"
+                    placeholder="Type single line or multi-line paragraph text..."
                   />
                 </div>
 
-                {/* FONT STYLE / FAMILY SELECTOR */}
+                {/* TEXT BOX MAX WIDTH / BOUNDING FRAME SLIDER (CANVA STYLE) */}
+                <div className="space-y-1 bg-purple-50/50 p-3 rounded-xl border border-purple-100">
+                  <div className="flex items-center justify-between text-xs">
+                    <label className="font-bold text-[#160E4B]">Text Frame Box Width (%) :</label>
+                    <span className="font-mono font-black text-[#F82BA9]">{selectedText.maxWidth || 85}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="15"
+                    max="100"
+                    step="1"
+                    value={selectedText.maxWidth || 85}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      setTextZones(
+                        textZones.map((t) => (t.id === activeLayerId ? { ...t, maxWidth: val } : t))
+                      );
+                    }}
+                    className="w-full accent-[#F82BA9] cursor-pointer"
+                  />
+                  <p className="text-[10px] text-gray-500 font-medium">
+                    Adjust text box boundary width so paragraph text wraps into 3-5 lines automatically!
+                  </p>
+                </div>
+
+                {/* FONT STYLE / FAMILY SELECTOR (ALL 15 GOOGLE FONTS) */}
                 <div className="space-y-1">
                   <label className="font-bold text-gray-700 block">Font Style / Family :</label>
                   <select
-                    value={selectedText.fontFamily || 'Jost'}
+                    value={selectedText.fontFamily || 'Poppins'}
                     onChange={(e) =>
                       setTextZones(
                         textZones.map((t) => (t.id === activeLayerId ? { ...t, fontFamily: e.target.value } : t))
@@ -747,14 +784,21 @@ export const AdminTemplateEditor: React.FC<AdminTemplateEditorProps> = ({
                     }
                     className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-xl font-bold text-xs"
                   >
-                    <option value="Jost">Jost (Modern Clean Sans-Serif)</option>
-                    <option value="Playfair Display">Playfair Display (Classic Luxury Serif)</option>
-                    <option value="Dancing Script">Dancing Script (Cursive Romantic Script)</option>
-                    <option value="Great Vibes">Great Vibes (Elegant Calligraphy)</option>
-                    <option value="Cinzel">Cinzel (Regal Classic Serif)</option>
-                    <option value="Caveat">Caveat (Playful Hand-written Script)</option>
-                    <option value="Montserrat">Montserrat (Clean Bold Sans-Serif)</option>
-                    <option value="Georgia">Georgia (Traditional Book Serif)</option>
+                    <option value="Poppins">1. Poppins (Clean Modern Sans-Serif)</option>
+                    <option value="Montserrat">2. Montserrat (Bold Clean Sans-Serif)</option>
+                    <option value="Playfair Display">3. Playfair Display (Classic Luxury Serif)</option>
+                    <option value="Great Vibes">4. Great Vibes (Elegant Calligraphy)</option>
+                    <option value="Dancing Script">5. Dancing Script (Cursive Romantic Script)</option>
+                    <option value="Lobster">6. Lobster (Retro Bold Cursive)</option>
+                    <option value="Pacifico">7. Pacifico (Fun Playful Cursive)</option>
+                    <option value="Bebas Neue">8. Bebas Neue (Tall Bold Impact Caps)</option>
+                    <option value="Cinzel">9. Cinzel (Regal Royal Classic Serif)</option>
+                    <option value="Cormorant Garamond">10. Cormorant Garamond (Graceful Vintage Serif)</option>
+                    <option value="Lora">11. Lora (Refined Editorial Serif)</option>
+                    <option value="Raleway">12. Raleway (Elegant Geometric Sans-Serif)</option>
+                    <option value="Fredoka">13. Fredoka (Rounded Soft Friendly)</option>
+                    <option value="Caveat">14. Caveat (Handwritten Personal Touch)</option>
+                    <option value="Baloo 2">15. Baloo 2 (Warm Bold Round Script)</option>
                   </select>
                 </div>
 

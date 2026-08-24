@@ -1,7 +1,24 @@
+export type FrameCutoutShape =
+  | 'circle'
+  | 'square'
+  | 'rectangle'
+  | 'rounded'
+  | 'oval'
+  | 'heart'
+  | 'star'
+  | 'triangle'
+  | 'diamond'
+  | 'hexagon'
+  | 'pentagon'
+  | 'arch'
+  | 'shield'
+  | 'cloud'
+  | 'polaroid';
+
 export interface PhotoSlotConfig {
   id: string;
   label: string;
-  shape: 'circle' | 'rectangle' | 'rounded';
+  shape: FrameCutoutShape | string;
   x: number; // Percentage X (0-100)
   y: number; // Percentage Y (0-100)
   width: number; // Percentage width
@@ -15,6 +32,7 @@ export interface TextZoneConfig {
   defaultValue: string;
   x: number; // Percentage X (0-100)
   y: number; // Percentage Y (0-100)
+  maxWidth?: number; // Percentage max width of text bounding box (0-100, default 80%)
   fontSize: number; // font size in px
   fontFamily: string;
   color: string;
