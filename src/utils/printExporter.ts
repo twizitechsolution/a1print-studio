@@ -84,8 +84,46 @@ export async function generateHighResPrintFile(
 
               ctx.save();
               ctx.beginPath();
-              if (slot.shape === 'circle') {
+              const shapeLower = (slot.shape || '').toLowerCase();
+              if (shapeLower === 'circle') {
                 ctx.arc(centerX, centerY, slotW / 2, 0, Math.PI * 2);
+              } else if (shapeLower === 'oval') {
+                ctx.ellipse(centerX, centerY, slotW / 2, slotH / 2, 0, 0, Math.PI * 2);
+              } else if (shapeLower === 'heart') {
+                // Draw heart shape path
+                ctx.moveTo(centerX, topY + slotH * 0.3);
+                ctx.bezierCurveTo(centerX, topY, leftX, topY, leftX, topY + slotH * 0.35);
+                ctx.bezierCurveTo(leftX, topY + slotH * 0.6, centerX - slotW * 0.1, topY + slotH * 0.8, centerX, topY + slotH);
+                ctx.bezierCurveTo(centerX + slotW * 0.1, topY + slotH * 0.8, leftX + slotW, topY + slotH * 0.6, leftX + slotW, topY + slotH * 0.35);
+                ctx.bezierCurveTo(leftX + slotW, topY, centerX, topY, centerX, topY + slotH * 0.3);
+              } else if (shapeLower === 'star') {
+                const outerR = slotW / 2;
+                const innerR = outerR / 2.2;
+                let rot = (Math.PI / 2) * 3;
+                let step = Math.PI / 5;
+                ctx.moveTo(centerX, centerY - outerR);
+                for (let i = 0; i < 5; i++) {
+                  ctx.lineTo(centerX + Math.cos(rot) * outerR, centerY + Math.sin(rot) * outerR);
+                  rot += step;
+                  ctx.lineTo(centerX + Math.cos(rot) * innerR, centerY + Math.sin(rot) * innerR);
+                  rot += step;
+                }
+                ctx.lineTo(centerX, centerY - outerR);
+                ctx.closePath();
+              } else if (shapeLower === 'diamond') {
+                ctx.moveTo(centerX, topY);
+                ctx.lineTo(leftX + slotW, centerY);
+                ctx.lineTo(centerX, topY + slotH);
+                ctx.lineTo(leftX, centerY);
+                ctx.closePath();
+              } else if (shapeLower === 'hexagon') {
+                ctx.moveTo(leftX + slotW * 0.25, topY);
+                ctx.lineTo(leftX + slotW * 0.75, topY);
+                ctx.lineTo(leftX + slotW, centerY);
+                ctx.lineTo(leftX + slotW * 0.75, topY + slotH);
+                ctx.lineTo(leftX + slotW * 0.25, topY + slotH);
+                ctx.lineTo(leftX, centerY);
+                ctx.closePath();
               } else {
                 ctx.rect(leftX, topY, slotW, slotH);
               }

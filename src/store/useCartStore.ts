@@ -220,13 +220,20 @@ export function useCartStore() {
     if (productOrItem && productOrItem.product && productOrItem.selectedSize) {
       // Called with a single CartItem object payload
       const itemObj = productOrItem;
+      const customUrl = itemObj.customizedFramePreviewUrl || itemObj.uploadedPhotoUrl || itemObj.product.thumbnail;
+      const customizedProduct = {
+        ...itemObj.product,
+        thumbnail: customUrl,
+        image: customUrl,
+      };
+
       newItem = {
         id: itemObj.id || `cart-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-        product: itemObj.product,
+        product: customizedProduct,
         selectedSize: itemObj.selectedSize,
         selectedFrame: itemObj.selectedFrame || itemObj.product.frames?.[0],
         uploadedPhotoUrl: itemObj.uploadedPhotoUrl || itemObj.product.thumbnail,
-        customizedFramePreviewUrl: itemObj.customizedFramePreviewUrl || itemObj.product.thumbnail,
+        customizedFramePreviewUrl: customUrl,
         customTextValues: itemObj.customTextValues || {},
         quantity: itemObj.quantity || 1,
         itemTotalPrice: itemObj.itemTotalPrice || (itemObj.selectedSize?.price || 699) * (itemObj.quantity || 1),
@@ -238,14 +245,22 @@ export function useCartStore() {
       const frame = selectedFrame || product?.frames?.[0];
       const price = size?.price || 699;
       const itemTotalPrice = price * quantity;
+      const customUrl = customizedFramePreviewUrl || uploadedPhotoUrl || product?.thumbnail || '';
+      const customizedProduct = product
+        ? {
+            ...product,
+            thumbnail: customUrl || product.thumbnail,
+            image: customUrl || product.image,
+          }
+        : product;
 
       newItem = {
         id: `cart-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-        product,
+        product: customizedProduct,
         selectedSize: size,
         selectedFrame: frame,
         uploadedPhotoUrl: uploadedPhotoUrl || product?.thumbnail || '',
-        customizedFramePreviewUrl: customizedFramePreviewUrl || product?.thumbnail || '',
+        customizedFramePreviewUrl: customUrl,
         customTextValues: customTextValues || {},
         quantity,
         itemTotalPrice,

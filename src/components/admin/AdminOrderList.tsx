@@ -114,7 +114,10 @@ export const AdminOrderList: React.FC<AdminOrderListProps> = ({
       const innerH = targetH - borderThickness * 2;
 
       // 2. Draw Base Poster Template Image matching DOM object-cover inside inner bounds
-      const baseDataUri = await urlToBase64DataUri(item.product.thumbnail);
+      const printSrc =
+        item.customizedFramePreviewUrl ||
+        (item.product?.thumbnail && item.product.thumbnail.startsWith('data:image') ? item.product.thumbnail : item.product.thumbnail);
+      const baseDataUri = await urlToBase64DataUri(printSrc);
       const baseImg = await loadBase64Image(baseDataUri, 4000);
 
       if (baseImg) {

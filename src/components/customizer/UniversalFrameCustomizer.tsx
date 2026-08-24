@@ -255,16 +255,19 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
   const handleProceedWithExport = async () => {
     setIsExportingCanvas(true);
     try {
-      const compiledFrameDataUrl = await Promise.race([
-        generateHighResPrintFile(template, photoValues, textValues, 1200, 1760),
-        new Promise<string>((res) => setTimeout(() => res(''), 2500)),
-      ]);
+      let compiled = compiledPreviewUrl;
+      if (!compiled) {
+        compiled = await Promise.race([
+          generateHighResPrintFile(template, photoValues, textValues, 1200, 1760),
+          new Promise<string>((res) => setTimeout(() => res(''), 2500)),
+        ]);
+      }
       setIsExportingCanvas(false);
-      onProceedToCheckout(photoValues, textValues, selectedSize, compiledFrameDataUrl || template.baseImageUrl);
+      onProceedToCheckout(photoValues, textValues, selectedSize, compiled || template.baseImageUrl);
     } catch (err) {
       console.warn('Canvas export fallback:', err);
       setIsExportingCanvas(false);
-      onProceedToCheckout(photoValues, textValues, selectedSize);
+      onProceedToCheckout(photoValues, textValues, selectedSize, compiledPreviewUrl || template.baseImageUrl);
     }
   };
 
