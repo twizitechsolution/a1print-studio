@@ -3,6 +3,7 @@ import { Product } from '../../types';
 import { useCartStore } from '../../store/useCartStore';
 import { Tag, Plus, Edit2, Trash2, Flame, Sliders, Download, Cloud } from 'lucide-react';
 import { firebaseCloudDb } from '../../config/firebase';
+import { AdminProductListingModal } from './AdminProductListingModal';
 
 interface AdminCatalogManagerProps {
   onOpenTemplateEditor?: (product: Product) => void;
