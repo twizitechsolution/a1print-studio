@@ -303,8 +303,23 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
             {textZones.map((zone) => {
               const val = textValues[zone.id] || zone.defaultValue;
 
-              // Render Interactive Calendar Grid with Red Heart Highlight if zone is calendar type
-              if (zone.isCalendar || zone.type === 'calendar') {
+              const labelLower = (zone.label || '').toLowerCase();
+              const idLower = (zone.id || '').toLowerCase();
+              const valLower = (zone.defaultValue || '').toLowerCase();
+
+              const isCalendarZone =
+                zone.isCalendar ||
+                zone.type === 'calendar' ||
+                labelLower.includes('calendar') ||
+                labelLower.includes('date') ||
+                labelLower.includes('dob') ||
+                idLower.includes('calendar') ||
+                idLower.includes('date') ||
+                valLower.includes('february') ||
+                valLower.includes('january');
+
+              // Render Interactive Calendar Grid with Red Heart Highlight if zone is calendar or date type
+              if (isCalendarZone) {
                 return (
                   <div
                     key={zone.id}
@@ -491,6 +506,18 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                 </h4>
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {!textZones.some((z) => {
+                    const l = (z.label || '').toLowerCase();
+                    const i = (z.id || '').toLowerCase();
+                    return z.isCalendar || z.type === 'calendar' || z.type === 'date' || l.includes('date') || l.includes('dob') || i.includes('date');
+                  }) && (
+                    <DatePickerControl
+                      label="Special Birthday Date (Calendar ❤️)"
+                      value={textValues['specialDate'] || '14 Feb 2026'}
+                      onChange={(val) => setTextValues({ ...textValues, specialDate: val })}
+                    />
+                  )}
+
                   {textZones.map((zone) => {
                     const labelLower = (zone.label || '').toLowerCase();
                     const idLower = (zone.id || '').toLowerCase();
@@ -550,13 +577,27 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                     }
 
                     return (
-                      <div key={zone.id} className="space-y-1">
-                        <label className="text-xs font-bold text-gray-800">{zone.label} :</label>
+                      <div key={zone.id} className="space-y-1 sm:col-span-2">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-bold text-gray-800">{zone.label} :</label>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newMsg = getRandomBirthdayMessage(textValues[zone.id] || zone.defaultValue);
+                              setTextValues({ ...textValues, [zone.id]: newMsg });
+                            }}
+                            className="text-[11px] font-extrabold text-[#F82BA9] hover:text-pink-700 bg-pink-50 hover:bg-pink-100 px-2.5 py-1 rounded-lg border border-pink-200 transition-colors flex items-center gap-1 cursor-pointer shadow-2xs"
+                            title="Click to generate another random birthday wish message"
+                          >
+                            <Wand2 className="w-3.5 h-3.5 text-[#F82BA9]" /> 🔄 Regenerate Message
+                          </button>
+                        </div>
                         <input
                           type={zone.type || 'text'}
                           value={textValues[zone.id] || ''}
                           onChange={(e) => setTextValues({ ...textValues, [zone.id]: e.target.value })}
-                          className="w-full px-3 py-2 text-xs bg-white border border-gray-300 rounded-xl focus:outline-hidden focus:border-[#F82BA9]"
+                          className="w-full px-3 py-2 text-xs bg-white border border-gray-300 rounded-xl focus:outline-hidden focus:border-[#F82BA9] font-medium"
+                          placeholder="Type custom text or click Regenerate Message button..."
                         />
                       </div>
                     );
