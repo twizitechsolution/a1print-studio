@@ -3,8 +3,8 @@ import { CartItem, Order, Product } from '../types';
 import { PRODUCTS as INITIAL_PRODUCTS } from '../data/products';
 import { firebaseCloudDb } from '../config/firebase';
 
-const STORAGE_KEY = 'a1print_store_data_v12';
-const DELETED_IDS_KEY = 'a1print_deleted_product_ids_v12';
+const STORAGE_KEY = 'a1print_store_data_v13';
+const DELETED_IDS_KEY = 'a1print_deleted_product_ids_v13';
 
 interface StoreData {
   products: Product[];

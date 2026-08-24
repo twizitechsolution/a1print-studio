@@ -23,16 +23,12 @@ export const ProductFrameDisplay: React.FC<ProductFrameDisplayProps> = ({
   const photoSlots: PhotoSlotConfig[] = product.photoSlots || [];
   const textZones: TextZoneConfig[] = product.textZones || [];
 
-  // Always resolve the exact master frame poster artwork image URL matching the Individual Product Page!
   const masterFrameImgSrc =
     product.baseImageUrl ||
-    (product.thumbnail && !product.thumbnail.startsWith('data:') && !product.thumbnail.includes('single-bg')
-      ? product.thumbnail
-      : null) ||
-    (product.image && !product.image.startsWith('data:') && !product.image.includes('single-bg')
-      ? product.image
-      : null) ||
-    (product.images && product.images[0] && !product.images[0].startsWith('data:') ? product.images[0] : null);
+    product.thumbnail ||
+    product.image ||
+    (product.images && product.images[0]) ||
+    'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80';
 
   const isDarkPoster = product.id.includes('brother-sister') || product.id.includes('dad') || product.id.includes('dark');
 
@@ -42,7 +38,7 @@ export const ProductFrameDisplay: React.FC<ProductFrameDisplayProps> = ({
         isDarkPoster ? 'bg-black text-white' : 'bg-white text-gray-900'
       } ${className}`}
     >
-      {/* 1. Exact Master Frame Poster Image Artwork (Matching Individual Product Page 100%!) */}
+      {/* 1. Master Base Frame Poster Image Background */}
       {masterFrameImgSrc && (
         <img
           src={masterFrameImgSrc}
@@ -51,11 +47,10 @@ export const ProductFrameDisplay: React.FC<ProductFrameDisplayProps> = ({
         />
       )}
 
-      {/* 2. Customer Uploaded Photos ONLY (Transparent by default until user uploads custom photo!) */}
+      {/* 2. Customer Uploaded Photos (or slot cutout placeholders) */}
       {photoSlots.map((slot) => {
         const photoSrc = customPhotoValues[slot.id] || slot.defaultPhotoUrl;
-        if (!photoSrc) return null; // Transparent layer: Lets master frame artwork show through 100%!
-
+        if (!photoSrc) return null;
         const shapeStyles = getFrameShapeStyles(slot.shape);
 
         return (
@@ -80,10 +75,10 @@ export const ProductFrameDisplay: React.FC<ProductFrameDisplayProps> = ({
         );
       })}
 
-      {/* 3. Dynamic Text Zones Overlay (Only renders if custom text is provided, otherwise lets master frame text show through!) */}
+      {/* 3. Dynamic Text Zones Overlay (Renders custom user text OR product default sample text!) */}
       {textZones.map((zone) => {
-        const customVal = customTextValues[zone.id];
-        if (!customVal) return null; // Lets master frame artwork text show through!
+        const val = customTextValues[zone.id] || zone.defaultValue;
+        if (!val) return null;
 
         const labelLower = (zone.label || '').toLowerCase();
         const idLower = (zone.id || '').toLowerCase();
@@ -111,7 +106,7 @@ export const ProductFrameDisplay: React.FC<ProductFrameDisplayProps> = ({
               }}
             >
               <InteractiveCalendarZone
-                dateString={customVal}
+                dateString={val}
                 color={zone.color || (isDarkPoster ? '#FFFFFF' : '#160E4B')}
                 fontFamily={zone.fontFamily}
                 scale={fontScale}
@@ -136,7 +131,7 @@ export const ProductFrameDisplay: React.FC<ProductFrameDisplayProps> = ({
               textAlign: zone.align || 'center',
             }}
           >
-            {customVal}
+            {val}
           </div>
         );
       })}
