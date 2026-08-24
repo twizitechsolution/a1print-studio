@@ -42,7 +42,7 @@ export const InteractiveCalendarZone: React.FC<InteractiveCalendarZoneProps> = (
   const selectedDayNum = targetDate.getDate();
 
   const monthNamesTitle = [
-    'February', 'February', 'March', 'April', 'May', 'June',
+    'January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December',
   ];
 
@@ -62,26 +62,39 @@ export const InteractiveCalendarZone: React.FC<InteractiveCalendarZoneProps> = (
     gridCells.push(d);
   }
 
+  const headerFontSize = `${Math.max(10, Math.round(14 * scale))}px`;
+  const weekdayFontSize = `${Math.max(7, Math.round(8.5 * scale))}px`;
+  const dayFontSize = `${Math.max(7, Math.round(8.5 * scale))}px`;
+
   return (
     <div
-      className="inline-block text-center font-serif select-none leading-none p-0 bg-transparent border-0 shadow-none"
-      style={{ color, fontFamily, transform: `scale(${scale})`, transformOrigin: 'top center' }}
+      className="w-full max-w-full inline-block text-center font-serif select-none leading-none p-0 bg-transparent border-0 shadow-none overflow-hidden"
+      style={{ color, fontFamily }}
     >
       {/* Month Only Header (No Year) */}
-      <div className="font-playfair font-bold text-lg tracking-wide mb-1.5 capitalize" style={{ color }}>
+      <div
+        className="font-playfair font-bold tracking-wide mb-1 capitalize leading-tight"
+        style={{ color, fontSize: headerFontSize }}
+      >
         {monthTitle}
       </div>
 
       {/* Weekdays Header (Sun Mon Tue Wed Thu Fri Sat) */}
-      <div className="grid grid-cols-7 gap-1.5 text-[9px] font-bold tracking-tight mb-1 opacity-90" style={{ color }}>
+      <div
+        className="grid grid-cols-7 gap-0.5 font-bold tracking-tight mb-1 opacity-90 leading-tight"
+        style={{ color, fontSize: weekdayFontSize }}
+      >
         <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
       </div>
 
       {/* Days Grid */}
-      <div className="grid grid-cols-7 gap-1.5 text-[10px] font-bold font-sans">
+      <div
+        className="grid grid-cols-7 gap-0.5 font-bold font-sans"
+        style={{ fontSize: dayFontSize }}
+      >
         {gridCells.map((dayNum, idx) => {
           if (dayNum === null) {
-            return <div key={`empty-${idx}`} className="w-4 h-4" />;
+            return <div key={`empty-${idx}`} className="w-full aspect-square" />;
           }
 
           const isSelected = dayNum === selectedDayNum;
@@ -89,15 +102,15 @@ export const InteractiveCalendarZone: React.FC<InteractiveCalendarZoneProps> = (
           return (
             <div
               key={`day-${dayNum}`}
-              className="relative w-4 h-4 flex items-center justify-center text-[10px] font-bold"
+              className="relative w-full aspect-square flex items-center justify-center font-bold"
               style={{ color: isSelected ? '#FF1493' : color }}
             >
               {isSelected ? (
                 <div className="relative flex items-center justify-center w-full h-full">
-                  <span className="text-red-500 font-extrabold text-[15px] absolute inset-0 flex items-center justify-center animate-pulse">
+                  <span className="text-red-500 font-extrabold text-[1.4em] absolute inset-0 flex items-center justify-center animate-pulse">
                     ❤️
                   </span>
-                  <span className="relative z-10 text-white font-black text-[8px] drop-shadow-sm">
+                  <span className="relative z-10 text-white font-black text-[0.8em] drop-shadow-xs">
                     {dayNum}
                   </span>
                 </div>

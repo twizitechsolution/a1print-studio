@@ -177,8 +177,29 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
   const [textValues, setTextValues] = useState<Record<string, string>>({});
   const [selectedSize, setSelectedSize] = useState<string>('A4');
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState<boolean>(false);
+  const [compiledPreviewUrl, setCompiledPreviewUrl] = useState<string | null>(null);
+  const [isLoadingPreview, setIsLoadingPreview] = useState<boolean>(false);
   const [isExportingCanvas, setIsExportingCanvas] = useState<boolean>(false);
   const [liveViewers, setLiveViewers] = useState<number>(360);
+  const [generatedZones, setGeneratedZones] = useState<Record<string, boolean>>({});
+
+  const handleOpenPreviewModal = async () => {
+    setIsLoadingPreview(true);
+    setIsPreviewModalOpen(true);
+    try {
+      const compiled = await Promise.race([
+        generateHighResPrintFile(template, photoValues, textValues, 1200, 1760),
+        new Promise<string>((res) => setTimeout(() => res(''), 2500)),
+      ]);
+      if (compiled) {
+        setCompiledPreviewUrl(compiled);
+      }
+    } catch (e) {
+      console.warn('Preview compilation fallback:', e);
+    } finally {
+      setIsLoadingPreview(false);
+    }
+  };
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -373,7 +394,7 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
         {/* 👁️ Preview Customized Frame Button */}
         <button
           type="button"
-          onClick={() => setIsPreviewModalOpen(true)}
+          onClick={handleOpenPreviewModal}
           className="w-full py-3.5 bg-[#F82BA9]/10 hover:bg-[#F82BA9]/20 text-[#F82BA9] font-extrabold text-xs rounded-2xl border border-[#F82BA9]/30 transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
         >
           <Eye className="w-4 h-4" /> 👁️ Preview High-Res Customized Frame
@@ -559,6 +580,7 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                     }
 
                     if (isMessageField) {
+                      const hasBeenGenerated = generatedZones[zone.id];
                       return (
                         <div key={zone.id} className="space-y-1.5 sm:col-span-2">
                           <div className="flex items-center justify-between">
@@ -568,11 +590,12 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                               onClick={() => {
                                 const newMsg = getRandomBirthdayMessage(textValues[zone.id] || zone.defaultValue);
                                 setTextValues({ ...textValues, [zone.id]: newMsg });
+                                setGeneratedZones((prev) => ({ ...prev, [zone.id]: true }));
                               }}
-                              className="text-[11px] font-extrabold text-[#F82BA9] hover:text-pink-700 bg-pink-50 hover:bg-pink-100 px-2.5 py-1 rounded-lg border border-pink-200 transition-colors flex items-center gap-1 cursor-pointer shadow-2xs"
-                              title="Click to generate another random love message"
+                              className="text-[11px] font-extrabold text-[#F82BA9] hover:text-pink-700 bg-pink-50 hover:bg-pink-100 px-3 py-1 rounded-xl border border-pink-200 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                              title="Click to generate or regenerate custom message"
                             >
-                              <Wand2 className="w-3.5 h-3.5 text-[#F82BA9]" /> 🔄 Regenerate Message
+                              {hasBeenGenerated ? '🔄 Regenerate Message' : '✨ Generate Message'}
                             </button>
                           </div>
                           <textarea
@@ -580,12 +603,13 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                             value={textValues[zone.id] || ''}
                             onChange={(e) => setTextValues({ ...textValues, [zone.id]: e.target.value })}
                             className="w-full px-3 py-2 text-xs bg-white border border-gray-300 rounded-xl focus:outline-hidden focus:border-[#F82BA9] font-medium"
-                            placeholder="Type custom message or click Regenerate Message button..."
+                            placeholder="Type custom message or click Generate Message button..."
                           />
                         </div>
                       );
                     }
 
+                    const hasBeenGenerated = generatedZones[zone.id];
                     return (
                       <div key={zone.id} className="space-y-1 sm:col-span-2">
                         <div className="flex items-center justify-between">
@@ -595,11 +619,12 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                             onClick={() => {
                               const newMsg = getRandomBirthdayMessage(textValues[zone.id] || zone.defaultValue);
                               setTextValues({ ...textValues, [zone.id]: newMsg });
+                              setGeneratedZones((prev) => ({ ...prev, [zone.id]: true }));
                             }}
-                            className="text-[11px] font-extrabold text-[#F82BA9] hover:text-pink-700 bg-pink-50 hover:bg-pink-100 px-2.5 py-1 rounded-lg border border-pink-200 transition-colors flex items-center gap-1 cursor-pointer shadow-2xs"
-                            title="Click to generate another random birthday wish message"
+                            className="text-[11px] font-extrabold text-[#F82BA9] hover:text-pink-700 bg-pink-50 hover:bg-pink-100 px-3 py-1 rounded-xl border border-pink-200 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                            title="Click to generate or regenerate custom text"
                           >
-                            <Wand2 className="w-3.5 h-3.5 text-[#F82BA9]" /> 🔄 Regenerate Message
+                            {hasBeenGenerated ? '🔄 Regenerate Message' : '✨ Generate Message'}
                           </button>
                         </div>
                         <input
@@ -607,7 +632,7 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                           value={textValues[zone.id] || ''}
                           onChange={(e) => setTextValues({ ...textValues, [zone.id]: e.target.value })}
                           className="w-full px-3 py-2 text-xs bg-white border border-gray-300 rounded-xl focus:outline-hidden focus:border-[#F82BA9] font-medium"
-                          placeholder="Type custom text or click Regenerate Message button..."
+                          placeholder="Type custom text or click Generate Message button..."
                         />
                       </div>
                     );
@@ -699,62 +724,109 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
 
             {/* High-Res Canvas Container */}
             <div 
-              className="relative w-full max-w-[340px] aspect-[3/4.4] rounded-xs border-8 border-black shadow-2xl bg-white overflow-hidden select-none font-serif"
+              className="relative w-full max-w-[340px] aspect-[3/4.4] rounded-xs border-8 border-black shadow-2xl bg-white overflow-hidden select-none font-serif flex items-center justify-center"
             >
-              <img
-                src={template.baseImageUrl}
-                alt={template.title}
-                className="w-full h-full object-cover absolute inset-0 pointer-events-none"
-              />
+              {isLoadingPreview ? (
+                <div className="flex flex-col items-center justify-center p-8 space-y-3">
+                  <Loader2 className="w-8 h-8 text-[#F82BA9] animate-spin" />
+                  <p className="text-xs font-bold text-gray-700">Compiling 300 DPI High-Res Preview...</p>
+                </div>
+              ) : compiledPreviewUrl ? (
+                <img
+                  src={compiledPreviewUrl}
+                  alt={template.title}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <>
+                  <img
+                    src={template.baseImageUrl}
+                    alt={template.title}
+                    className="w-full h-full object-cover absolute inset-0 pointer-events-none"
+                  />
 
-              {photoSlots.map((slot) => {
-                const photoSrc = photoValues[slot.id];
-                if (!photoSrc) return null;
+                  {photoSlots.map((slot) => {
+                    const photoSrc = photoValues[slot.id];
+                    if (!photoSrc) return null;
+                    const shapeStyles = getFrameShapeStyles(slot.shape);
 
-                return (
-                  <div
-                    key={slot.id}
-                    className={`absolute overflow-hidden p-0 border-0 bg-transparent ${
-                      slot.shape === 'circle'
-                        ? 'rounded-full'
-                        : slot.shape === 'rounded'
-                        ? 'rounded-xl'
-                        : 'rounded-none'
-                    }`}
-                    style={{
-                      left: `${slot.x}%`,
-                      top: `${slot.y}%`,
-                      width: `${slot.width}%`,
-                      height: `${slot.height}%`,
-                      transform: 'translate(-50%, -50%)',
-                    }}
-                  >
-                    <img src={photoSrc} alt={slot.label} className="w-full h-full object-cover rounded-[inherit]" />
-                  </div>
-                );
-              })}
+                    return (
+                      <div
+                        key={slot.id}
+                        className="absolute overflow-hidden p-0 border-0 bg-transparent"
+                        style={{
+                          left: `${slot.x}%`,
+                          top: `${slot.y}%`,
+                          width: `${slot.width}%`,
+                          height: `${slot.height}%`,
+                          transform: 'translate(-50%, -50%)',
+                          ...shapeStyles,
+                        }}
+                      >
+                        <img src={photoSrc} alt={slot.label} className="w-full h-full object-cover rounded-[inherit]" />
+                      </div>
+                    );
+                  })}
 
-              {textZones.map((zone) => {
-                const val = textValues[zone.id] || zone.defaultValue;
-                return (
-                  <div
-                    key={zone.id}
-                    className="absolute transform -translate-x-1/2 -translate-y-1/2 whitespace-nowrap"
-                    style={{
-                      left: `${zone.x}%`,
-                      top: `${zone.y}%`,
-                      color: zone.color,
-                      fontFamily: zone.fontFamily,
-                      fontSize: `${zone.fontSize * 0.75}px`,
-                      fontWeight: 'bold',
-                      textAlign: zone.align,
-                    }}
-                  >
-                    {val}
-                  </div>
-                );
-              })}
+                  {textZones.map((zone) => {
+                    const val = textValues[zone.id] || zone.defaultValue;
 
+                    const labelLower = (zone.label || '').toLowerCase();
+                    const idLower = (zone.id || '').toLowerCase();
+                    const valLower = (zone.defaultValue || '').toLowerCase();
+
+                    const isCalendarZone =
+                      zone.isCalendar ||
+                      zone.type === 'calendar' ||
+                      labelLower.includes('calendar') ||
+                      labelLower.includes('date') ||
+                      labelLower.includes('dob') ||
+                      idLower.includes('calendar') ||
+                      idLower.includes('date') ||
+                      valLower.includes('february') ||
+                      valLower.includes('january');
+
+                    if (isCalendarZone) {
+                      return (
+                        <div
+                          key={zone.id}
+                          className="absolute transform -translate-x-1/2 -translate-y-1/2"
+                          style={{
+                            left: `${zone.x}%`,
+                            top: `${zone.y}%`,
+                          }}
+                        >
+                          <InteractiveCalendarZone
+                            dateString={val}
+                            color={zone.color}
+                            fontFamily={zone.fontFamily}
+                          />
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div
+                        key={zone.id}
+                        className="absolute transform -translate-x-1/2 -translate-y-1/2 whitespace-pre-wrap break-words leading-tight"
+                        style={{
+                          left: `${zone.x}%`,
+                          top: `${zone.y}%`,
+                          width: zone.maxWidth ? `${zone.maxWidth}%` : '85%',
+                          maxWidth: zone.maxWidth ? `${zone.maxWidth}%` : '85%',
+                          color: zone.color,
+                          fontFamily: zone.fontFamily,
+                          fontSize: `${zone.fontSize * 0.7}px`,
+                          fontWeight: 'bold',
+                          textAlign: zone.align || 'center',
+                        }}
+                      >
+                        {val}
+                      </div>
+                    );
+                  })}
+                </>
+              )}
             </div>
 
           </div>

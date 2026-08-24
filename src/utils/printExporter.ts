@@ -99,20 +99,63 @@ export async function generateHighResPrintFile(
           }
         }
 
-        // 4. Draw dynamic text zones
+        // 4. Draw dynamic text zones & calendar grids
         for (const zone of template.textZones) {
           const val = textValues[zone.id] || zone.defaultValue;
           if (val && !val.startsWith('data:image')) {
             const textX = (zone.x / 100) * targetWidth;
             const textY = (zone.y / 100) * targetHeight;
+            const maxBoxWidth = ((zone.maxWidth || 85) / 100) * targetWidth;
 
-            const scaledFontSize = Math.round(zone.fontSize * (targetWidth / 400));
-            ctx.font = `bold ${scaledFontSize}px ${zone.fontFamily || 'sans-serif'}`;
-            ctx.fillStyle = zone.color || '#000000';
-            ctx.textAlign = zone.align || 'center';
-            ctx.textBaseline = 'middle';
+            const labelLower = (zone.label || '').toLowerCase();
+            const idLower = (zone.id || '').toLowerCase();
+            const valLower = (zone.defaultValue || '').toLowerCase();
 
-            ctx.fillText(val, textX, textY);
+            const isCalendarZone =
+              zone.isCalendar ||
+              zone.type === 'calendar' ||
+              labelLower.includes('calendar') ||
+              labelLower.includes('date') ||
+              labelLower.includes('dob') ||
+              idLower.includes('calendar') ||
+              idLower.includes('date') ||
+              valLower.includes('february') ||
+              valLower.includes('january');
+
+            if (isCalendarZone) {
+              // Draw high-res month calendar grid onto canvas
+              drawCalendarGridOnCanvas(ctx, val, textX, textY, maxBoxWidth, zone.color || '#FFFFFF', zone.fontFamily || 'serif');
+            } else {
+              // Draw multi-line paragraph wrapped text
+              const scaledFontSize = Math.round((zone.fontSize || 14) * (targetWidth / 400));
+              ctx.font = `bold ${scaledFontSize}px ${zone.fontFamily || 'sans-serif'}`;
+              ctx.fillStyle = zone.color || '#000000';
+              ctx.textAlign = (zone.align as CanvasTextAlign) || 'center';
+              ctx.textBaseline = 'middle';
+
+              const words = val.split(' ');
+              const lines: string[] = [];
+              let currentLine = '';
+
+              for (const word of words) {
+                const testLine = currentLine ? `${currentLine} ${word}` : word;
+                const metrics = ctx.measureText(testLine);
+                if (metrics.width > maxBoxWidth && currentLine) {
+                  lines.push(currentLine);
+                  currentLine = word;
+                } else {
+                  currentLine = testLine;
+                }
+              }
+              if (currentLine) lines.push(currentLine);
+
+              const lineHeight = scaledFontSize * 1.25;
+              const startY = textY - ((lines.length - 1) * lineHeight) / 2;
+
+              lines.forEach((line, lineIdx) => {
+                ctx.fillText(line, textX, startY + lineIdx * lineHeight);
+              });
+            }
           }
         }
 
@@ -143,7 +186,6 @@ function loadImage(src: string): Promise<HTMLImageElement> {
     }
     img.onload = () => res(img);
     img.onerror = () => {
-      // Retry without crossOrigin if CORS failed
       const img2 = new Image();
       img2.onload = () => res(img2);
       img2.onerror = (e) => rej(e);
@@ -151,4 +193,101 @@ function loadImage(src: string): Promise<HTMLImageElement> {
     };
     img.src = src;
   });
+}
+
+function drawCalendarGridOnCanvas(
+  ctx: CanvasRenderingContext2D,
+  dateString: string,
+  centerX: number,
+  centerY: number,
+  boxWidth: number,
+  color: string,
+  fontFamily: string
+) {
+  let targetDate = new Date();
+  if (dateString) {
+    const parsed = new Date(dateString);
+    if (!isNaN(parsed.getTime())) {
+      targetDate = parsed;
+    } else {
+      const parts = dateString.split(' ');
+      if (parts.length >= 1) {
+        const day = parseInt(parts[0]);
+        const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+        let monthIdx = -1;
+        if (parts.length >= 2) {
+          monthIdx = monthNames.findIndex((m) => parts[1].toLowerCase().startsWith(m));
+        }
+        const year = parts.length >= 3 ? parseInt(parts[2]) : targetDate.getFullYear();
+        if (!isNaN(day)) {
+          targetDate = new Date(year, monthIdx !== -1 ? monthIdx : targetDate.getMonth(), day);
+        }
+      }
+    }
+  }
+
+  const selectedYear = targetDate.getFullYear();
+  const selectedMonthIdx = targetDate.getMonth();
+  const selectedDayNum = targetDate.getDate();
+
+  const monthNamesTitle = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
+  ];
+  const monthTitle = monthNamesTitle[selectedMonthIdx] || 'February';
+
+  const firstDayOfWeek = new Date(selectedYear, selectedMonthIdx, 1).getDay();
+  const daysInMonth = new Date(selectedYear, selectedMonthIdx + 1, 0).getDate();
+
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = color;
+
+  // Month Header
+  const titleFontSize = Math.max(14, Math.round(boxWidth * 0.1));
+  ctx.font = `bold ${titleFontSize}px ${fontFamily}`;
+  ctx.fillText(monthTitle, centerX, centerY - boxWidth * 0.35);
+
+  // Weekdays Header
+  const dayHeaderFontSize = Math.max(9, Math.round(boxWidth * 0.055));
+  ctx.font = `bold ${dayHeaderFontSize}px sans-serif`;
+  const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const colStep = boxWidth / 7;
+  const startX = centerX - boxWidth / 2 + colStep / 2;
+
+  weekdays.forEach((dayName, colIdx) => {
+    ctx.fillText(dayName, startX + colIdx * colStep, centerY - boxWidth * 0.22);
+  });
+
+  // Days Grid
+  const numFontSize = Math.max(9, Math.round(boxWidth * 0.055));
+  ctx.font = `bold ${numFontSize}px sans-serif`;
+
+  const totalGridCells = firstDayOfWeek + daysInMonth;
+  const rowStep = boxWidth * 0.09;
+  const gridStartY = centerY - boxWidth * 0.12;
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const cellIdx = firstDayOfWeek + d - 1;
+    const colIdx = cellIdx % 7;
+    const rowIdx = Math.floor(cellIdx / 7);
+
+    const cellX = startX + colIdx * colStep;
+    const cellY = gridStartY + rowIdx * rowStep;
+
+    if (d === selectedDayNum) {
+      ctx.fillStyle = '#EF4444';
+      ctx.fillText('❤️', cellX, cellY);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = `bold ${Math.round(numFontSize * 0.85)}px sans-serif`;
+      ctx.fillText(d.toString(), cellX, cellY);
+      ctx.fillStyle = color;
+      ctx.font = `bold ${numFontSize}px sans-serif`;
+    } else {
+      ctx.fillText(d.toString(), cellX, cellY);
+    }
+  }
+
+  ctx.restore();
 }
