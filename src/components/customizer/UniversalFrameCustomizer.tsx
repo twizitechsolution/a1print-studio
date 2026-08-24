@@ -177,6 +177,16 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
   const [selectedSize, setSelectedSize] = useState<string>('A4');
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState<boolean>(false);
   const [isExportingCanvas, setIsExportingCanvas] = useState<boolean>(false);
+  const [liveViewers, setLiveViewers] = useState<number>(360);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const delta = Math.floor(Math.random() * 11) - 5;
+      setLiveViewers((prev) => Math.min(480, Math.max(310, prev + delta)));
+    }, 2500);
+
+    return () => clearInterval(interval);
+  }, []);
 
   // Crop Modal state
   const [cropModalOpen, setCropModalOpen] = useState<boolean>(false);
@@ -647,6 +657,14 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
               </>
             )}
           </button>
+
+          {/* Live Customers Viewing Counter Ticker (LovecraftbySE Urgency Ticker) */}
+          <div className="flex items-center justify-center gap-2 py-2.5 px-4 bg-orange-50/80 border border-orange-200 rounded-2xl text-xs font-extrabold text-orange-900 shadow-2xs">
+            <span className="text-base animate-pulse">🔥</span>
+            <span>
+              <strong className="text-orange-600 font-black text-sm">{liveViewers}</strong> customers are currently viewing this product
+            </span>
+          </div>
         </div>
 
       </div>

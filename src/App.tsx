@@ -7,6 +7,7 @@ import { compressImageBase64 } from './utils/imageCompressor';
 import { Header } from './components/layout/Header';
 import { Footer } from './components/layout/Footer';
 import { FloatingWhatsApp } from './components/layout/FloatingWhatsApp';
+import { RecentPurchaseToast } from './components/common/RecentPurchaseToast';
 
 import { HomePage } from './pages/HomePage';
 import { ProductPage } from './pages/ProductPage';
@@ -247,6 +248,9 @@ export const App: React.FC = () => {
 
       {/* Floating WhatsApp Support Button */}
       {currentPage !== 'admin' && <FloatingWhatsApp />}
+
+      {/* Floating Social Proof Sales Toast Popup */}
+      {currentPage !== 'admin' && <RecentPurchaseToast />}
 
       {/* Slide-over Shopping Cart Drawer */}
       <CartDrawer

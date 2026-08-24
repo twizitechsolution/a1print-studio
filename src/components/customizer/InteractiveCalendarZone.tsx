@@ -9,7 +9,7 @@ interface InteractiveCalendarZoneProps {
 
 export const InteractiveCalendarZone: React.FC<InteractiveCalendarZoneProps> = ({
   dateString,
-  color = '#160E4B',
+  color = '#FFFFFF',
   fontFamily = 'Playfair Display',
   scale = 1,
 }) => {
@@ -22,13 +22,16 @@ export const InteractiveCalendarZone: React.FC<InteractiveCalendarZoneProps> = (
     } else {
       // Try parsing formats like "14 Feb 2026"
       const parts = dateString.split(' ');
-      if (parts.length >= 3) {
+      if (parts.length >= 1) {
         const day = parseInt(parts[0]);
         const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
-        const monthIdx = monthNames.findIndex((m) => parts[1].toLowerCase().startsWith(m));
-        const year = parseInt(parts[2]);
-        if (!isNaN(day) && monthIdx !== -1 && !isNaN(year)) {
-          targetDate = new Date(year, monthIdx, day);
+        let monthIdx = -1;
+        if (parts.length >= 2) {
+          monthIdx = monthNames.findIndex((m) => parts[1].toLowerCase().startsWith(m));
+        }
+        const year = parts.length >= 3 ? parseInt(parts[2]) : targetDate.getFullYear();
+        if (!isNaN(day)) {
+          targetDate = new Date(year, monthIdx !== -1 ? monthIdx : targetDate.getMonth(), day);
         }
       }
     }
@@ -38,12 +41,13 @@ export const InteractiveCalendarZone: React.FC<InteractiveCalendarZoneProps> = (
   const selectedMonthIdx = targetDate.getMonth();
   const selectedDayNum = targetDate.getDate();
 
-  const monthNamesUpper = [
-    'JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE',
-    'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER',
+  const monthNamesTitle = [
+    'February', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
   ];
 
-  const monthTitle = `${monthNamesUpper[selectedMonthIdx]} ${selectedYear}`;
+  // Title Month Name Only (Matching reference image: "February")
+  const monthTitle = monthNamesTitle[selectedMonthIdx] || 'February';
 
   // First day of month (0 = Sun, 1 = Mon, etc.) & Total days in month
   const firstDayOfWeek = new Date(selectedYear, selectedMonthIdx, 1).getDay();
@@ -60,21 +64,21 @@ export const InteractiveCalendarZone: React.FC<InteractiveCalendarZoneProps> = (
 
   return (
     <div
-      className="inline-block text-center font-serif select-none leading-none p-1 bg-white/40 rounded-lg shadow-2xs backdrop-blur-2xs"
-      style={{ color, fontFamily, transform: `scale(${scale})`, transformOrigin: 'center' }}
+      className="inline-block text-center font-serif select-none leading-none p-0 bg-transparent border-0 shadow-none"
+      style={{ color, fontFamily, transform: `scale(${scale})`, transformOrigin: 'top center' }}
     >
-      {/* Month & Year Header */}
-      <div className="font-bold text-[11px] tracking-widest border-b border-gray-400/30 pb-0.5 mb-1 uppercase">
+      {/* Month Only Header (No Year) */}
+      <div className="font-playfair font-bold text-lg tracking-wide mb-1.5 capitalize" style={{ color }}>
         {monthTitle}
       </div>
 
-      {/* Weekdays Header */}
-      <div className="grid grid-cols-7 gap-0.5 text-[8px] font-bold text-gray-500 mb-0.5">
-        <span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span>
+      {/* Weekdays Header (Sun Mon Tue Wed Thu Fri Sat) */}
+      <div className="grid grid-cols-7 gap-1.5 text-[9px] font-bold tracking-tight mb-1 opacity-90" style={{ color }}>
+        <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
       </div>
 
       {/* Days Grid */}
-      <div className="grid grid-cols-7 gap-0.5 text-[9px] font-bold font-mono">
+      <div className="grid grid-cols-7 gap-1.5 text-[10px] font-bold font-sans">
         {gridCells.map((dayNum, idx) => {
           if (dayNum === null) {
             return <div key={`empty-${idx}`} className="w-4 h-4" />;
@@ -85,14 +89,15 @@ export const InteractiveCalendarZone: React.FC<InteractiveCalendarZoneProps> = (
           return (
             <div
               key={`day-${dayNum}`}
-              className="relative w-4 h-4 flex items-center justify-center text-[9px] font-bold"
+              className="relative w-4 h-4 flex items-center justify-center text-[10px] font-bold"
+              style={{ color: isSelected ? '#FF1493' : color }}
             >
               {isSelected ? (
-                <div className="relative flex items-center justify-center">
-                  <span className="text-red-600 font-extrabold text-[12px] absolute inset-0 flex items-center justify-center animate-pulse">
+                <div className="relative flex items-center justify-center w-full h-full">
+                  <span className="text-red-500 font-extrabold text-[15px] absolute inset-0 flex items-center justify-center animate-pulse">
                     ❤️
                   </span>
-                  <span className="relative z-10 text-white font-extrabold text-[7px]">
+                  <span className="relative z-10 text-white font-black text-[8px] drop-shadow-sm">
                     {dayNum}
                   </span>
                 </div>
