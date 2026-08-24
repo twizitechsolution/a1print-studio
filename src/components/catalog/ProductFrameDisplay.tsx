@@ -12,14 +12,6 @@ interface ProductFrameDisplayProps {
   fontScale?: number;
 }
 
-const DEFAULT_SAMPLE_PHOTOS = [
-  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=500&q=80',
-  'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=500&q=80',
-  'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=500&q=80',
-  'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=500&q=80',
-  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=500&q=80',
-];
-
 export const ProductFrameDisplay: React.FC<ProductFrameDisplayProps> = ({
   product,
   customTextValues = {},
@@ -31,15 +23,16 @@ export const ProductFrameDisplay: React.FC<ProductFrameDisplayProps> = ({
   const photoSlots: PhotoSlotConfig[] = product.photoSlots || [];
   const textZones: TextZoneConfig[] = product.textZones || [];
 
-  // Determine base background image safely (only use valid non-base64, non-single-bg URLs)
-  const baseImgSrc =
+  // Always resolve the exact master frame poster artwork image URL matching the Individual Product Page!
+  const masterFrameImgSrc =
     product.baseImageUrl ||
     (product.thumbnail && !product.thumbnail.startsWith('data:') && !product.thumbnail.includes('single-bg')
       ? product.thumbnail
       : null) ||
     (product.image && !product.image.startsWith('data:') && !product.image.includes('single-bg')
       ? product.image
-      : null);
+      : null) ||
+    (product.images && product.images[0] && !product.images[0].startsWith('data:') ? product.images[0] : null);
 
   const isDarkPoster = product.id.includes('brother-sister') || product.id.includes('dad') || product.id.includes('dark');
 
@@ -49,24 +42,19 @@ export const ProductFrameDisplay: React.FC<ProductFrameDisplayProps> = ({
         isDarkPoster ? 'bg-black text-white' : 'bg-white text-gray-900'
       } ${className}`}
     >
-      {/* Base Frame Poster Image Artwork if valid image exists */}
-      {baseImgSrc && (
+      {/* 1. Exact Master Frame Poster Image Artwork (Matching Individual Product Page 100%!) */}
+      {masterFrameImgSrc && (
         <img
-          src={baseImgSrc}
+          src={masterFrameImgSrc}
           alt={product.title}
           className="w-full h-full object-cover absolute inset-0 pointer-events-none"
-          onError={(e: any) => {
-            e.target.style.display = 'none';
-          }}
         />
       )}
 
-      {/* Render Photo Slots with Cutout Shapes (Falls back to default sample photos so frame is NEVER empty!) */}
-      {photoSlots.map((slot, idx) => {
-        const photoSrc =
-          customPhotoValues[slot.id] ||
-          slot.defaultPhotoUrl ||
-          DEFAULT_SAMPLE_PHOTOS[idx % DEFAULT_SAMPLE_PHOTOS.length];
+      {/* 2. Customer Uploaded Photos ONLY (Transparent by default until user uploads custom photo!) */}
+      {photoSlots.map((slot) => {
+        const photoSrc = customPhotoValues[slot.id] || slot.defaultPhotoUrl;
+        if (!photoSrc) return null; // Transparent layer: Lets master frame artwork show through 100%!
 
         const shapeStyles = getFrameShapeStyles(slot.shape);
 
@@ -87,18 +75,15 @@ export const ProductFrameDisplay: React.FC<ProductFrameDisplayProps> = ({
               src={photoSrc}
               alt={slot.label}
               className="w-full h-full object-cover rounded-[inherit]"
-              onError={(e: any) => {
-                e.target.src = DEFAULT_SAMPLE_PHOTOS[idx % DEFAULT_SAMPLE_PHOTOS.length];
-              }}
             />
           </div>
         );
       })}
 
-      {/* Render Dynamic Text Zones Overlay */}
+      {/* 3. Dynamic Text Zones Overlay (Only renders if custom text is provided, otherwise lets master frame text show through!) */}
       {textZones.map((zone) => {
-        const val = customTextValues[zone.id] || zone.defaultValue;
-        if (!val) return null;
+        const customVal = customTextValues[zone.id];
+        if (!customVal) return null; // Lets master frame artwork text show through!
 
         const labelLower = (zone.label || '').toLowerCase();
         const idLower = (zone.id || '').toLowerCase();
@@ -126,7 +111,7 @@ export const ProductFrameDisplay: React.FC<ProductFrameDisplayProps> = ({
               }}
             >
               <InteractiveCalendarZone
-                dateString={val}
+                dateString={customVal}
                 color={zone.color || (isDarkPoster ? '#FFFFFF' : '#160E4B')}
                 fontFamily={zone.fontFamily}
                 scale={fontScale}
@@ -151,7 +136,7 @@ export const ProductFrameDisplay: React.FC<ProductFrameDisplayProps> = ({
               textAlign: zone.align || 'center',
             }}
           >
-            {val}
+            {customVal}
           </div>
         );
       })}

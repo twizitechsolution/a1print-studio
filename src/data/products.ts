@@ -10,9 +10,10 @@ export const PRODUCTS: Product[] = [
     categoryLabel: 'Photo Collages',
     rating: 5.0,
     reviewsCount: 24,
-    thumbnail: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80',
+    thumbnail: 'https://lovecraftbyse.com/wp-content/uploads/2026/03/custom-birthday-collage-photo-frame-personalized-name-date-1.jpg',
+    baseImageUrl: 'https://lovecraftbyse.com/wp-content/uploads/2026/03/custom-birthday-collage-photo-frame-personalized-name-date-1.jpg',
     images: [
-      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80',
+      'https://lovecraftbyse.com/wp-content/uploads/2026/03/custom-birthday-collage-photo-frame-personalized-name-date-1.jpg',
     ],
     bestseller: true,
     onSale: true,
@@ -25,9 +26,9 @@ export const PRODUCTS: Product[] = [
       'AI Love Message Generator with 1-click Regenerate button',
     ],
     photoSlots: [
-      { id: 'photo-1', label: 'Top Left Photo', shape: 'rounded', x: 25, y: 32, width: 34, height: 26, defaultPhotoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80' },
-      { id: 'photo-2', label: 'Top Right Photo', shape: 'rounded', x: 75, y: 32, width: 34, height: 26, defaultPhotoUrl: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=400&q=80' },
-      { id: 'photo-3', label: 'Bottom Center Photo', shape: 'rounded', x: 50, y: 72, width: 78, height: 30, defaultPhotoUrl: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=400&q=80' },
+      { id: 'photo-1', label: 'Top Left Photo', shape: 'rounded', x: 25, y: 32, width: 34, height: 26 },
+      { id: 'photo-2', label: 'Top Right Photo', shape: 'rounded', x: 75, y: 32, width: 34, height: 26 },
+      { id: 'photo-3', label: 'Bottom Center Photo', shape: 'rounded', x: 50, y: 72, width: 78, height: 30 },
     ],
     textZones: [
       { id: 'headerTitle', label: 'Header Title', defaultValue: 'Happy Birthday', x: 50, y: 10, color: '#FFFFFF', fontFamily: 'Playfair Display', fontSize: 20, align: 'center', type: 'text' },
@@ -51,9 +52,10 @@ export const PRODUCTS: Product[] = [
     categoryLabel: 'Photo Collages',
     rating: 4.9,
     reviewsCount: 11,
-    thumbnail: 'https://images.unsplash.com/photo-1519689680058-324335c77eba?auto=format&fit=crop&w=600&q=80',
+    thumbnail: 'https://lovecraftbyse.com/wp-content/uploads/2025/02/welcome-baby-boy-scaled.webp',
+    baseImageUrl: 'https://lovecraftbyse.com/wp-content/uploads/2025/02/welcome-baby-boy-scaled.webp',
     images: [
-      'https://images.unsplash.com/photo-1519689680058-324335c77eba?auto=format&fit=crop&w=600&q=80',
+      'https://lovecraftbyse.com/wp-content/uploads/2025/02/welcome-baby-boy-scaled.webp',
     ],
     bestseller: true,
     onSale: true,
@@ -66,8 +68,8 @@ export const PRODUCTS: Product[] = [
       '100% Damage-proof bubble wrapper packaging',
     ],
     photoSlots: [
-      { id: 'babyPhoto', label: 'Baby Picture', shape: 'circle', x: 50, y: 28, width: 36, height: 26, defaultPhotoUrl: 'https://images.unsplash.com/photo-1519689680058-324335c77eba?auto=format&fit=crop&w=400&q=80' },
-      { id: 'parentsPhoto', label: 'Parents Picture', shape: 'circle', x: 50, y: 82, width: 28, height: 20, defaultPhotoUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=400&q=80' },
+      { id: 'babyPhoto', label: 'Baby Picture', shape: 'circle', x: 50, y: 28, width: 36, height: 26 },
+      { id: 'parentsPhoto', label: 'Parents Picture', shape: 'circle', x: 50, y: 82, width: 28, height: 20 },
     ],
     textZones: [
       { id: 'babyName', label: 'Baby Name', defaultValue: 'Arya Sharma', x: 50, y: 50, color: '#0369A1', fontFamily: 'Jost', fontSize: 20, align: 'center', type: 'text' },
@@ -96,9 +98,10 @@ export const PRODUCTS: Product[] = [
     categoryLabel: 'Family Frame',
     rating: 4.9,
     reviewsCount: 38,
-    thumbnail: 'https://images.unsplash.com/photo-1506880018603-83d5b814b5a6?auto=format&fit=crop&w=600&q=80',
+    thumbnail: 'https://lovecraftbyse.com/wp-content/uploads/2026/02/personalized-dad-heartbeat-frame-multiple-photos.webp-scaled.webp',
+    baseImageUrl: 'https://lovecraftbyse.com/wp-content/uploads/2026/02/personalized-dad-heartbeat-frame-multiple-photos.webp-scaled.webp',
     images: [
-      'https://images.unsplash.com/photo-1506880018603-83d5b814b5a6?auto=format&fit=crop&w=600&q=80',
+      'https://lovecraftbyse.com/wp-content/uploads/2026/02/personalized-dad-heartbeat-frame-multiple-photos.webp-scaled.webp',
     ],
     bestseller: true,
     onSale: true,
@@ -109,9 +112,9 @@ export const PRODUCTS: Product[] = [
       'Solid black wood frame',
     ],
     photoSlots: [
-      { id: 'photo-1', label: 'Left Photo', shape: 'rounded', x: 26, y: 40, width: 36, height: 35, defaultPhotoUrl: 'https://images.unsplash.com/photo-1506880018603-83d5b814b5a6?auto=format&fit=crop&w=400&q=80' },
-      { id: 'photo-2', label: 'Right Photo', shape: 'rounded', x: 74, y: 40, width: 36, height: 35, defaultPhotoUrl: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=400&q=80' },
-      { id: 'photo-3', label: 'Bottom Center Photo', shape: 'rounded', x: 50, y: 78, width: 60, height: 28, defaultPhotoUrl: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=400&q=80' },
+      { id: 'photo-1', label: 'Left Photo', shape: 'rounded', x: 26, y: 40, width: 36, height: 35 },
+      { id: 'photo-2', label: 'Right Photo', shape: 'rounded', x: 74, y: 40, width: 36, height: 35 },
+      { id: 'photo-3', label: 'Bottom Center Photo', shape: 'rounded', x: 50, y: 78, width: 60, height: 28 },
     ],
     textZones: [
       { id: 'dadTitle', label: 'Dad Title', defaultValue: 'Dad Heartbeat', x: 50, y: 15, color: '#FFFFFF', fontFamily: 'Playfair Display', fontSize: 20, align: 'center', type: 'text' },
