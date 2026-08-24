@@ -284,23 +284,45 @@ export function useCartStore() {
   };
 
   const placeOrder = (
-    customer: Order['customer'],
-    paymentMethod: Order['paymentMethod']
+    customerOrOrderData: Order['customer'] | any,
+    paymentMethodParam?: Order['paymentMethod']
   ): Order => {
-    const subtotal = memoryData.items.reduce((sum, item) => sum + item.itemTotalPrice, 0);
-    const total = subtotal;
+    let customer: Order['customer'];
+    let paymentMethod: Order['paymentMethod'];
+    let orderItems: CartItem[];
+    let orderSubtotal: number;
+    let paymentStatus: Order['paymentStatus'];
+    let orderStatus: Order['orderStatus'];
+
+    if (customerOrOrderData && customerOrOrderData.customer && customerOrOrderData.customer.fullName) {
+      // Called with Object payload from CheckoutPage
+      customer = customerOrOrderData.customer;
+      paymentMethod = customerOrOrderData.paymentMethod || 'PhonePe';
+      orderItems = customerOrOrderData.items && customerOrOrderData.items.length > 0 ? customerOrOrderData.items : [...memoryData.items];
+      orderSubtotal = customerOrOrderData.subtotal || orderItems.reduce((sum, item) => sum + item.itemTotalPrice, 0);
+      paymentStatus = customerOrOrderData.paymentStatus || (paymentMethod === 'COD' ? 'Pending' : 'Paid');
+      orderStatus = customerOrOrderData.orderStatus || 'Received';
+    } else {
+      // Called with positional arguments
+      customer = customerOrOrderData;
+      paymentMethod = paymentMethodParam || 'PhonePe';
+      orderItems = [...memoryData.items];
+      orderSubtotal = orderItems.reduce((sum, item) => sum + item.itemTotalPrice, 0);
+      paymentStatus = paymentMethod === 'COD' ? 'Pending' : 'Paid';
+      orderStatus = 'Received';
+    }
 
     const newOrder: Order = {
       id: `ORD-${Math.floor(100000 + Math.random() * 900000)}`,
       customer,
-      items: [...memoryData.items],
-      subtotal,
+      items: orderItems,
+      subtotal: orderSubtotal,
       discount: 0,
       shipping: 0,
-      total,
+      total: orderSubtotal,
       paymentMethod,
-      paymentStatus: paymentMethod === 'COD' ? 'COD' : 'Paid',
-      orderStatus: 'Received',
+      paymentStatus,
+      orderStatus,
       createdAt: new Date().toISOString(),
     };
 
@@ -308,6 +330,7 @@ export function useCartStore() {
     saveStoredLocalData({ ...memoryData, orders: updatedOrders, items: [] });
     notifyListeners();
 
+    // Instant Write to Cloud Firestore for Real-Time Admin Dispatch!
     firebaseCloudDb.setDocument('orders', newOrder.id, newOrder);
 
     return newOrder;
