@@ -706,7 +706,7 @@ export const AdminTemplateEditor: React.FC<AdminTemplateEditorProps> = ({
 
               </div>
             ) : selectedText ? (
-              <div className="space-y-4">
+              <div className="space-y-4 font-jost">
                 <div className="space-y-1">
                   <label className="font-bold text-gray-700">Text Field Label :</label>
                   <input
@@ -735,19 +735,117 @@ export const AdminTemplateEditor: React.FC<AdminTemplateEditorProps> = ({
                   />
                 </div>
 
+                {/* FONT STYLE / FAMILY SELECTOR */}
                 <div className="space-y-1">
-                  <label className="font-bold text-gray-700">Font Size (PX) :</label>
-                  <input
-                    type="number"
-                    value={selectedText.fontSize}
+                  <label className="font-bold text-gray-700 block">Font Style / Family :</label>
+                  <select
+                    value={selectedText.fontFamily || 'Jost'}
                     onChange={(e) =>
                       setTextZones(
-                        textZones.map((t) => (t.id === activeLayerId ? { ...t, fontSize: Number(e.target.value) } : t))
+                        textZones.map((t) => (t.id === activeLayerId ? { ...t, fontFamily: e.target.value } : t))
                       )
                     }
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-xl font-bold"
-                  />
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-xl font-bold text-xs"
+                  >
+                    <option value="Jost">Jost (Modern Clean Sans-Serif)</option>
+                    <option value="Playfair Display">Playfair Display (Classic Luxury Serif)</option>
+                    <option value="Dancing Script">Dancing Script (Cursive Romantic Script)</option>
+                    <option value="Great Vibes">Great Vibes (Elegant Calligraphy)</option>
+                    <option value="Cinzel">Cinzel (Regal Classic Serif)</option>
+                    <option value="Caveat">Caveat (Playful Hand-written Script)</option>
+                    <option value="Montserrat">Montserrat (Clean Bold Sans-Serif)</option>
+                    <option value="Georgia">Georgia (Traditional Book Serif)</option>
+                  </select>
                 </div>
+
+                {/* FONT COLOR PICKER & QUICK PALETTE */}
+                <div className="space-y-2">
+                  <label className="font-bold text-gray-700 block">Font Color :</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={selectedText.color || '#000000'}
+                      onChange={(e) =>
+                        setTextZones(
+                          textZones.map((t) => (t.id === activeLayerId ? { ...t, color: e.target.value } : t))
+                        )
+                      }
+                      className="w-10 h-10 rounded-xl border border-gray-300 cursor-pointer p-0.5"
+                    />
+                    <input
+                      type="text"
+                      value={selectedText.color || '#000000'}
+                      onChange={(e) =>
+                        setTextZones(
+                          textZones.map((t) => (t.id === activeLayerId ? { ...t, color: e.target.value } : t))
+                        )
+                      }
+                      className="flex-1 px-3 py-2 bg-gray-50 border border-gray-300 rounded-xl font-mono font-bold uppercase text-xs"
+                    />
+                  </div>
+
+                  {/* Quick Color Palette Presets */}
+                  <div className="flex items-center gap-1.5 pt-1">
+                    {[
+                      { name: 'Black', hex: '#000000' },
+                      { name: 'Navy', hex: '#160E4B' },
+                      { name: 'Pink', hex: '#F82BA9' },
+                      { name: 'Sky Blue', hex: '#0284C7' },
+                      { name: 'Red', hex: '#DC2626' },
+                      { name: 'Gold', hex: '#D97706' },
+                      { name: 'Emerald', hex: '#059669' },
+                      { name: 'White', hex: '#FFFFFF' },
+                    ].map((item) => (
+                      <button
+                        key={item.hex}
+                        onClick={() =>
+                          setTextZones(
+                            textZones.map((t) => (t.id === activeLayerId ? { ...t, color: item.hex } : t))
+                          )
+                        }
+                        className={`w-6 h-6 rounded-full border border-gray-300 shadow-2xs transition-transform hover:scale-110 cursor-pointer ${
+                          selectedText.color === item.hex ? 'ring-2 ring-blue-500 scale-110' : ''
+                        }`}
+                        style={{ backgroundColor: item.hex }}
+                        title={item.name}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="font-bold text-gray-700">Font Size (PX) :</label>
+                    <input
+                      type="number"
+                      value={selectedText.fontSize}
+                      onChange={(e) =>
+                        setTextZones(
+                          textZones.map((t) => (t.id === activeLayerId ? { ...t, fontSize: Number(e.target.value) } : t))
+                        )
+                      }
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-xl font-bold"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="font-bold text-gray-700">Alignment :</label>
+                    <select
+                      value={selectedText.align || 'center'}
+                      onChange={(e) =>
+                        setTextZones(
+                          textZones.map((t) => (t.id === activeLayerId ? { ...t, align: e.target.value as any } : t))
+                        )
+                      }
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-xl font-bold"
+                    >
+                      <option value="center">Center</option>
+                      <option value="left">Left</option>
+                      <option value="right">Right</option>
+                    </select>
+                  </div>
+                </div>
+
               </div>
             ) : (
               <p className="text-gray-400 italic">Click any photo slot or text zone on the canvas to inspect properties.</p>
