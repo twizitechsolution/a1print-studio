@@ -207,26 +207,50 @@ export function useCartStore() {
   };
 
   const addToCart = (
-    product: Product,
-    selectedSize: Product['sizes'][0],
-    selectedFrame: Product['frames'][0],
-    uploadedPhotoUrl: string,
-    customTextValues: Record<string, string>,
+    productOrItem: Product | any,
+    selectedSize?: Product['sizes'][0],
+    selectedFrame?: Product['frames'][0],
+    uploadedPhotoUrl?: string,
+    customTextValues?: Record<string, string>,
     quantity = 1,
     customizedFramePreviewUrl?: string
   ) => {
-    const itemTotalPrice = selectedSize.price * quantity;
-    const newItem: CartItem = {
-      id: `cart-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-      product,
-      selectedSize,
-      selectedFrame,
-      uploadedPhotoUrl,
-      customizedFramePreviewUrl,
-      customTextValues,
-      quantity,
-      itemTotalPrice,
-    };
+    let newItem: CartItem;
+
+    if (productOrItem && productOrItem.product && productOrItem.selectedSize) {
+      // Called with a single CartItem object payload
+      const itemObj = productOrItem;
+      newItem = {
+        id: itemObj.id || `cart-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+        product: itemObj.product,
+        selectedSize: itemObj.selectedSize,
+        selectedFrame: itemObj.selectedFrame || itemObj.product.frames?.[0],
+        uploadedPhotoUrl: itemObj.uploadedPhotoUrl || itemObj.product.thumbnail,
+        customizedFramePreviewUrl: itemObj.customizedFramePreviewUrl || itemObj.product.thumbnail,
+        customTextValues: itemObj.customTextValues || {},
+        quantity: itemObj.quantity || 1,
+        itemTotalPrice: itemObj.itemTotalPrice || (itemObj.selectedSize?.price || 699) * (itemObj.quantity || 1),
+      };
+    } else {
+      // Called with positional arguments
+      const product = productOrItem as Product;
+      const size = selectedSize || product?.sizes?.[0];
+      const frame = selectedFrame || product?.frames?.[0];
+      const price = size?.price || 699;
+      const itemTotalPrice = price * quantity;
+
+      newItem = {
+        id: `cart-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+        product,
+        selectedSize: size,
+        selectedFrame: frame,
+        uploadedPhotoUrl: uploadedPhotoUrl || product?.thumbnail || '',
+        customizedFramePreviewUrl: customizedFramePreviewUrl || product?.thumbnail || '',
+        customTextValues: customTextValues || {},
+        quantity,
+        itemTotalPrice,
+      };
+    }
 
     const updatedItems = [...memoryData.items, newItem];
     saveStoredLocalData({ ...memoryData, items: updatedItems });
