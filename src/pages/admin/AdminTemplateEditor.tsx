@@ -846,6 +846,36 @@ export const AdminTemplateEditor: React.FC<AdminTemplateEditorProps> = ({
                   </div>
                 </div>
 
+                {/* ZONE SPECIAL FUNCTIONALITY TYPE */}
+                <div className="space-y-1 pt-2 border-t border-gray-100">
+                  <label className="font-bold text-gray-700 block">ZONE SPECIAL FUNCTIONALITY :</label>
+                  <select
+                    value={selectedText.type || 'text'}
+                    onChange={(e) => {
+                      const newType = e.target.value as any;
+                      setTextZones(
+                        textZones.map((t) =>
+                          t.id === activeLayerId
+                            ? {
+                                ...t,
+                                type: newType,
+                                isCalendar: newType === 'calendar',
+                                isAIMessage: newType === 'message',
+                              }
+                            : t
+                        )
+                      );
+                    }}
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-xl font-bold text-xs"
+                  >
+                    <option value="text">Standard Text Field</option>
+                    <option value="calendar">📅 Interactive Month Calendar Grid (Red Heart Highlight ❤️)</option>
+                    <option value="message">💌 AI Love Message Generator (🔄 Regenerate Button)</option>
+                    <option value="date">Standard Date Selector</option>
+                    <option value="time">Standard Time Selector</option>
+                  </select>
+                </div>
+
               </div>
             ) : (
               <p className="text-gray-400 italic">Click any photo slot or text zone on the canvas to inspect properties.</p>

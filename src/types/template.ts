@@ -16,10 +16,12 @@ export interface TextZoneConfig {
   x: number; // Percentage X (0-100)
   y: number; // Percentage Y (0-100)
   fontSize: number; // font size in px
-  fontFamily: 'Playfair Display' | 'Jost' | 'Dancing Script' | 'Inter' | 'Great Vibes';
+  fontFamily: string;
   color: string;
   align: 'center' | 'left' | 'right';
-  type: 'text' | 'date' | 'time' | 'number';
+  type: 'text' | 'date' | 'time' | 'number' | 'calendar' | 'message';
+  isCalendar?: boolean;
+  isAIMessage?: boolean;
 }
 
 export interface UniversalFrameTemplate {

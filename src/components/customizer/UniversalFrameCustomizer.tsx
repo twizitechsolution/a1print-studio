@@ -2,7 +2,9 @@ import React, { useState } from 'react';
 import { UniversalFrameTemplate } from '../../types/template';
 import { PhotoCropModal } from './PhotoCropModal';
 import { generateHighResPrintFile } from '../../utils/printExporter';
-import { Eye, ArrowRight, Image as ImageIcon, Sparkles, Loader2, X, ShieldCheck, Truck, CreditCard, RefreshCw, Star, Tag, Clock, Flame } from 'lucide-react';
+import { Eye, ArrowRight, Image as ImageIcon, Sparkles, Loader2, X, ShieldCheck, Truck, CreditCard, RefreshCw, Star, Tag, Clock, Flame, Wand2 } from 'lucide-react';
+import { InteractiveCalendarZone } from './InteractiveCalendarZone';
+import { getRandomBirthdayMessage } from '../../data/messageBank';
 
 interface UniversalFrameCustomizerProps {
   template: UniversalFrameTemplate;
@@ -300,6 +302,27 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
             {/* Dynamic Text Zones Overlay using Saved Coordinates */}
             {textZones.map((zone) => {
               const val = textValues[zone.id] || zone.defaultValue;
+
+              // Render Interactive Calendar Grid with Red Heart Highlight if zone is calendar type
+              if (zone.isCalendar || zone.type === 'calendar') {
+                return (
+                  <div
+                    key={zone.id}
+                    className="absolute transform -translate-x-1/2 -translate-y-1/2"
+                    style={{
+                      left: `${zone.x}%`,
+                      top: `${zone.y}%`,
+                    }}
+                  >
+                    <InteractiveCalendarZone
+                      dateString={val}
+                      color={zone.color}
+                      fontFamily={zone.fontFamily}
+                    />
+                  </div>
+                );
+              }
+
               return (
                 <div
                   key={zone.id}
@@ -472,8 +495,9 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                     const labelLower = (zone.label || '').toLowerCase();
                     const idLower = (zone.id || '').toLowerCase();
                     
-                    const isDateField = zone.type === 'date' || labelLower.includes('date') || labelLower.includes('dob') || idLower.includes('date');
+                    const isDateField = zone.isCalendar || zone.type === 'calendar' || zone.type === 'date' || labelLower.includes('date') || labelLower.includes('dob') || idLower.includes('date');
                     const isTimeField = zone.type === 'time' || labelLower.includes('time') || idLower.includes('time');
+                    const isMessageField = zone.isAIMessage || zone.type === 'message' || labelLower.includes('message') || labelLower.includes('quote') || idLower.includes('message') || idLower.includes('quote');
 
                     if (isDateField) {
                       return (
@@ -494,6 +518,34 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                           value={textValues[zone.id] || ''}
                           onChange={(val) => setTextValues({ ...textValues, [zone.id]: val })}
                         />
+                      );
+                    }
+
+                    if (isMessageField) {
+                      return (
+                        <div key={zone.id} className="space-y-1.5 sm:col-span-2">
+                          <div className="flex items-center justify-between">
+                            <label className="text-xs font-bold text-gray-800">{zone.label} :</label>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newMsg = getRandomBirthdayMessage(textValues[zone.id] || zone.defaultValue);
+                                setTextValues({ ...textValues, [zone.id]: newMsg });
+                              }}
+                              className="text-[11px] font-extrabold text-[#F82BA9] hover:text-pink-700 bg-pink-50 hover:bg-pink-100 px-2.5 py-1 rounded-lg border border-pink-200 transition-colors flex items-center gap-1 cursor-pointer shadow-2xs"
+                              title="Click to generate another random love message"
+                            >
+                              <Wand2 className="w-3.5 h-3.5 text-[#F82BA9]" /> 🔄 Regenerate Message
+                            </button>
+                          </div>
+                          <textarea
+                            rows={2}
+                            value={textValues[zone.id] || ''}
+                            onChange={(e) => setTextValues({ ...textValues, [zone.id]: e.target.value })}
+                            className="w-full px-3 py-2 text-xs bg-white border border-gray-300 rounded-xl focus:outline-hidden focus:border-[#F82BA9] font-medium"
+                            placeholder="Type custom message or click Regenerate Message button..."
+                          />
+                        </div>
                       );
                     }
 
