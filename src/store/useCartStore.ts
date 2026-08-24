@@ -3,8 +3,8 @@ import { CartItem, Order, Product } from '../types';
 import { PRODUCTS as INITIAL_PRODUCTS } from '../data/products';
 import { firebaseCloudDb } from '../config/firebase';
 
-const STORAGE_KEY = 'a1print_store_data_v9';
-const DELETED_IDS_KEY = 'a1print_deleted_product_ids_v9';
+const STORAGE_KEY = 'a1print_store_data_v10';
+const DELETED_IDS_KEY = 'a1print_deleted_product_ids_v10';
 
 interface StoreData {
   products: Product[];
@@ -220,16 +220,11 @@ export function useCartStore() {
     if (productOrItem && productOrItem.product && productOrItem.selectedSize) {
       // Called with a single CartItem object payload
       const itemObj = productOrItem;
-      const customUrl = itemObj.customizedFramePreviewUrl || itemObj.uploadedPhotoUrl || itemObj.product.thumbnail;
-      const customizedProduct = {
-        ...itemObj.product,
-        thumbnail: customUrl,
-        image: customUrl,
-      };
+      const customUrl = itemObj.customizedFramePreviewUrl || itemObj.uploadedPhotoUrl;
 
       newItem = {
         id: itemObj.id || `cart-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-        product: customizedProduct,
+        product: itemObj.product,
         selectedSize: itemObj.selectedSize,
         selectedFrame: itemObj.selectedFrame || itemObj.product.frames?.[0],
         uploadedPhotoUrl: itemObj.uploadedPhotoUrl || itemObj.product.thumbnail,
@@ -245,18 +240,11 @@ export function useCartStore() {
       const frame = selectedFrame || product?.frames?.[0];
       const price = size?.price || 699;
       const itemTotalPrice = price * quantity;
-      const customUrl = customizedFramePreviewUrl || uploadedPhotoUrl || product?.thumbnail || '';
-      const customizedProduct = product
-        ? {
-            ...product,
-            thumbnail: customUrl || product.thumbnail,
-            image: customUrl || product.image,
-          }
-        : product;
+      const customUrl = customizedFramePreviewUrl || uploadedPhotoUrl;
 
       newItem = {
         id: `cart-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-        product: customizedProduct,
+        product,
         selectedSize: size,
         selectedFrame: frame,
         uploadedPhotoUrl: uploadedPhotoUrl || product?.thumbnail || '',
