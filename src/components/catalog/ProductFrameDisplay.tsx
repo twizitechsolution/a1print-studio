@@ -12,6 +12,14 @@ interface ProductFrameDisplayProps {
   fontScale?: number;
 }
 
+const DEFAULT_SAMPLE_PHOTOS = [
+  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=500&q=80',
+  'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=500&q=80',
+  'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=500&q=80',
+  'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=500&q=80',
+  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=500&q=80',
+];
+
 export const ProductFrameDisplay: React.FC<ProductFrameDisplayProps> = ({
   product,
   customTextValues = {},
@@ -23,28 +31,43 @@ export const ProductFrameDisplay: React.FC<ProductFrameDisplayProps> = ({
   const photoSlots: PhotoSlotConfig[] = product.photoSlots || [];
   const textZones: TextZoneConfig[] = product.textZones || [];
 
-  // Determine base background image URL safely
+  // Determine base background image safely (only use valid non-base64, non-single-bg URLs)
   const baseImgSrc =
     product.baseImageUrl ||
-    (product.thumbnail && !product.thumbnail.startsWith('data:image') ? product.thumbnail : null) ||
-    (product.image && !product.image.startsWith('data:image') ? product.image : null) ||
-    'https://lovecraftbyse.com/wp-content/uploads/2025/06/single-bg.webp';
+    (product.thumbnail && !product.thumbnail.startsWith('data:') && !product.thumbnail.includes('single-bg')
+      ? product.thumbnail
+      : null) ||
+    (product.image && !product.image.startsWith('data:') && !product.image.includes('single-bg')
+      ? product.image
+      : null);
+
+  const isDarkPoster = product.id.includes('brother-sister') || product.id.includes('dad') || product.id.includes('dark');
 
   return (
     <div
-      className={`relative w-full aspect-[3/4.4] rounded-xs border-4 sm:border-8 border-black shadow-xl bg-white overflow-hidden font-serif select-none ${className}`}
+      className={`relative w-full aspect-[3/4.4] rounded-xs border-4 sm:border-8 border-black shadow-xl overflow-hidden font-serif select-none ${
+        isDarkPoster ? 'bg-black text-white' : 'bg-white text-gray-900'
+      } ${className}`}
     >
-      {/* Base Frame Poster Image Artwork */}
-      <img
-        src={baseImgSrc}
-        alt={product.title}
-        className="w-full h-full object-cover absolute inset-0 pointer-events-none"
-      />
+      {/* Base Frame Poster Image Artwork if valid image exists */}
+      {baseImgSrc && (
+        <img
+          src={baseImgSrc}
+          alt={product.title}
+          className="w-full h-full object-cover absolute inset-0 pointer-events-none"
+          onError={(e: any) => {
+            e.target.style.display = 'none';
+          }}
+        />
+      )}
 
-      {/* Render Photo Slots with Cutout Shapes */}
-      {photoSlots.map((slot) => {
-        const photoSrc = customPhotoValues[slot.id] || slot.defaultPhotoUrl;
-        if (!photoSrc) return null;
+      {/* Render Photo Slots with Cutout Shapes (Falls back to default sample photos so frame is NEVER empty!) */}
+      {photoSlots.map((slot, idx) => {
+        const photoSrc =
+          customPhotoValues[slot.id] ||
+          slot.defaultPhotoUrl ||
+          DEFAULT_SAMPLE_PHOTOS[idx % DEFAULT_SAMPLE_PHOTOS.length];
+
         const shapeStyles = getFrameShapeStyles(slot.shape);
 
         return (
@@ -64,6 +87,9 @@ export const ProductFrameDisplay: React.FC<ProductFrameDisplayProps> = ({
               src={photoSrc}
               alt={slot.label}
               className="w-full h-full object-cover rounded-[inherit]"
+              onError={(e: any) => {
+                e.target.src = DEFAULT_SAMPLE_PHOTOS[idx % DEFAULT_SAMPLE_PHOTOS.length];
+              }}
             />
           </div>
         );
@@ -101,7 +127,7 @@ export const ProductFrameDisplay: React.FC<ProductFrameDisplayProps> = ({
             >
               <InteractiveCalendarZone
                 dateString={val}
-                color={zone.color}
+                color={zone.color || (isDarkPoster ? '#FFFFFF' : '#160E4B')}
                 fontFamily={zone.fontFamily}
                 scale={fontScale}
               />
@@ -118,9 +144,9 @@ export const ProductFrameDisplay: React.FC<ProductFrameDisplayProps> = ({
               top: `${zone.y}%`,
               width: zone.maxWidth ? `${zone.maxWidth}%` : '85%',
               maxWidth: zone.maxWidth ? `${zone.maxWidth}%` : '85%',
-              color: zone.color || '#FFFFFF',
+              color: zone.color || (isDarkPoster ? '#FFFFFF' : '#160E4B'),
               fontFamily: zone.fontFamily || 'Jost',
-              fontSize: `${Math.max(3, (zone.fontSize || 12) * fontScale)}px`,
+              fontSize: `${Math.max(3.5, (zone.fontSize || 12) * fontScale)}px`,
               fontWeight: 'bold',
               textAlign: zone.align || 'center',
             }}
