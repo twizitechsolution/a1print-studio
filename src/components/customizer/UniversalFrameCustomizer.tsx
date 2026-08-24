@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { UniversalFrameTemplate } from '../../types/template';
 import { PhotoCropModal } from './PhotoCropModal';
 import { generateHighResPrintFile } from '../../utils/printExporter';
