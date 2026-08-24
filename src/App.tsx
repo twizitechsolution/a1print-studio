@@ -85,44 +85,72 @@ export const App: React.FC = () => {
     selectedSize: 'A4' | 'A3',
     customizedFramePreviewUrl?: string
   ) => {
-    const prod = activeProduct;
-    const sizeOpt = prod.sizes.find((s) => s.id.includes(selectedSize.toLowerCase())) || prod.sizes[0];
-    const frameOpt = prod.frames[0];
+    try {
+      const prod = activeProduct;
+      const sizeOpt = prod?.sizes?.find((s) => s.id.includes(selectedSize.toLowerCase())) || prod?.sizes?.[0] || {
+        id: 'size-a4',
+        name: 'A4 (8x12 Inch)',
+        dimensions: '8x12 Inch',
+        price: 699,
+        originalPrice: 999,
+        discountPercentage: 30,
+      };
+      const frameOpt = prod?.frames?.[0] || {
+        id: 'classic-black',
+        name: 'Classic Black Wood',
+        borderStyle: 'solid',
+        frameColor: '#000000',
+        borderColorClass: 'border-black',
+      };
 
-    // Compress all uploaded Base64 photo slot images to crisp ~50KB JPEGs (Reduces 6MB payload to 300KB!)
-    const compressedPhotoValues: Record<string, string> = {};
-    for (const [key, val] of Object.entries(photoValues)) {
-      if (val && val.startsWith('data:image')) {
-        compressedPhotoValues[key] = await compressImageBase64(val, 600, 0.70);
-      } else {
-        compressedPhotoValues[key] = val;
-      }
+      // Compress photo slot uploads in parallel with 1.5-second timeout guard
+      const compressedPhotoValues: Record<string, string> = {};
+      await Promise.all(
+        Object.entries(photoValues || {}).map(async ([key, val]) => {
+          if (val && val.startsWith('data:image')) {
+            try {
+              compressedPhotoValues[key] = await Promise.race([
+                compressImageBase64(val, 600, 0.70),
+                new Promise<string>((res) => setTimeout(() => res(val), 1500)),
+              ]);
+            } catch (e) {
+              compressedPhotoValues[key] = val;
+            }
+          } else {
+            compressedPhotoValues[key] = val;
+          }
+        })
+      );
+
+      const mergedValues = {
+        ...compressedPhotoValues,
+        ...textValues,
+      };
+
+      const firstPhoto = Object.values(compressedPhotoValues).find((val) => val && val.length > 0) || prod?.thumbnail || '';
+
+      const cartItemData = {
+        product: prod,
+        selectedSize: sizeOpt,
+        selectedFrame: frameOpt,
+        uploadedPhotoUrl: firstPhoto,
+        customizedFramePreviewUrl: customizedFramePreviewUrl || prod?.thumbnail || '',
+        customTextValues: mergedValues,
+        quantity: 1,
+        photoScale: 1,
+        photoPosition: { x: 0, y: 0 },
+        photoRotation: 0,
+        itemTotalPrice: sizeOpt.price,
+      };
+
+      addToCart(cartItemData);
+      setCurrentPage('checkout');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (err) {
+      console.error('Proceed to checkout fallback error:', err);
+      setCurrentPage('checkout');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
-
-    const mergedValues = {
-      ...compressedPhotoValues,
-      ...textValues,
-    };
-
-    const firstPhoto = Object.values(compressedPhotoValues).find((val) => val && val.length > 0) || prod.thumbnail;
-
-    const cartItemData = {
-      product: prod,
-      selectedSize: sizeOpt,
-      selectedFrame: frameOpt,
-      uploadedPhotoUrl: firstPhoto,
-      customizedFramePreviewUrl: customizedFramePreviewUrl || prod.thumbnail,
-      customTextValues: mergedValues,
-      quantity: 1,
-      photoScale: 1,
-      photoPosition: { x: 0, y: 0 },
-      photoRotation: 0,
-      itemTotalPrice: sizeOpt.price,
-    };
-
-    addToCart(cartItemData);
-    setCurrentPage('checkout');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleOrderSuccess = (order: Order) => {
