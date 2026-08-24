@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Product } from '../../types';
 import { PhotoSlotConfig, TextZoneConfig } from '../../types/template';
 import { Upload, Sparkles, X, Check, Image as ImageIcon, Loader2 } from 'lucide-react';
@@ -6,17 +6,17 @@ import { compressImageBase64 } from '../../utils/imageCompressor';
 
 interface AdminProductListingModalProps {
   isOpen: boolean;
+  editingProduct?: Product | null;
   onClose: () => void;
   onSaveProduct: (newProduct: Product) => void;
 }
 
 export const AdminProductListingModal: React.FC<AdminProductListingModalProps> = ({
   isOpen,
+  editingProduct,
   onClose,
   onSaveProduct,
 }) => {
-  if (!isOpen) return null;
-
   const [title, setTitle] = useState<string>('');
   const [category, setCategory] = useState<string>('Photo Collages');
   const [price, setPrice] = useState<number>(699);
@@ -26,6 +26,28 @@ export const AdminProductListingModal: React.FC<AdminProductListingModalProps> =
 
   const [detectedPhotoSlots, setDetectedPhotoSlots] = useState<PhotoSlotConfig[]>([]);
   const [detectedTextZones, setDetectedTextZones] = useState<TextZoneConfig[]>([]);
+
+  useEffect(() => {
+    if (editingProduct) {
+      setTitle(editingProduct.title || '');
+      setCategory(editingProduct.categoryLabel || 'Photo Collages');
+      setPrice(editingProduct.sizes?.[0]?.price || 699);
+      setOriginalPrice(editingProduct.sizes?.[0]?.originalPrice || 999);
+      setUploadedPosterUrl(editingProduct.thumbnail || null);
+      setDetectedPhotoSlots(editingProduct.photoSlots || []);
+      setDetectedTextZones(editingProduct.textZones || []);
+    } else {
+      setTitle('');
+      setCategory('Photo Collages');
+      setPrice(699);
+      setOriginalPrice(999);
+      setUploadedPosterUrl(null);
+      setDetectedPhotoSlots([]);
+      setDetectedTextZones([]);
+    }
+  }, [editingProduct, isOpen]);
+
+  if (!isOpen) return null;
 
   // Smart Auto-Detection & Image Compression for newly uploaded poster image
   const handleUploadImage = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -118,7 +140,7 @@ export const AdminProductListingModal: React.FC<AdminProductListingModalProps> =
     };
 
     const newProd: Product = {
-      id: `frame-${Date.now()}`,
+      id: editingProduct?.id || `frame-${Date.now()}`,
       slug: title.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
       title,
       subtitle: 'Premium Archival Custom Frame',
