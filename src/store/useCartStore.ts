@@ -119,25 +119,18 @@ async function initCloudSync() {
   try {
     const deletedIds = getDeletedProductIds();
 
-    // 1. Sync all local memory products to Cloud Firestore so new custom frames are saved in Cloud Database!
-    memoryData.products.forEach((prod) => {
-      if (!deletedIds.has(prod.id)) {
-        firebaseCloudDb.setDocument('products', prod.id, prod);
-      }
-    });
-
-    // 2. Fetch fresh Cloud Firestore catalog
+    // 1. FETCH CLOUD FIRESTORE CATALOG FIRST (Cloud-First Priority!)
     const cloudProds = await firebaseCloudDb.getCollection('products');
 
     if (cloudProds && cloudProds.length > 0) {
       const filteredCloud = cloudProds.filter((p: Product) => !deletedIds.has(p.id));
       if (filteredCloud.length > 0) {
-        // Merge cloud products with local memory so zero products are lost
+        // Merge cloud products: Cloud Firestore ALWAYS overwrites local memory defaults!
         const merged = [...memoryData.products];
         filteredCloud.forEach((cp) => {
           const idx = merged.findIndex((mp) => mp.id === cp.id);
           if (idx !== -1) {
-            merged[idx] = cp;
+            merged[idx] = cp; // CLOUD WINS 100%! Preserves all custom visual edits!
           } else {
             merged.push(cp);
           }
@@ -148,6 +141,14 @@ async function initCloudSync() {
         notifyListeners();
       }
     }
+
+    // 2. Only push products to Cloud Firestore if they DO NOT exist in Cloud Firestore yet!
+    const existingCloudIds = new Set((cloudProds || []).map((cp: Product) => cp.id));
+    memoryData.products.forEach((prod) => {
+      if (!deletedIds.has(prod.id) && !existingCloudIds.has(prod.id)) {
+        firebaseCloudDb.setDocument('products', prod.id, prod);
+      }
+    });
 
     const cloudOrders = await firebaseCloudDb.getCollection('orders');
     if (cloudOrders && cloudOrders.length > 0) {
