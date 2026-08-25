@@ -73,7 +73,7 @@ export const PRODUCTS: Product[] = [
     ],
     textZones: [
       { id: 'babyName', label: 'Baby Name', defaultValue: 'Arya Sharma', x: 50, y: 50, color: '#0369A1', fontFamily: 'Jost', fontSize: 20, align: 'center', type: 'text' },
-      { id: 'birthDateDay', label: 'Date of Birth (Calendar ❤️)', defaultValue: '31 Jan 2025', x: 22, y: 35, color: '#334155', fontFamily: 'Jost', fontSize: 11, align: 'center', type: 'calendar', isCalendar: true },
+      { id: 'birthDateDay', label: 'Date of Birth', defaultValue: '31 Jan 2025', x: 22, y: 35, color: '#334155', fontFamily: 'Jost', fontSize: 11, align: 'center', type: 'date', isCalendar: false },
       { id: 'birthTime', label: 'Birth Time', defaultValue: '11:00 AM', x: 78, y: 35, color: '#334155', fontFamily: 'Jost', fontSize: 11, align: 'center', type: 'time' },
       { id: 'bloodGroup', label: 'Blood Group', defaultValue: 'A+', x: 22, y: 55, color: '#DC2626', fontFamily: 'Jost', fontSize: 12, align: 'center', type: 'text' },
       { id: 'height', label: 'Height (Cm)', defaultValue: '49 Cm', x: 78, y: 55, color: '#0369A1', fontFamily: 'Jost', fontSize: 11, align: 'center', type: 'text' },

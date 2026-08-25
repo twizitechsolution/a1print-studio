@@ -84,16 +84,7 @@ export const ProductFrameDisplay: React.FC<ProductFrameDisplayProps> = ({
         const idLower = (zone.id || '').toLowerCase();
         const valLower = (zone.defaultValue || '').toLowerCase();
 
-        const isCalendarZone =
-          zone.isCalendar ||
-          zone.type === 'calendar' ||
-          labelLower.includes('calendar') ||
-          labelLower.includes('date') ||
-          labelLower.includes('dob') ||
-          idLower.includes('calendar') ||
-          idLower.includes('date') ||
-          valLower.includes('february') ||
-          valLower.includes('january');
+        const isCalendarZone = zone.type === 'calendar' || zone.isCalendar === true;
 
         if (isCalendarZone) {
           return (

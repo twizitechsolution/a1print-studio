@@ -480,6 +480,37 @@ export const AdminTemplateEditor: React.FC<AdminTemplateEditorProps> = ({
               {/* Rendered Text Zones (Exclusively for this product!) */}
               {textZones.map((zone) => {
                 const isActive = activeLayerId === zone.id;
+                const isCalendarZone = zone.type === 'calendar' || zone.isCalendar === true;
+
+                if (isCalendarZone) {
+                  return (
+                    <div
+                      key={zone.id}
+                      onMouseDown={(e) => {
+                        e.stopPropagation();
+                        setActiveLayerId(zone.id);
+                        setIsDragging(true);
+                      }}
+                      className={`absolute cursor-grab active:cursor-grabbing transition-all p-1 rounded-md transform -translate-x-1/2 -translate-y-1/2 ${
+                        isActive
+                          ? 'border-2 border-[#9333EA] bg-purple-500/20 z-30 ring-2 ring-purple-500/40'
+                          : 'hover:border border-dashed border-gray-400 z-20'
+                      }`}
+                      style={{
+                        left: `${zone.x}%`,
+                        top: `${zone.y}%`,
+                      }}
+                    >
+                      <InteractiveCalendarZone
+                        dateString={zone.defaultValue || '14 Feb 2026'}
+                        color={zone.color}
+                        fontFamily={zone.fontFamily}
+                        scale={0.7}
+                      />
+                    </div>
+                  );
+                }
+
                 return (
                   <div
                     key={zone.id}
