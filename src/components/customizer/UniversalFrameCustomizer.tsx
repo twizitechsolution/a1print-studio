@@ -639,30 +639,15 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                       );
                     }
 
-                    const hasBeenGenerated = generatedZones[zone.id];
                     return (
-                      <div key={zone.id} className="space-y-1 sm:col-span-2">
-                        <div className="flex items-center justify-between">
-                          <label className="text-xs font-bold text-gray-800">{zone.label} :</label>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const newMsg = getRandomBirthdayMessage(textValues[zone.id] || zone.defaultValue);
-                              setTextValues({ ...textValues, [zone.id]: newMsg });
-                              setGeneratedZones((prev) => ({ ...prev, [zone.id]: true }));
-                            }}
-                            className="text-[11px] font-extrabold text-[#F82BA9] hover:text-pink-700 bg-pink-50 hover:bg-pink-100 px-3 py-1 rounded-xl border border-pink-200 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                            title="Click to generate or regenerate custom text"
-                          >
-                            {hasBeenGenerated ? '🔄 Regenerate Message' : '✨ Generate Message'}
-                          </button>
-                        </div>
+                      <div key={zone.id} className="space-y-1 sm:col-span-1">
+                        <label className="text-xs font-bold text-gray-800 block">{zone.label} :</label>
                         <input
-                          type={zone.type || 'text'}
+                          type="text"
                           value={textValues[zone.id] || ''}
                           onChange={(e) => setTextValues({ ...textValues, [zone.id]: e.target.value })}
                           className="w-full px-3 py-2 text-xs bg-white border border-gray-300 rounded-xl focus:outline-hidden focus:border-[#F82BA9] font-medium"
-                          placeholder="Type custom text or click Generate Message button..."
+                          placeholder={`Enter ${zone.label}...`}
                         />
                       </div>
                     );
