@@ -585,7 +585,7 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                     
                     const isDateField = zone.isCalendar || zone.type === 'calendar' || zone.type === 'date' || labelLower.includes('date') || labelLower.includes('dob') || idLower.includes('date');
                     const isTimeField = zone.type === 'time' || labelLower.includes('time') || idLower.includes('time');
-                    const isMessageField = zone.isAIMessage || zone.type === 'message' || labelLower.includes('message') || labelLower.includes('quote') || idLower.includes('message') || idLower.includes('quote');
+                    const isMessageField = zone.type === 'message' || zone.isAIMessage === true;
 
                     if (isDateField) {
                       return (

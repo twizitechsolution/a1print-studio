@@ -1,8 +1,24 @@
-import React, { useState } from 'react';
-import { Mail, Phone, MapPin, Send, CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Mail, Phone, Send, CheckCircle2, Share2, Facebook, Instagram, Twitter, Linkedin } from 'lucide-react';
+import { SocialSettings } from '../components/admin/AdminStoreSettings';
 
 export const ContactPage: React.FC = () => {
   const [submitted, setSubmitted] = useState(false);
+  const [socials, setSocials] = useState<SocialSettings>({
+    facebookUrl: 'https://facebook.com',
+    instagramUrl: 'https://instagram.com',
+    twitterUrl: 'https://twitter.com',
+    linkedinUrl: 'https://linkedin.com',
+  });
+
+  useEffect(() => {
+    const saved = localStorage.getItem('a1print_social_settings');
+    if (saved) {
+      try {
+        setSocials(JSON.parse(saved));
+      } catch (e) {}
+    }
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -10,13 +26,13 @@ export const ContactPage: React.FC = () => {
   };
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-12 font-sans">
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-12 font-sans select-none">
       <div className="text-center max-w-xl mx-auto space-y-2">
         <span className="px-3 py-1 bg-[#F82BA9]/10 text-[#F82BA9] font-bold text-xs rounded-full uppercase tracking-wider font-jost">
           GET IN TOUCH
         </span>
         <h1 className="font-playfair text-4xl font-extrabold text-[#160E4B]">
-          Contact LoveCraft.A1 Support
+          Contact A1print Studio Support
         </h1>
         <p className="text-xs text-gray-600">
           Have questions about your custom order or need assistance with live customization?
@@ -42,19 +58,62 @@ export const ContactPage: React.FC = () => {
             </div>
             <div>
               <h4 className="font-bold text-sm text-[#160E4B]">Email Support</h4>
-              <p className="text-xs text-gray-600">support@a1printlovecraft.com</p>
+              <p className="text-xs text-gray-600">support@a1print.com</p>
             </div>
           </div>
 
-          <div className="p-5 bg-white rounded-2xl border border-gray-200 shadow-xs flex items-center gap-4">
-            <div className="w-10 h-10 rounded-xl bg-pink-50 text-[#F82BA9] flex items-center justify-center shrink-0">
-              <MapPin className="w-5 h-5" />
+          {/* Social Media Links Card */}
+          <div className="p-5 bg-white rounded-2xl border border-gray-200 shadow-xs space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-pink-50 text-[#F82BA9] flex items-center justify-center shrink-0">
+                <Share2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="font-bold text-sm text-[#160E4B]">Official Social Media Handles</h4>
+                <p className="text-[11px] text-gray-500">Connect with us on official channels</p>
+              </div>
             </div>
-            <div>
-              <h4 className="font-bold text-sm text-[#160E4B]">Print Studio & Store Address</h4>
-              <p className="text-xs text-gray-600 leading-relaxed">
-                minibazar, blockroad, near Bank Of India, Dhamanagar, Odisha 756117
-              </p>
+
+            <div className="flex items-center gap-3 pt-2">
+              <a
+                href={socials.facebookUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-10 h-10 rounded-xl bg-gray-100 hover:bg-[#F82BA9] text-gray-700 hover:text-white flex items-center justify-center transition-colors shadow-2xs"
+                title="Facebook"
+              >
+                <Facebook className="w-5 h-5" />
+              </a>
+
+              <a
+                href={socials.instagramUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-10 h-10 rounded-xl bg-gray-100 hover:bg-[#F82BA9] text-gray-700 hover:text-white flex items-center justify-center transition-colors shadow-2xs"
+                title="Instagram"
+              >
+                <Instagram className="w-5 h-5" />
+              </a>
+
+              <a
+                href={socials.twitterUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-10 h-10 rounded-xl bg-gray-100 hover:bg-[#F82BA9] text-gray-700 hover:text-white flex items-center justify-center transition-colors shadow-2xs"
+                title="Twitter / X"
+              >
+                <Twitter className="w-5 h-5" />
+              </a>
+
+              <a
+                href={socials.linkedinUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-10 h-10 rounded-xl bg-gray-100 hover:bg-[#F82BA9] text-gray-700 hover:text-white flex items-center justify-center transition-colors shadow-2xs"
+                title="LinkedIn"
+              >
+                <Linkedin className="w-5 h-5" />
+              </a>
             </div>
           </div>
         </div>
@@ -105,7 +164,7 @@ export const ContactPage: React.FC = () => {
 
               <button
                 type="submit"
-                className="w-full py-3 bg-[#F82BA9] hover:bg-[#D61B90] text-white font-bold text-xs rounded-xl shadow-md transition-colors flex items-center justify-center gap-2"
+                className="w-full py-3 bg-[#F82BA9] hover:bg-[#D61B90] text-white font-bold text-xs rounded-xl shadow-md transition-colors flex items-center justify-center gap-2 cursor-pointer"
               >
                 <Send className="w-4 h-4" /> Send Message
               </button>

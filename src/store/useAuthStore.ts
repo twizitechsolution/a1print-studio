@@ -28,32 +28,11 @@ interface AuthState {
   authModalMode: 'login' | 'register';
 }
 
-const AUTH_STORAGE_KEY = 'a1print_customer_auth_v5';
-
-const defaultUser: CustomerUser = {
-  id: 'cust-demo-101',
-  fullName: 'Nirod Behera',
-  email: 'nirod@a1printstudio.com',
-  phone: '7790098808',
-  createdAt: '2026-01-15T00:00:00.000Z',
-  savedAddresses: [
-    {
-      id: 'addr-1',
-      type: 'Home',
-      fullName: 'Nirod Behera',
-      phone: '7790098808',
-      address: 'Rasulgarh Chowk, Near BOI',
-      city: 'Bhubaneswar',
-      state: 'Odisha',
-      pincode: '751007',
-      isDefault: true,
-    },
-  ],
-};
+const AUTH_STORAGE_KEY = 'a1print_customer_auth_v6';
 
 let globalAuthState: AuthState = {
-  user: defaultUser,
-  isAuthenticated: true,
+  user: null,
+  isAuthenticated: false,
   isAuthModalOpen: false,
   authModalMode: 'login',
 };
@@ -113,7 +92,7 @@ export function useAuthStore() {
       id: `cust-${Date.now()}`,
       fullName: emailOrPhone.includes('@') ? emailOrPhone.split('@')[0] : 'Valued Customer',
       email: emailOrPhone.includes('@') ? emailOrPhone : 'customer@a1printstudio.com',
-      phone: emailOrPhone.includes('@') ? '9583626786' : emailOrPhone,
+      phone: emailOrPhone.includes('@') ? '9876543210' : emailOrPhone,
       createdAt: new Date().toISOString(),
       savedAddresses: [],
     };

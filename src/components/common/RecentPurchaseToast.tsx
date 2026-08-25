@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingBag, X, CheckCircle2 } from 'lucide-react';
+import { ShoppingBag, X } from 'lucide-react';
 
 interface PurchaseNotification {
   id: string;
@@ -27,32 +27,33 @@ export const RecentPurchaseToast: React.FC = () => {
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
-    let timeoutId: NodeJS.Timeout;
+    let hideTimer: NodeJS.Timeout;
+    let gapTimer: NodeJS.Timeout;
 
-    // Show initial toast after 3 seconds
-    const initialTimer = setTimeout(() => {
+    const triggerPopupCycle = () => {
+      // 1. Make visible for 4 seconds
       setIsVisible(true);
-      scheduleNextPopup();
-    }, 3000);
 
-    const scheduleNextPopup = () => {
-      // 10 to 15 seconds random interval (10000ms - 15000ms)
-      const randomInterval = Math.floor(Math.random() * 5000) + 10000;
-
-      timeoutId = setTimeout(() => {
+      hideTimer = setTimeout(() => {
         setIsVisible(false);
 
-        setTimeout(() => {
+        // 2. Wait 20 seconds quiet gap interval before triggering next popup
+        gapTimer = setTimeout(() => {
           setCurrentIndex((prev) => (prev + 1) % SAMPLE_NOTIFICATIONS.length);
-          setIsVisible(true);
-          scheduleNextPopup();
-        }, 600);
-      }, randomInterval);
+          triggerPopupCycle();
+        }, 20000);
+      }, 4000);
     };
 
+    // Initial popup triggers after 3 seconds on page load
+    const initialDelay = setTimeout(() => {
+      triggerPopupCycle();
+    }, 3000);
+
     return () => {
-      clearTimeout(initialTimer);
-      clearTimeout(timeoutId);
+      clearTimeout(initialDelay);
+      clearTimeout(hideTimer);
+      clearTimeout(gapTimer);
     };
   }, []);
 
