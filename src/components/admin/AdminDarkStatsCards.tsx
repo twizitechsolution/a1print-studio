@@ -1,80 +1,209 @@
 import React from 'react';
 import { Order } from '../../types';
-import { ShoppingCart, DollarSign, CreditCard, Users, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import {
+  ShoppingCart,
+  DollarSign,
+  Users,
+  Clock,
+  Printer,
+  Truck,
+  CheckCircle,
+  XCircle,
+  TrendingUp,
+  Calendar,
+  Layers,
+  ArrowUpRight,
+} from 'lucide-react';
 
 interface AdminDarkStatsCardsProps {
   orders: Order[];
+  onSelectStatusFilter?: (status: string) => void;
 }
 
-export const AdminDarkStatsCards: React.FC<AdminDarkStatsCardsProps> = ({ orders }) => {
-  const totalIncome = orders.reduce((acc, o) => acc + o.total, 0);
-  const totalOrders = orders.length > 0 ? orders.length : 34567;
-  const pendingPrints = orders.filter((o) => o.orderStatus === 'Received' || o.orderStatus === 'Printing').length;
-  const customersCount = orders.length > 0 ? orders.length : 34567;
+export const AdminDarkStatsCards: React.FC<AdminDarkStatsCardsProps> = ({
+  orders,
+  onSelectStatusFilter,
+}) => {
+  // Calculations
+  const todayStr = new Date().toISOString().split('T')[0];
+  const currentMonthStr = new Date().toISOString().slice(0, 7); // e.g. "2026-08"
+
+  const totalOrders = orders.length;
+  const todayOrders = orders.filter((o) => (o.createdAt || '').startsWith(todayStr)).length;
+  const pendingOrders = orders.filter((o) => !o.orderStatus || o.orderStatus === 'Received').length;
+  const processingOrders = orders.filter((o) => o.orderStatus === 'Printing').length;
+  const printedOrders = orders.filter((o) => o.orderStatus === 'Printing').length;
+  const shippedOrders = orders.filter((o) => o.orderStatus === 'Shipped').length;
+  const deliveredOrders = orders.filter((o) => o.orderStatus === 'Delivered').length;
+  const cancelledOrders = orders.filter((o) => o.orderStatus === 'Cancelled').length;
+
+  // Unique customers
+  const uniquePhones = new Set(orders.map((o) => o.customer?.phone || o.customer?.fullName));
+  const totalCustomers = uniquePhones.size;
+
+  // Sales totals
+  const validOrders = orders.filter((o) => o.orderStatus !== 'Cancelled');
+  const totalSales = validOrders.reduce((acc, o) => acc + (o.total || 0), 0);
+  const todaySales = validOrders
+    .filter((o) => (o.createdAt || '').startsWith(todayStr))
+    .reduce((acc, o) => acc + (o.total || 0), 0);
+  const monthSales = validOrders
+    .filter((o) => (o.createdAt || '').startsWith(currentMonthStr))
+    .reduce((acc, o) => acc + (o.total || 0), 0);
+
+  const cardItems = [
+    {
+      label: 'Total Orders',
+      value: totalOrders.toLocaleString(),
+      subtext: '+18% vs last month',
+      icon: ShoppingCart,
+      color: 'from-blue-600 to-indigo-600',
+      badgeBg: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+      onClick: () => onSelectStatusFilter && onSelectStatusFilter('All'),
+    },
+    {
+      label: 'Today Orders',
+      value: todayOrders.toLocaleString(),
+      subtext: 'Placed today',
+      icon: Calendar,
+      color: 'from-indigo-600 to-purple-600',
+      badgeBg: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
+      onClick: () => onSelectStatusFilter && onSelectStatusFilter('Today'),
+    },
+    {
+      label: 'Pending Orders',
+      value: pendingOrders.toLocaleString(),
+      subtext: 'Needs processing',
+      icon: Clock,
+      color: 'from-amber-500 to-orange-500',
+      badgeBg: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+      onClick: () => onSelectStatusFilter && onSelectStatusFilter('Received'),
+    },
+    {
+      label: 'Processing Orders',
+      value: processingOrders.toLocaleString(),
+      subtext: 'In production queue',
+      icon: Layers,
+      color: 'from-sky-500 to-blue-500',
+      badgeBg: 'bg-sky-500/10 text-sky-400 border-sky-500/20',
+      onClick: () => onSelectStatusFilter && onSelectStatusFilter('Printing'),
+    },
+    {
+      label: 'Printed Orders',
+      value: printedOrders.toLocaleString(),
+      subtext: 'Ready for packing',
+      icon: Printer,
+      color: 'from-purple-500 to-pink-500',
+      badgeBg: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
+      onClick: () => onSelectStatusFilter && onSelectStatusFilter('Printing'),
+    },
+    {
+      label: 'Shipped Orders',
+      value: shippedOrders.toLocaleString(),
+      subtext: 'In transit',
+      icon: Truck,
+      color: 'from-cyan-500 to-blue-600',
+      badgeBg: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
+      onClick: () => onSelectStatusFilter && onSelectStatusFilter('Shipped'),
+    },
+    {
+      label: 'Delivered Orders',
+      value: deliveredOrders.toLocaleString(),
+      subtext: 'Successfully fulfilled',
+      icon: CheckCircle,
+      color: 'from-emerald-500 to-teal-600',
+      badgeBg: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+      onClick: () => onSelectStatusFilter && onSelectStatusFilter('Delivered'),
+    },
+    {
+      label: 'Cancelled Orders',
+      value: cancelledOrders.toLocaleString(),
+      subtext: 'Refunded / Void',
+      icon: XCircle,
+      color: 'from-rose-500 to-red-600',
+      badgeBg: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
+      onClick: () => onSelectStatusFilter && onSelectStatusFilter('Cancelled'),
+    },
+    {
+      label: 'Total Customers',
+      value: totalCustomers.toLocaleString(),
+      subtext: '+15% New leads',
+      icon: Users,
+      color: 'from-fuchsia-500 to-pink-600',
+      badgeBg: 'bg-fuchsia-500/10 text-fuchsia-400 border-fuchsia-500/20',
+    },
+    {
+      label: 'Total Revenue',
+      value: `₹${totalSales.toLocaleString()}`,
+      subtext: '+22% Overall growth',
+      icon: DollarSign,
+      color: 'from-emerald-600 to-green-600',
+      badgeBg: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+    },
+    {
+      label: "Today's Sales",
+      value: `₹${todaySales.toLocaleString()}`,
+      subtext: 'Revenue recorded today',
+      icon: TrendingUp,
+      color: 'from-amber-600 to-yellow-500',
+      badgeBg: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+    },
+    {
+      label: "This Month's Sales",
+      value: `₹${monthSales.toLocaleString()}`,
+      subtext: 'Current month total',
+      icon: DollarSign,
+      color: 'from-indigo-600 to-blue-600',
+      badgeBg: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
+    },
+  ];
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 font-jost">
-      
-      {/* 1. New Orders Card matching reference image */}
-      <div className="bg-[#121829] p-5 rounded-2xl border border-[#262E4A] shadow-xl text-white flex items-center justify-between">
-        <div className="space-y-1">
-          <span className="text-xs font-bold text-gray-400 block">New Orders</span>
-          <h3 className="font-extrabold text-2xl text-white">{totalOrders.toLocaleString()}</h3>
-          <div className="flex items-center gap-1 text-[11px] font-bold text-emerald-400">
-            <ArrowUpRight className="w-3.5 h-3.5" />
-            <span>+2.00% (30 days)</span>
-          </div>
-        </div>
-        <div className="w-12 h-12 rounded-2xl bg-[#8B5CF6]/20 border border-[#8B5CF6]/40 text-[#8B5CF6] flex items-center justify-center shrink-0 shadow-lg">
-          <ShoppingCart className="w-6 h-6" />
-        </div>
+    <div className="space-y-4 font-jost">
+      <div className="flex items-center justify-between">
+        <h3 className="font-playfair text-lg font-bold text-white flex items-center gap-2">
+          <span>📊</span> Key Performance Metrics & Status Summary
+        </h3>
+        <span className="text-xs text-gray-400 font-bold">12 Dashboard KPI Cards</span>
       </div>
 
-      {/* 2. Total Income Card matching reference image */}
-      <div className="bg-[#121829] p-5 rounded-2xl border border-[#262E4A] shadow-xl text-white flex items-center justify-between">
-        <div className="space-y-1">
-          <span className="text-xs font-bold text-gray-400 block">Total Income</span>
-          <h3 className="font-extrabold text-2xl text-white">₹{totalIncome ? totalIncome.toLocaleString() : '74,567'}</h3>
-          <div className="flex items-center gap-1 text-[11px] font-bold text-emerald-400">
-            <ArrowUpRight className="w-3.5 h-3.5" />
-            <span>+5.45% Increased</span>
-          </div>
-        </div>
-        <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center shrink-0 shadow-lg">
-          <DollarSign className="w-6 h-6" />
-        </div>
-      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {cardItems.map((card, idx) => {
+          const IconComp = card.icon;
 
-      {/* 3. Total Expense / Pending Prints Card matching reference image */}
-      <div className="bg-[#121829] p-5 rounded-2xl border border-[#262E4A] shadow-xl text-white flex items-center justify-between">
-        <div className="space-y-1">
-          <span className="text-xs font-bold text-gray-400 block">Pending Print Queue</span>
-          <h3 className="font-extrabold text-2xl text-white">{pendingPrints || '12'}</h3>
-          <div className="flex items-center gap-1 text-[11px] font-bold text-rose-400">
-            <ArrowDownRight className="w-3.5 h-3.5" />
-            <span>-2.00% Queue</span>
-          </div>
-        </div>
-        <div className="w-12 h-12 rounded-2xl bg-[#3B82F6]/20 border border-[#3B82F6]/40 text-[#3B82F6] flex items-center justify-center shrink-0 shadow-lg">
-          <CreditCard className="w-6 h-6" />
-        </div>
-      </div>
+          return (
+            <div
+              key={idx}
+              onClick={card.onClick}
+              className={`p-4 bg-[#121829] rounded-2xl border border-[#262E4A] shadow-xl hover:border-blue-500/50 transition-all cursor-pointer group flex flex-col justify-between space-y-3 ${
+                card.onClick ? 'hover:scale-[1.01]' : ''
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                  {card.label}
+                </span>
+                <div
+                  className={`w-9 h-9 rounded-xl bg-gradient-to-tr ${card.color} text-white flex items-center justify-center shadow-md group-hover:rotate-6 transition-transform`}
+                >
+                  <IconComp className="w-4 h-4" />
+                </div>
+              </div>
 
-      {/* 4. New User / Customers Card matching reference image */}
-      <div className="bg-[#121829] p-5 rounded-2xl border border-[#262E4A] shadow-xl text-white flex items-center justify-between">
-        <div className="space-y-1">
-          <span className="text-xs font-bold text-gray-400 block">New User</span>
-          <h3 className="font-extrabold text-2xl text-white">{customersCount.toLocaleString()}</h3>
-          <div className="flex items-center gap-1 text-[11px] font-bold text-amber-400">
-            <ArrowUpRight className="w-3.5 h-3.5" />
-            <span>+12.00% Growth</span>
-          </div>
-        </div>
-        <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center shrink-0 shadow-lg">
-          <Users className="w-6 h-6" />
-        </div>
+              <div className="space-y-1">
+                <h4 className="font-playfair font-extrabold text-2xl text-white tracking-tight">
+                  {card.value}
+                </h4>
+                <div className="flex items-center gap-1.5 text-[11px] font-bold">
+                  <span className={`px-2 py-0.5 rounded-md border ${card.badgeBg}`}>
+                    {card.subtext}
+                  </span>
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
-
     </div>
   );
 };

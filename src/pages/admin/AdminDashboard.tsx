@@ -7,9 +7,16 @@ import { AdminCharts } from '../../components/admin/AdminCharts';
 import { AdminOrderList } from '../../components/admin/AdminOrderList';
 import { AdminCatalogManager } from '../../components/admin/AdminCatalogManager';
 import { AdminTemplateEditor } from './AdminTemplateEditor';
-import { AdminReportsSection } from '../../components/admin/AdminReportsSection';
-import { AdminSupportDesk } from '../../components/admin/AdminSupportDesk';
 import { AdminStoreSettings } from '../../components/admin/AdminStoreSettings';
+import { AdminCustomFieldsManager } from '../../components/admin/AdminCustomFieldsManager';
+import { AdminCouponManager } from '../../components/admin/AdminCouponManager';
+import { AdminShippingManager } from '../../components/admin/AdminShippingManager';
+import { AdminPaymentManager } from '../../components/admin/AdminPaymentManager';
+import { AdminDesignPreviewManager } from '../../components/admin/AdminDesignPreviewManager';
+import { AdminAdvancedReports } from '../../components/admin/AdminAdvancedReports';
+import { AdminNotificationDesk } from '../../components/admin/AdminNotificationDesk';
+import { AdminCMSManager } from '../../components/admin/AdminCMSManager';
+import { AdminUserRoleManager } from '../../components/admin/AdminUserRoleManager';
 
 import {
   LayoutDashboard,
@@ -17,14 +24,19 @@ import {
   Tag,
   Users,
   LogOut,
-  Search,
   Bell,
   MessageSquare,
   Menu,
-  Wrench,
-  Sparkles,
   BarChart3,
   Settings,
+  Layers,
+  Gift,
+  Truck,
+  CreditCard,
+  Palette,
+  FileText,
+  Shield,
+  ExternalLink,
 } from 'lucide-react';
 
 interface AdminDashboardProps {
@@ -33,18 +45,32 @@ interface AdminDashboardProps {
 
 const ADMIN_AUTH_KEY = 'a1print_admin_authenticated';
 
+export type AdminTab =
+  | 'dashboard'
+  | 'catalog'
+  | 'custom_fields'
+  | 'orders'
+  | 'customers'
+  | 'coupons'
+  | 'shipping'
+  | 'payments'
+  | 'design_preview'
+  | 'reports'
+  | 'notifications'
+  | 'cms'
+  | 'settings'
+  | 'users';
+
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialOrders }) => {
-  // Initialize from localStorage so Admin session is 100% preserved across page reloads & F5!
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     return localStorage.getItem(ADMIN_AUTH_KEY) === 'true';
   });
 
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'reports' | 'orders' | 'catalog' | 'customers' | 'support' | 'settings'>('dashboard');
+  const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
 
   const { products, orders, updateOrderStatus } = useCartStore();
 
-  // Full-Page Template Editor state
   const [editingTemplateProduct, setEditingTemplateProduct] = useState<Product | null>(null);
 
   const handleLoginSuccess = () => {
@@ -61,7 +87,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
     return <AdminLogin onLoginSuccess={handleLoginSuccess} />;
   }
 
-  // If configuring a template, render the Dedicated Visual Design Workspace full page!
   if (editingTemplateProduct) {
     return (
       <AdminTemplateEditor
@@ -71,10 +96,52 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
     );
   }
 
+  const navGroups = [
+    {
+      title: 'Analytics & Main',
+      items: [
+        { id: 'dashboard', label: 'Dashboard Overview', icon: LayoutDashboard, color: 'text-[#3B82F6]' },
+        { id: 'reports', label: 'Financial & Sales Reports', icon: BarChart3, color: 'text-emerald-400' },
+      ],
+    },
+    {
+      title: 'Catalog & Products',
+      items: [
+        { id: 'catalog', label: 'Frame Management', icon: Package, color: 'text-purple-400' },
+        { id: 'custom_fields', label: 'Customization Fields', icon: Layers, color: 'text-cyan-400' },
+        { id: 'design_preview', label: 'Design & Live Preview', icon: Palette, color: 'text-pink-400' },
+      ],
+    },
+    {
+      title: 'Sales & Operations',
+      items: [
+        { id: 'orders', label: 'Orders & Print Queue', icon: Tag, color: 'text-amber-400', badge: orders.length },
+        { id: 'customers', label: 'Customers Directory', icon: Users, color: 'text-sky-400' },
+        { id: 'shipping', label: 'Shipping & Delivery', icon: Truck, color: 'text-teal-400' },
+        { id: 'payments', label: 'Payment Methods & COD', icon: CreditCard, color: 'text-emerald-400' },
+      ],
+    },
+    {
+      title: 'Marketing & Comms',
+      items: [
+        { id: 'coupons', label: 'Coupons & Discounts', icon: Gift, color: 'text-rose-400' },
+        { id: 'notifications', label: 'WhatsApp & Notifications', icon: MessageSquare, color: 'text-emerald-400' },
+        { id: 'cms', label: 'Store Content CMS', icon: FileText, color: 'text-amber-400' },
+      ],
+    },
+    {
+      title: 'System & Admin',
+      items: [
+        { id: 'settings', label: 'Store Settings', icon: Settings, color: 'text-pink-400' },
+        { id: 'users', label: 'Users & Access Roles', icon: Shield, color: 'text-indigo-400' },
+      ],
+    },
+  ];
+
   return (
     <div className="min-h-screen bg-[#0B0E1B] text-white flex font-sans select-none">
       
-      {/* 1. Left Vertical Sidebar Navigation */}
+      {/* 1. Left Deep Indigo Sidebar Navigation matching media_1787652165036.jpg */}
       <aside 
         className={`${
           isSidebarOpen ? 'w-64' : 'w-20'
@@ -83,13 +150,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
         {/* Brand Header */}
         <div className="h-20 border-b border-[#262E4A] flex items-center justify-between px-6">
           {isSidebarOpen ? (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <div className="w-9 h-9 bg-gradient-to-tr from-[#3B82F6] to-[#8B5CF6] rounded-xl flex items-center justify-center font-extrabold text-white text-lg shadow-lg">
                 A1
               </div>
               <div>
-                <h1 className="font-playfair text-lg font-bold text-white tracking-wide leading-none">A1print</h1>
-                <span className="text-[10px] text-[#3B82F6] font-extrabold tracking-widest uppercase block pt-0.5">Admin Studio</span>
+                <h1 className="font-playfair text-base font-bold text-white tracking-wide leading-none">A1print Studio</h1>
+                <span className="text-[10px] text-[#3B82F6] font-extrabold tracking-widest uppercase block pt-0.5">ADMIN CONTROL CENTER</span>
               </div>
             </div>
           ) : (
@@ -106,145 +173,70 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
           </button>
         </div>
 
-        {/* Sidebar Nav Links */}
-        <nav className="flex-1 p-4 space-y-1.5 text-xs font-bold overflow-y-auto">
-          
-          <div className="px-3 pb-2 text-[10px] text-gray-400 uppercase tracking-wider font-extrabold">
-            {isSidebarOpen ? 'Analytics & Orders' : '•••'}
-          </div>
+        {/* Categorized Nav Links */}
+        <nav className="flex-1 p-3 space-y-4 text-xs font-bold overflow-y-auto">
+          {navGroups.map((group, idx) => (
+            <div key={idx} className="space-y-1">
+              <div className="px-3 pb-1 text-[10px] text-gray-400 uppercase tracking-wider font-extrabold">
+                {isSidebarOpen ? group.title : '•••'}
+              </div>
 
-          {/* 1. Dashboard Overview */}
-          <button
-            onClick={() => setActiveTab('dashboard')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all cursor-pointer ${
-              activeTab === 'dashboard'
-                ? 'bg-[#2563EB] text-white shadow-lg shadow-blue-500/20'
-                : 'text-gray-400 hover:bg-[#1A2035] hover:text-gray-200'
-            }`}
-          >
-            <LayoutDashboard className="w-4 h-4 shrink-0" />
-            {isSidebarOpen && <span>Dashboard Overview</span>}
-          </button>
+              {group.items.map((item) => {
+                const Icon = item.icon;
+                const isActive = activeTab === item.id;
 
-          {/* 2. Financial & Sales Reports */}
-          <button
-            onClick={() => setActiveTab('reports')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all cursor-pointer ${
-              activeTab === 'reports'
-                ? 'bg-[#2563EB] text-white shadow-lg shadow-blue-500/20'
-                : 'text-gray-400 hover:bg-[#1A2035] hover:text-gray-200'
-            }`}
-          >
-            <BarChart3 className="w-4 h-4 shrink-0 text-emerald-400" />
-            {isSidebarOpen && <span>Financial Sales Reports</span>}
-          </button>
-
-          {/* 3. Orders & Print Queue */}
-          <button
-            onClick={() => setActiveTab('orders')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all justify-between cursor-pointer ${
-              activeTab === 'orders'
-                ? 'bg-[#2563EB] text-white shadow-lg shadow-blue-500/20'
-                : 'text-gray-400 hover:bg-[#1A2035] hover:text-gray-200'
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              <Tag className="w-4 h-4 shrink-0 text-amber-400" />
-              {isSidebarOpen && <span>Orders & Print Queue</span>}
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => setActiveTab(item.id as AdminTab)}
+                    className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all cursor-pointer ${
+                      isActive
+                        ? 'bg-[#2563EB] text-white shadow-lg shadow-blue-500/25 font-extrabold'
+                        : 'text-gray-400 hover:bg-[#1A2035] hover:text-gray-200'
+                    }`}
+                  >
+                    <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : item.color}`} />
+                    {isSidebarOpen && <span className="truncate flex-1 text-left">{item.label}</span>}
+                    {isSidebarOpen && item.badge !== undefined && (
+                      <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-md text-[10px] font-mono">
+                        {item.badge}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
-            {isSidebarOpen && (
-              <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-md text-[10px]">
-                {orders.length}
-              </span>
-            )}
-          </button>
-
-          <div className="px-3 pt-3 pb-2 text-[10px] text-gray-400 uppercase tracking-wider font-extrabold">
-            {isSidebarOpen ? 'Management & Support' : '•••'}
-          </div>
-
-          {/* 4. Frame Catalog & Editor */}
-          <button
-            onClick={() => setActiveTab('catalog')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all cursor-pointer ${
-              activeTab === 'catalog'
-                ? 'bg-[#2563EB] text-white shadow-lg shadow-blue-500/20'
-                : 'text-gray-400 hover:bg-[#1A2035] hover:text-gray-200'
-            }`}
-          >
-            <Package className="w-4 h-4 shrink-0 text-purple-400" />
-            {isSidebarOpen && <span>Frame Catalog & Editor</span>}
-          </button>
-
-          {/* 5. Customers Directory */}
-          <button
-            onClick={() => setActiveTab('customers')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all cursor-pointer ${
-              activeTab === 'customers'
-                ? 'bg-[#2563EB] text-white shadow-lg shadow-blue-500/20'
-                : 'text-gray-400 hover:bg-[#1A2035] hover:text-gray-200'
-            }`}
-          >
-            <Users className="w-4 h-4 shrink-0 text-sky-400" />
-            {isSidebarOpen && <span>Customers Directory</span>}
-          </button>
-
-          {/* 6. Support & WhatsApp Desk */}
-          <button
-            onClick={() => setActiveTab('support')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all cursor-pointer ${
-              activeTab === 'support'
-                ? 'bg-[#2563EB] text-white shadow-lg shadow-blue-500/20'
-                : 'text-gray-400 hover:bg-[#1A2035] hover:text-gray-200'
-            }`}
-          >
-            <MessageSquare className="w-4 h-4 shrink-0 text-emerald-400" />
-            {isSidebarOpen && <span>Support & WhatsApp Desk</span>}
-          </button>
-
-          {/* 7. Store Settings & Promo Manager */}
-          <button
-            onClick={() => setActiveTab('settings')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all cursor-pointer ${
-              activeTab === 'settings'
-                ? 'bg-[#2563EB] text-white shadow-lg shadow-blue-500/20'
-                : 'text-gray-400 hover:bg-[#1A2035] hover:text-gray-200'
-            }`}
-          >
-            <Settings className="w-4 h-4 shrink-0 text-pink-400" />
-            {isSidebarOpen && <span>Store Settings & Promos</span>}
-          </button>
-
+          ))}
         </nav>
 
-        {/* Sidebar Footer Logout Button */}
-        <div className="p-4 border-t border-[#262E4A]">
+        {/* Sidebar Footer */}
+        <div className="p-3 border-t border-[#262E4A]">
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 font-bold text-xs transition-colors cursor-pointer"
+            className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 font-bold text-xs transition-colors cursor-pointer"
           >
             <LogOut className="w-4 h-4 shrink-0" />
-            {isSidebarOpen && <span>Logout</span>}
+            {isSidebarOpen && <span>Sign Out Admin</span>}
           </button>
         </div>
 
       </aside>
 
-      {/* 2. Main Content Area */}
+      {/* 2. Main Content Container */}
       <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
         
-        {/* Top Navbar */}
+        {/* Top Navbar Header */}
         <header className="h-20 bg-[#121829] border-b border-[#262E4A] px-6 sm:px-8 flex items-center justify-between gap-4 font-jost shrink-0">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <span className="text-xs font-bold text-gray-400">Admin Control Center /</span>
-            <span className="text-xs font-extrabold text-white capitalize">{activeTab}</span>
+            <span className="text-xs font-extrabold text-white capitalize">{activeTab.replace('_', ' ')}</span>
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Live Firebase Cloud Database Status Indicator */}
-            <div className="px-3.5 py-1.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-xl text-xs font-bold flex items-center gap-2">
+            {/* Live Firebase Indicator */}
+            <div className="hidden md:flex px-3.5 py-1.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-xl text-xs font-bold items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              🔥 Firebase Cloud DB: Connected (aoneprintstudio-4c1bd)
+              🔥 Firebase Cloud DB: Live Connected
             </div>
 
             <a
@@ -253,36 +245,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
               rel="noopener noreferrer"
               className="px-3.5 py-2 bg-[#1A2035] hover:bg-[#262E4A] text-gray-300 hover:text-white rounded-xl text-xs font-extrabold border border-[#262E4A] transition-colors flex items-center gap-1.5 cursor-pointer"
             >
-              View Live Storefront ➔
+              View Storefront <ExternalLink className="w-3.5 h-3.5" />
             </a>
           </div>
         </header>
 
-        {/* Tab Content Render */}
+        {/* Main Workspace Content Render */}
         <main className="p-6 sm:p-8 space-y-8 flex-1">
           
-          {/* 1. DASHBOARD OVERVIEW TAB */}
+          {/* Module 1: Dashboard Overview */}
           {activeTab === 'dashboard' && (
             <>
-              <AdminDarkStatsCards orders={orders} />
-              <AdminCharts orders={orders} />
+              <AdminDarkStatsCards orders={orders} onSelectStatusFilter={() => setActiveTab('orders')} />
+              <AdminCharts orders={orders} onNavigateOrders={() => setActiveTab('orders')} />
             </>
           )}
 
-          {/* 2. FINANCIAL SALES REPORTS TAB */}
-          {activeTab === 'reports' && (
-            <AdminReportsSection orders={orders} />
-          )}
-
-          {/* 3. ORDERS & PRINT QUEUE TAB */}
-          {activeTab === 'orders' && (
-            <AdminOrderList
-              orders={orders}
-              onUpdateStatus={updateOrderStatus}
-            />
-          )}
-
-          {/* 4. FRAME CATALOG & EDITOR TAB */}
+          {/* Module 2: Frame Management */}
           {activeTab === 'catalog' && (
             <AdminCatalogManager
               onOpenVisualEditor={(product) => setEditingTemplateProduct(product)}
@@ -290,11 +269,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
             />
           )}
 
-          {/* 5. CUSTOMERS DIRECTORY TAB */}
+          {/* Module 3: Customization Fields */}
+          {activeTab === 'custom_fields' && <AdminCustomFieldsManager />}
+
+          {/* Module 4: Orders & Print Queue */}
+          {activeTab === 'orders' && (
+            <AdminOrderList
+              orders={orders}
+              onUpdateOrderStatus={updateOrderStatus}
+            />
+          )}
+
+          {/* Module 5: Customers Directory */}
           {activeTab === 'customers' && (
-            <div className="bg-[#121829] rounded-3xl border border-[#262E4A] p-6 space-y-4 font-jost">
+            <div className="bg-[#121829] rounded-3xl border border-[#262E4A] p-6 space-y-4 font-jost shadow-xl">
               <h3 className="font-playfair text-xl font-bold text-white">Registered Customers Directory ({orders.length})</h3>
-              
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead className="bg-[#1A2035] text-gray-400 text-[11px] font-extrabold uppercase border-b border-[#262E4A]">
@@ -322,15 +311,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
             </div>
           )}
 
-          {/* 6. SUPPORT & WHATSAPP DESK TAB */}
-          {activeTab === 'support' && (
-            <AdminSupportDesk orders={orders} />
-          )}
+          {/* Module 6: Coupons & Discounts */}
+          {activeTab === 'coupons' && <AdminCouponManager />}
 
-          {/* 7. STORE SETTINGS & PROMO MANAGER TAB */}
-          {activeTab === 'settings' && (
-            <AdminStoreSettings />
-          )}
+          {/* Module 7: Shipping Management */}
+          {activeTab === 'shipping' && <AdminShippingManager />}
+
+          {/* Module 8: Payment Methods & COD */}
+          {activeTab === 'payments' && <AdminPaymentManager />}
+
+          {/* Module 9: Design & Live Preview */}
+          {activeTab === 'design_preview' && <AdminDesignPreviewManager />}
+
+          {/* Module 10: Reports & Analytics */}
+          {activeTab === 'reports' && <AdminAdvancedReports orders={orders} />}
+
+          {/* Module 11: WhatsApp & Notifications */}
+          {activeTab === 'notifications' && <AdminNotificationDesk />}
+
+          {/* Module 12: Content Management CMS */}
+          {activeTab === 'cms' && <AdminCMSManager />}
+
+          {/* Module 13: Store Settings */}
+          {activeTab === 'settings' && <AdminStoreSettings />}
+
+          {/* Module 14: Users & Access Roles */}
+          {activeTab === 'users' && <AdminUserRoleManager />}
 
         </main>
 

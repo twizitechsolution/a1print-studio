@@ -1,5 +1,7 @@
 import { PhotoSlotConfig, TextZoneConfig } from './template';
 
+export * from './admin';
+
 export interface FrameOption {
   id: string;
   name: string;
@@ -27,6 +29,7 @@ export interface Product {
   rating: number;
   reviewsCount: number;
   thumbnail: string;
+  baseImageUrl?: string;
   images: string[];
   bestseller?: boolean;
   onSale?: boolean;
@@ -73,6 +76,7 @@ export interface Order {
   total: number;
   paymentMethod: 'PhonePe' | 'GPay' | 'Paytm' | 'Card' | 'COD';
   paymentStatus: 'Paid' | 'Pending' | 'COD';
-  orderStatus: 'Received' | 'Printing' | 'Shipped' | 'Delivered';
+  orderStatus: 'Received' | 'Printing' | 'Shipped' | 'Delivered' | 'Cancelled';
   createdAt: string;
+  notes?: string;
 }
