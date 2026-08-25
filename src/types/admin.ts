@@ -66,8 +66,11 @@ export interface CMSFAQ {
 export interface AdminUser {
   id: string;
   name: string;
+  username: string; // Login ID
+  password?: string; // Account password
   email: string;
   role: 'Super Admin' | 'Production Manager' | 'Customer Support' | 'Content Editor';
+  allowedTabs: string[]; // List of permitted menu tab IDs
   active: boolean;
   lastLogin: string;
   phone: string;

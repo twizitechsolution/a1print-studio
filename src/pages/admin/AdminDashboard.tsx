@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Order, Product } from '../../types';
+import { AdminUser } from '../../types/admin';
 import { useCartStore } from '../../store/useCartStore';
-import { AdminLogin } from './AdminLogin';
+import { AdminLogin, SUPER_ADMIN_USER } from './AdminLogin';
 import { AdminDarkStatsCards } from '../../components/admin/AdminDarkStatsCards';
 import { AdminCharts } from '../../components/admin/AdminCharts';
 import { AdminOrderList } from '../../components/admin/AdminOrderList';
@@ -37,6 +38,7 @@ import {
   FileText,
   Shield,
   ExternalLink,
+  User as UserIcon,
 } from 'lucide-react';
 
 interface AdminDashboardProps {
@@ -66,6 +68,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
     return localStorage.getItem(ADMIN_AUTH_KEY) === 'true';
   });
 
+  const [currentAdminUser, setCurrentAdminUser] = useState<AdminUser>(() => {
+    const saved = localStorage.getItem('a1print_admin_user');
+    return saved ? JSON.parse(saved) : SUPER_ADMIN_USER;
+  });
+
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
 
@@ -73,13 +80,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
 
   const [editingTemplateProduct, setEditingTemplateProduct] = useState<Product | null>(null);
 
-  const handleLoginSuccess = () => {
+  const handleLoginSuccess = (user: AdminUser) => {
     localStorage.setItem(ADMIN_AUTH_KEY, 'true');
+    localStorage.setItem('a1print_admin_user', JSON.stringify(user));
+    setCurrentAdminUser(user);
     setIsAuthenticated(true);
+    if (user.allowedTabs && user.allowedTabs.length > 0) {
+      setActiveTab(user.allowedTabs[0] as AdminTab);
+    }
   };
 
   const handleLogout = () => {
     localStorage.removeItem(ADMIN_AUTH_KEY);
+    localStorage.removeItem('a1print_admin_user');
     setIsAuthenticated(false);
   };
 
@@ -96,6 +109,27 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
     );
   }
 
+  const allowedTabsSet = new Set(
+    currentAdminUser.role === 'Super Admin'
+      ? [
+          'dashboard',
+          'catalog',
+          'custom_fields',
+          'orders',
+          'customers',
+          'coupons',
+          'shipping',
+          'payments',
+          'design_preview',
+          'reports',
+          'notifications',
+          'cms',
+          'settings',
+          'users',
+        ]
+      : currentAdminUser.allowedTabs || ['dashboard', 'orders']
+  );
+
   const navGroups = [
     {
       title: 'Analytics & Main',
@@ -105,11 +139,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
       ],
     },
     {
-      title: 'Catalog & Products',
+      title: 'Products & Customization',
       items: [
-        { id: 'catalog', label: 'Frame Management', icon: Package, color: 'text-purple-400' },
+        { id: 'catalog', label: 'Frame Catalog', icon: Package, color: 'text-purple-400' },
         { id: 'custom_fields', label: 'Customization Fields', icon: Layers, color: 'text-cyan-400' },
-        { id: 'design_preview', label: 'Design & Live Preview', icon: Palette, color: 'text-pink-400' },
+        { id: 'design_preview', label: 'Live Preview Settings', icon: Palette, color: 'text-pink-400' },
       ],
     },
     {
@@ -117,23 +151,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
       items: [
         { id: 'orders', label: 'Orders & Print Queue', icon: Tag, color: 'text-amber-400', badge: orders.length },
         { id: 'customers', label: 'Customers Directory', icon: Users, color: 'text-sky-400' },
-        { id: 'shipping', label: 'Shipping & Delivery', icon: Truck, color: 'text-teal-400' },
-        { id: 'payments', label: 'Payment Methods & COD', icon: CreditCard, color: 'text-emerald-400' },
+        { id: 'shipping', label: 'Shipping Rules', icon: Truck, color: 'text-teal-400' },
+        { id: 'payments', label: 'Payments & COD', icon: CreditCard, color: 'text-emerald-400' },
       ],
     },
     {
       title: 'Marketing & Comms',
       items: [
         { id: 'coupons', label: 'Coupons & Discounts', icon: Gift, color: 'text-rose-400' },
-        { id: 'notifications', label: 'WhatsApp & Notifications', icon: MessageSquare, color: 'text-emerald-400' },
-        { id: 'cms', label: 'Store Content CMS', icon: FileText, color: 'text-amber-400' },
+        { id: 'notifications', label: 'WhatsApp Desk', icon: MessageSquare, color: 'text-emerald-400' },
+        { id: 'cms', label: 'Store CMS Banners', icon: FileText, color: 'text-amber-400' },
       ],
     },
     {
-      title: 'System & Admin',
+      title: 'System & Security',
       items: [
         { id: 'settings', label: 'Store Settings', icon: Settings, color: 'text-pink-400' },
-        { id: 'users', label: 'Users & Access Roles', icon: Shield, color: 'text-indigo-400' },
+        { id: 'users', label: 'Users & Roles', icon: Shield, color: 'text-indigo-400' },
       ],
     },
   ];
@@ -141,7 +175,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
   return (
     <div className="min-h-screen bg-[#0B0E1B] text-white flex font-sans select-none">
       
-      {/* 1. Left Deep Indigo Sidebar Navigation matching media_1787652165036.jpg */}
+      {/* 1. Left Clean Deep-Indigo Sidebar */}
       <aside 
         className={`${
           isSidebarOpen ? 'w-64' : 'w-20'
@@ -155,8 +189,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
                 A1
               </div>
               <div>
-                <h1 className="font-playfair text-base font-bold text-white tracking-wide leading-none">A1print Studio</h1>
-                <span className="text-[10px] text-[#3B82F6] font-extrabold tracking-widest uppercase block pt-0.5">ADMIN CONTROL CENTER</span>
+                <h1 className="font-playfair text-base font-bold text-white tracking-wide leading-none">A1print Admin</h1>
+                <span className="text-[10px] text-[#3B82F6] font-extrabold tracking-widest uppercase block pt-0.5">Control Studio</span>
               </div>
             </div>
           ) : (
@@ -173,44 +207,61 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
           </button>
         </div>
 
-        {/* Categorized Nav Links */}
+        {/* Dynamic Sidebar Nav Links filtered by User Permissions */}
         <nav className="flex-1 p-3 space-y-4 text-xs font-bold overflow-y-auto">
-          {navGroups.map((group, idx) => (
-            <div key={idx} className="space-y-1">
-              <div className="px-3 pb-1 text-[10px] text-gray-400 uppercase tracking-wider font-extrabold">
-                {isSidebarOpen ? group.title : '•••'}
+          {navGroups.map((group, idx) => {
+            const filteredItems = group.items.filter((item) => allowedTabsSet.has(item.id));
+            if (filteredItems.length === 0) return null;
+
+            return (
+              <div key={idx} className="space-y-1">
+                <div className="px-3 pb-1 text-[10px] text-gray-400 uppercase tracking-wider font-extrabold">
+                  {isSidebarOpen ? group.title : '•••'}
+                </div>
+
+                {filteredItems.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = activeTab === item.id;
+
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => setActiveTab(item.id as AdminTab)}
+                      className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all cursor-pointer ${
+                        isActive
+                          ? 'bg-[#2563EB] text-white shadow-lg shadow-blue-500/25 font-extrabold'
+                          : 'text-gray-400 hover:bg-[#1A2035] hover:text-gray-200'
+                      }`}
+                    >
+                      <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : item.color}`} />
+                      {isSidebarOpen && <span className="truncate flex-1 text-left">{item.label}</span>}
+                      {isSidebarOpen && item.badge !== undefined && (
+                        <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-md text-[10px] font-mono">
+                          {item.badge}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
-
-              {group.items.map((item) => {
-                const Icon = item.icon;
-                const isActive = activeTab === item.id;
-
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => setActiveTab(item.id as AdminTab)}
-                    className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all cursor-pointer ${
-                      isActive
-                        ? 'bg-[#2563EB] text-white shadow-lg shadow-blue-500/25 font-extrabold'
-                        : 'text-gray-400 hover:bg-[#1A2035] hover:text-gray-200'
-                    }`}
-                  >
-                    <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : item.color}`} />
-                    {isSidebarOpen && <span className="truncate flex-1 text-left">{item.label}</span>}
-                    {isSidebarOpen && item.badge !== undefined && (
-                      <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-md text-[10px] font-mono">
-                        {item.badge}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          ))}
+            );
+          })}
         </nav>
 
-        {/* Sidebar Footer */}
-        <div className="p-3 border-t border-[#262E4A]">
+        {/* Sidebar Logged In User Profile Footer */}
+        <div className="p-3 border-t border-[#262E4A] space-y-2">
+          {isSidebarOpen && (
+            <div className="p-2.5 bg-[#1A2035] rounded-xl border border-[#262E4A] flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-indigo-600/30 text-indigo-400 border border-indigo-500/40 flex items-center justify-center font-bold text-xs shrink-0">
+                <UserIcon className="w-4 h-4" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h5 className="font-extrabold text-white text-xs truncate">{currentAdminUser.name}</h5>
+                <span className="text-[10px] text-indigo-400 font-bold block truncate">{currentAdminUser.role}</span>
+              </div>
+            </div>
+          )}
+
           <button
             onClick={handleLogout}
             className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 font-bold text-xs transition-colors cursor-pointer"
@@ -222,7 +273,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
 
       </aside>
 
-      {/* 2. Main Content Container */}
+      {/* 2. Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
         
         {/* Top Navbar Header */}
@@ -233,7 +284,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Live Firebase Indicator */}
+            {/* Live Database Status */}
             <div className="hidden md:flex px-3.5 py-1.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-xl text-xs font-bold items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               🔥 Firebase Cloud DB: Live Connected
