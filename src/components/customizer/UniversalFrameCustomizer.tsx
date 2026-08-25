@@ -220,12 +220,21 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
   }, [isPreviewModalOpen]);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      const delta = Math.floor(Math.random() * 11) - 5;
-      setLiveViewers((prev) => Math.min(480, Math.max(310, prev + delta)));
-    }, 2500);
+    let timeoutId: NodeJS.Timeout;
 
-    return () => clearInterval(interval);
+    const scheduleNextViewerUpdate = () => {
+      const randomInterval = Math.floor(Math.random() * 5000) + 10000;
+
+      timeoutId = setTimeout(() => {
+        const delta = Math.floor(Math.random() * 15) - 7;
+        setLiveViewers((prev) => Math.min(380, Math.max(305, prev + delta)));
+        scheduleNextViewerUpdate();
+      }, randomInterval);
+    };
+
+    scheduleNextViewerUpdate();
+
+    return () => clearTimeout(timeoutId);
   }, []);
 
   // Crop Modal state
