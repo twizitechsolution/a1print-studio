@@ -183,6 +183,14 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
   const [liveViewers, setLiveViewers] = useState<number>(360);
   const [generatedZones, setGeneratedZones] = useState<Record<string, boolean>>({});
 
+  const [watermarkSettings, setWatermarkSettings] = useState<{ enabled: boolean; text: string }>(() => {
+    const saved = localStorage.getItem('a1print_watermark_settings');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return { enabled: true, text: 'A1PRINT STUDIO SAMPLE' };
+  });
+
   const handleOpenPreviewModal = async () => {
     setIsLoadingPreview(true);
     setIsPreviewModalOpen(true);
@@ -200,6 +208,16 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
       setIsLoadingPreview(false);
     }
   };
+
+  useEffect(() => {
+    const loadWatermark = () => {
+      const saved = localStorage.getItem('a1print_watermark_settings');
+      if (saved) {
+        try { setWatermarkSettings(JSON.parse(saved)); } catch (e) {}
+      }
+    };
+    loadWatermark();
+  }, [isPreviewModalOpen]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -390,6 +408,15 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                 </div>
               );
             })}
+
+            {/* Anti-Piracy Protection Watermark Overlay */}
+            {watermarkSettings.enabled && (
+              <div className="absolute inset-0 pointer-events-none flex items-center justify-center overflow-hidden z-20">
+                <div className="text-pink-500/35 font-extrabold text-xl sm:text-2xl uppercase tracking-widest -rotate-45 select-none text-center px-4 py-2 border-2 border-pink-500/35 rounded-xl backdrop-blur-[0.5px]">
+                  {watermarkSettings.text || 'A1PRINT STUDIO SAMPLE'}
+                </div>
+              </div>
+            )}
 
           </div>
         </div>
@@ -829,6 +856,15 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                     );
                   })}
                 </>
+              )}
+
+              {/* Anti-Piracy Protection Watermark Overlay */}
+              {watermarkSettings.enabled && (
+                <div className="absolute inset-0 pointer-events-none flex items-center justify-center overflow-hidden z-30">
+                  <div className="text-pink-500/40 font-extrabold text-2xl sm:text-3xl uppercase tracking-widest -rotate-45 select-none text-center px-6 py-3 border-4 border-pink-500/40 rounded-2xl backdrop-blur-[0.5px]">
+                    {watermarkSettings.text || 'A1PRINT STUDIO SAMPLE'}
+                  </div>
+                </div>
               )}
             </div>
 
