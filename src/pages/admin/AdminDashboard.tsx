@@ -78,7 +78,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
 
-  const { products, orders, updateOrderStatus } = useCartStore();
+  const { products, orders, updateOrderStatus, recordOrderAction } = useCartStore();
 
   const [editingTemplateProduct, setEditingTemplateProduct] = useState<Product | null>(null);
 
