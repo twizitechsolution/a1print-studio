@@ -94,7 +94,8 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
             <thead className="bg-[#1A2035] text-gray-400 text-[11px] font-extrabold uppercase border-b border-[#262E4A]">
               <tr>
                 <th className="p-4">Product Poster</th>
-                <th className="p-4">Frame Title & Category</th>
+                <th className="p-4">Frame Title & Details</th>
+                <th className="p-4">Category</th>
                 <th className="p-4">Starting Price</th>
                 <th className="p-4">Bestseller Status</th>
                 <th className="p-4">Discount Badge</th>
@@ -104,6 +105,9 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
             <tbody className="divide-y divide-[#262E4A] font-bold">
               {paginatedProducts.map((product) => {
                 const posterSrc = product.baseImageUrl || product.thumbnail || product.image;
+                const priceVal = (product as any).price || (product.sizes && product.sizes[0] ? product.sizes[0].price : 699);
+                const origVal = product.sizes && product.sizes[0] ? product.sizes[0].originalPrice : null;
+                const catName = product.categoryLabel || product.category || 'Custom Photo Frame';
 
                 return (
                   <tr key={product.id} className="hover:bg-[#1A2035]/50 transition-colors text-gray-200">
@@ -123,13 +127,25 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
                     <td className="p-4">
                       <div className="space-y-0.5">
                         <h4 className="font-extrabold text-white text-sm">{product.title}</h4>
-                        <span className="text-[#3B82F6] text-[11px] block">{product.category || 'Custom Photo Frame'}</span>
-                        <span className="text-gray-400 font-mono text-[10px]">ID: {product.id}</span>
+                        <span className="text-gray-400 font-mono text-[10px] block">ID: {product.id}</span>
                       </div>
                     </td>
 
-                    <td className="p-4 text-emerald-400 font-extrabold text-sm">
-                      ₹{product.price}
+                    <td className="p-4">
+                      <span className="px-2.5 py-1 rounded-full bg-blue-500/10 text-[#3B82F6] font-extrabold text-[11px] border border-blue-500/20 inline-block">
+                        {catName}
+                      </span>
+                    </td>
+
+                    <td className="p-4">
+                      <div className="font-extrabold text-emerald-400 text-sm">
+                        ₹{priceVal}.00
+                      </div>
+                      {origVal && (
+                        <div className="text-[10px] text-gray-400 line-through font-mono">
+                          ₹{origVal}.00
+                        </div>
+                      )}
                     </td>
 
                     <td className="p-4">
