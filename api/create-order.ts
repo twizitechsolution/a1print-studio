@@ -1,7 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import Razorpay from 'razorpay';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // CORS Headers
+  // Set CORS Headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -26,42 +27,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Amount must be a valid number and at least 100 paise (₹1.00).' });
     }
 
-    // Direct HTTP Request to Official Razorpay REST API with Basic Auth
-    const authHeader = 'Basic ' + Buffer.from(`${keyId}:${keySecret}`).toString('base64');
-    
-    const razorpayRes = await fetch('https://api.razorpay.com/v1/orders', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': authHeader,
-      },
-      body: JSON.stringify({
-        amount: Math.round(amountInPaise),
-        currency: currency || 'INR',
-        receipt: receipt || `receipt_${Date.now()}`,
-      }),
+    // Initialize Official Razorpay SDK Instance
+    const razorpay = new Razorpay({
+      key_id: keyId,
+      key_secret: keySecret,
     });
 
-    const data = await razorpayRes.json();
+    const options = {
+      amount: Math.round(amountInPaise),
+      currency: currency || 'INR',
+      receipt: receipt || `receipt_${Date.now()}`,
+    };
 
-    if (!razorpayRes.ok) {
-      console.error('Razorpay API error response:', data);
-      return res.status(razorpayRes.status).json({
-        error: data.error?.description || 'Razorpay order creation failed',
-        details: data,
-      });
+    const order = await razorpay.orders.create(options);
+
+    if (!order || !order.id) {
+      return res.status(500).json({ error: 'Razorpay API returned empty order object.' });
     }
 
     return res.status(200).json({
-      order_id: data.id,
-      amount: data.amount,
-      currency: data.currency,
+      order_id: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      key_id: keyId,
     });
   } catch (error: any) {
-    console.error('Razorpay Create Order Serverless Error:', error);
+    console.error('Razorpay Create Order API Error:', error);
     return res.status(500).json({
-      error: 'Failed to create Razorpay order',
-      details: error.message || error,
+      error: error.message || error.description || 'Failed to create Razorpay order on server.',
+      details: error,
     });
   }
 }
