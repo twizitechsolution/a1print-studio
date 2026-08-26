@@ -83,7 +83,7 @@ export interface Order {
   discount: number;
   shipping: number;
   total: number;
-  paymentMethod: 'PhonePe' | 'GPay' | 'Paytm' | 'Card' | 'COD';
+  paymentMethod: 'Razorpay' | 'PhonePe' | 'GPay' | 'Paytm' | 'Card' | 'COD';
   paymentStatus: 'Paid' | 'Pending' | 'COD';
   orderStatus: 'Received' | 'Printing' | 'Shipped' | 'Delivered' | 'Cancelled';
   createdAt: string;

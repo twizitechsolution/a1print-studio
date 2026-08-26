@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { CartItem, Order } from '../types';
 import { LiveCustomizedFrameThumbnail } from '../components/customizer/LiveCustomizedFrameThumbnail';
 import { useAuthStore } from '../store/useAuthStore';
-import { ShieldCheck, Truck, CreditCard, Lock, Sparkles, Edit3, Loader2, UserPlus, LogIn, X, CheckCircle2 } from 'lucide-react';
+import { launchRazorpayCheckout } from '../services/razorpayService';
+import { ShieldCheck, Truck, CreditCard, Lock, Sparkles, Edit3, Loader2, UserPlus, LogIn, X, CheckCircle2, Zap } from 'lucide-react';
 
 interface CheckoutPageProps {
   items: CartItem[];
@@ -19,7 +20,7 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
   onOrderSuccess,
   onNavigate,
 }) => {
-  const { user, isAuthenticated, registerUser, loginUser } = useAuthStore();
+  const { user, isAuthenticated, registerUser } = useAuthStore();
 
   const [firstName, setFirstName] = useState(user?.fullName ? user.fullName.split(' ')[0] : '');
   const [lastName, setLastName] = useState(user?.fullName && user.fullName.split(' ').length > 1 ? user.fullName.split(' ').slice(1).join(' ') : '');
@@ -30,7 +31,7 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
   const [city, setCity] = useState('');
   const [state, setState] = useState('Odisha');
   const [pincode, setPincode] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'PhonePe' | 'GPay' | 'COD'>('PhonePe');
+  const [paymentMethod, setPaymentMethod] = useState<'Razorpay' | 'PhonePe' | 'COD'>('Razorpay');
 
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -75,41 +76,95 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
 
   const executeFinalOrderPlacement = () => {
     setIsSubmitting(true);
+    setErrorMsg(null);
 
-    setTimeout(() => {
-      try {
-        const order = onPlaceOrder({
-          customer: {
-            fullName: `${firstName} ${lastName}`.trim(),
-            phone,
-            email: email || `${phone}@a1printstudio.com`,
-            address: `${address}${landmark ? `, Near ${landmark}` : ''}`,
-            city,
-            state,
-            pincode,
-          },
-          items,
-          subtotal,
-          discount: 0,
-          shipping: 0,
-          total: subtotal,
-          paymentMethod,
-          paymentStatus: paymentMethod === 'COD' ? 'Pending' : 'Paid',
-          orderStatus: 'Received',
-        });
+    const customerData = {
+      fullName: `${firstName} ${lastName}`.trim(),
+      phone,
+      email: email || `${phone}@a1printstudio.com`,
+      address: `${address}${landmark ? `, Near ${landmark}` : ''}`,
+      city,
+      state,
+      pincode,
+    };
 
-        setIsSubmitting(false);
-        if (onOrderSuccess) {
-          onOrderSuccess(order);
-        } else {
-          onNavigate('order-success');
+    if (paymentMethod === 'Razorpay' || paymentMethod === 'PhonePe') {
+      // Launch Official Razorpay Standard Web Checkout Gateway
+      launchRazorpayCheckout({
+        amountInRupees: subtotal,
+        orderTitle: activeItem?.product?.title || 'A1print Custom Photo Frame',
+        description: `Order for ${customerData.fullName} (${activeItem?.selectedSize?.name || 'A4 Frame'})`,
+        customer: {
+          name: customerData.fullName,
+          email: customerData.email,
+          phone: customerData.phone,
+          address: customerData.address,
+        },
+        onSuccess: (razorpayResp) => {
+          try {
+            const order = onPlaceOrder({
+              customer: customerData,
+              items,
+              subtotal,
+              discount: 0,
+              shipping: 0,
+              total: subtotal,
+              paymentMethod: 'Razorpay',
+              paymentStatus: 'Paid',
+              orderStatus: 'Received',
+              notes: `Verified Razorpay Payment ID: ${razorpayResp.razorpay_payment_id} | Order ID: ${razorpayResp.razorpay_order_id}`,
+            });
+
+            setIsSubmitting(false);
+            if (onOrderSuccess) {
+              onOrderSuccess(order);
+            } else {
+              onNavigate('order-success');
+            }
+          } catch (err: any) {
+            console.error('Order saving error after payment:', err);
+            setIsSubmitting(false);
+            setErrorMsg('Payment was verified successfully, but order creation failed. Please contact support.');
+          }
+        },
+        onFailure: (errMsg) => {
+          setIsSubmitting(false);
+          setErrorMsg(errMsg);
+        },
+        onDismiss: () => {
+          setIsSubmitting(false);
+          setErrorMsg('Payment modal closed. You can retry Razorpay or select Cash on Delivery.');
+        },
+      });
+    } else {
+      // Cash on Delivery Flow
+      setTimeout(() => {
+        try {
+          const order = onPlaceOrder({
+            customer: customerData,
+            items,
+            subtotal,
+            discount: 0,
+            shipping: 0,
+            total: subtotal,
+            paymentMethod: 'COD',
+            paymentStatus: 'Pending',
+            orderStatus: 'Received',
+          });
+
+          setIsSubmitting(false);
+          if (onOrderSuccess) {
+            onOrderSuccess(order);
+          } else {
+            onNavigate('order-success');
+          }
+        } catch (err) {
+          console.error('COD order submission error:', err);
+          setIsSubmitting(false);
+          setErrorMsg('Failed to process order. Please try again!');
         }
-      } catch (err) {
-        console.error('Order submission error:', err);
-        setIsSubmitting(false);
-        setErrorMsg('Failed to process order. Please try again!');
-      }
-    }, 1000);
+      }, 800);
+    }
   };
 
   if (!items || items.length === 0) {
@@ -139,8 +194,9 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
       </div>
 
       {errorMsg && (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-xs font-bold text-red-700">
-          {errorMsg}
+        <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-xs font-bold text-red-700 flex items-center justify-between animate-fadeIn">
+          <span>{errorMsg}</span>
+          <button onClick={() => setErrorMsg(null)} className="text-red-500 font-bold hover:underline">Dismiss</button>
         </div>
       )}
 
@@ -282,19 +338,25 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
             <div className="space-y-2">
               
               <label className={`p-4 rounded-2xl border-2 flex items-center justify-between cursor-pointer transition-all ${
-                paymentMethod === 'PhonePe' ? 'border-[#F82BA9] bg-pink-50/40' : 'border-gray-200'
+                paymentMethod === 'Razorpay' || paymentMethod === 'PhonePe' ? 'border-[#F82BA9] bg-pink-50/40' : 'border-gray-200'
               }`}>
                 <div className="flex items-center gap-3">
                   <input
                     type="radio"
                     name="payment"
-                    checked={paymentMethod === 'PhonePe'}
-                    onChange={() => setPaymentMethod('PhonePe')}
+                    checked={paymentMethod === 'Razorpay' || paymentMethod === 'PhonePe'}
+                    onChange={() => setPaymentMethod('Razorpay')}
                     className="accent-[#F82BA9]"
                   />
-                  <span className="font-bold text-xs text-gray-900">PhonePe / UPI / GPay (Instant Prepaid 9% OFF Discount)</span>
+                  <div>
+                    <span className="font-bold text-xs text-gray-900 block flex items-center gap-1.5">
+                      Razorpay Checkout <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                      <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 font-extrabold text-[10px] rounded-full">Instant 9% OFF</span>
+                    </span>
+                    <span className="text-[11px] text-gray-500 block">UPI, GPay, PhonePe, Cards, NetBanking & Wallets</span>
+                  </div>
                 </div>
-                <CreditCard className="w-4 h-4 text-purple-600" />
+                <CreditCard className="w-5 h-5 text-purple-600" />
               </label>
 
               <label className={`p-4 rounded-2xl border-2 flex items-center justify-between cursor-pointer transition-all ${
@@ -308,9 +370,12 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
                     onChange={() => setPaymentMethod('COD')}
                     className="accent-[#F82BA9]"
                   />
-                  <span className="font-bold text-xs text-gray-900">Cash on Delivery (COD Available)</span>
+                  <div>
+                    <span className="font-bold text-xs text-gray-900 block">Cash on Delivery (COD)</span>
+                    <span className="text-[11px] text-gray-500 block">Pay in cash when order is delivered to your address</span>
+                  </div>
                 </div>
-                <Truck className="w-4 h-4 text-emerald-600" />
+                <Truck className="w-5 h-5 text-emerald-600" />
               </label>
 
             </div>
@@ -349,17 +414,19 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
             >
               {isSubmitting ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" /> Processing Order...
+                  <Loader2 className="w-4 h-4 animate-spin" /> Processing Payment...
                 </>
+              ) : paymentMethod === 'COD' ? (
+                'Place COD Order Now'
               ) : (
-                'Place Order Now'
+                'Pay Now with Razorpay'
               )}
             </button>
           </div>
 
           <div className="p-4 bg-purple-50/50 rounded-2xl border border-purple-100 text-center text-xs text-purple-900 space-y-1">
             <span className="font-bold flex items-center justify-center gap-1">
-              <Lock className="w-3.5 h-3.5 text-purple-700" /> 100% Encrypted & Safe Order Checkout
+              <Lock className="w-3.5 h-3.5 text-purple-700" /> 100% Encrypted & Safe Razorpay Payment
             </span>
             <p className="text-[11px] text-gray-500">Your custom poster file is saved securely for A1print high-res printing.</p>
           </div>
@@ -413,7 +480,7 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
                 type="submit"
                 className="w-full py-4 bg-[#F82BA9] hover:bg-[#D61B90] text-white font-extrabold text-xs rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
-                <UserPlus className="w-4 h-4" /> Create Account & Complete Order
+                <UserPlus className="w-4 h-4" /> Create Account & Proceed to Payment
               </button>
             </form>
 
@@ -424,3 +491,4 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
     </div>
   );
 };
+
