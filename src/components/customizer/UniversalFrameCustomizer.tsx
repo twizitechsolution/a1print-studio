@@ -326,11 +326,14 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
             id="live-frame-canvas"
             className="relative w-full max-w-[340px] aspect-[3/4.4] rounded-xs border-[12px] sm:border-[16px] border-black shadow-[0_25px_60px_rgba(0,0,0,0.6)] bg-white overflow-hidden font-serif select-none"
           >
-            {/* Base Frame Poster Image */}
+            {/* Base Frame Poster Image with Bulletproof Fallback & onError Guard */}
             <img
-              src={template.baseImageUrl}
+              src={template.baseImageUrl && !template.baseImageUrl.includes('[COMPRESSED_FIRESTORE_PREVIEW]') ? template.baseImageUrl : 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80'}
               alt={template.title}
               className="w-full h-full object-cover absolute inset-0 pointer-events-none"
+              onError={(e) => {
+                e.currentTarget.src = 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80';
+              }}
             />
 
             {/* Dynamic Photo Slot Cutouts Overlay - Transparent by default until customer uploads photo! */}

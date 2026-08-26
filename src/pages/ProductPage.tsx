@@ -86,7 +86,11 @@ export const ProductPage: React.FC<ProductPageProps> = ({
     category: product.category,
     basePrice: product.sizes[0]?.price || 699,
     originalPrice: product.sizes[0]?.originalPrice || 999,
-    baseImageUrl: product.thumbnail,
+    baseImageUrl:
+      (product.baseImageUrl && !product.baseImageUrl.includes('[COMPRESSED_FIRESTORE_PREVIEW]') ? product.baseImageUrl : null) ||
+      (product.thumbnail && !product.thumbnail.includes('[COMPRESSED_FIRESTORE_PREVIEW]') ? product.thumbnail : null) ||
+      (product.images && product.images[0] && !product.images[0].includes('[COMPRESSED_FIRESTORE_PREVIEW]') ? product.images[0] : null) ||
+      'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80',
     photoSlots: product.photoSlots || [],
     textZones: product.textZones || [],
     createdAt: new Date().toISOString(),

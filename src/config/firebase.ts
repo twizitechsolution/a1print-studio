@@ -24,8 +24,8 @@ function sanitizePayloadForFirestore(obj: any): any {
   const sanitized: Record<string, any> = {};
   for (const [key, val] of Object.entries(obj)) {
     if (typeof val === 'string') {
-      // Truncate heavy base64 strings if over 30,000 chars to guarantee payload < 500 KB
-      if (val.startsWith('data:image') && val.length > 30000) {
+      // Truncate heavy base64 strings if over 30,000 chars to guarantee payload < 500 KB (Exclude product catalog image URLs)
+      if (val.startsWith('data:image') && val.length > 30000 && key !== 'baseImageUrl' && key !== 'thumbnail' && key !== 'image') {
         sanitized[key] = val.substring(0, 15000) + '...[COMPRESSED_FIRESTORE_PREVIEW]';
       } else {
         sanitized[key] = val;

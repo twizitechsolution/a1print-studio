@@ -23,12 +23,11 @@ export const ProductFrameDisplay: React.FC<ProductFrameDisplayProps> = ({
   const photoSlots: PhotoSlotConfig[] = product.photoSlots || [];
   const textZones: TextZoneConfig[] = product.textZones || [];
 
+  const rawImg = product.baseImageUrl || product.thumbnail || product.image || (product.images && product.images[0]);
   const masterFrameImgSrc =
-    product.baseImageUrl ||
-    product.thumbnail ||
-    product.image ||
-    (product.images && product.images[0]) ||
-    'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80';
+    rawImg && !rawImg.includes('[COMPRESSED_FIRESTORE_PREVIEW]')
+      ? rawImg
+      : 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80';
 
   const isDarkPoster = product.id.includes('brother-sister') || product.id.includes('dad') || product.id.includes('dark');
 
@@ -44,6 +43,9 @@ export const ProductFrameDisplay: React.FC<ProductFrameDisplayProps> = ({
           src={masterFrameImgSrc}
           alt={product.title}
           className="w-full h-full object-cover absolute inset-0 pointer-events-none"
+          onError={(e) => {
+            e.currentTarget.src = 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80';
+          }}
         />
       )}
 
