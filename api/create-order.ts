@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import Razorpay from 'razorpay';
+import RazorpayPkg from 'razorpay';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Set CORS Headers
@@ -27,36 +27,69 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Amount must be a valid number and at least 100 paise (₹1.00).' });
     }
 
-    // Initialize Official Razorpay SDK Instance
-    const razorpay = new Razorpay({
-      key_id: keyId,
-      key_secret: keySecret,
-    });
+    let orderId: string | null = null;
+    let orderAmount: number = Math.round(amountInPaise);
+    let orderCurrency: string = currency || 'INR';
 
-    const options = {
-      amount: Math.round(amountInPaise),
-      currency: currency || 'INR',
-      receipt: receipt || `receipt_${Date.now()}`,
-    };
+    // Approach 1: Try Razorpay Node SDK (ESM-safe import)
+    try {
+      const RazorpayClass = (RazorpayPkg as any).default || RazorpayPkg;
+      const razorpay = new RazorpayClass({
+        key_id: keyId,
+        key_secret: keySecret,
+      });
 
-    const order = await razorpay.orders.create(options);
+      const order = await razorpay.orders.create({
+        amount: orderAmount,
+        currency: orderCurrency,
+        receipt: receipt || `receipt_${Date.now()}`,
+      });
 
-    if (!order || !order.id) {
-      return res.status(500).json({ error: 'Razorpay API returned empty order response.' });
+      if (order && order.id) {
+        orderId = order.id;
+      }
+    } catch (sdkError) {
+      console.warn('Razorpay SDK order creation failed, executing direct REST API fallback:', sdkError);
+    }
+
+    // Approach 2: Direct REST API Fallback with Basic Auth if SDK failed
+    if (!orderId) {
+      const authHeader = 'Basic ' + Buffer.from(`${keyId}:${keySecret}`).toString('base64');
+      const apiRes = await fetch('https://api.razorpay.com/v1/orders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': authHeader,
+        },
+        body: JSON.stringify({
+          amount: orderAmount,
+          currency: orderCurrency,
+          receipt: receipt || `receipt_${Date.now()}`,
+        }),
+      });
+
+      const apiData = await apiRes.json();
+      if (apiRes.ok && apiData && apiData.id) {
+        orderId = apiData.id;
+      } else {
+        console.error('Razorpay Direct REST API Error response:', apiData);
+        return res.status(apiRes.status || 500).json({
+          error: apiData?.error?.description || 'Failed to create order on Razorpay API.',
+          details: apiData,
+        });
+      }
     }
 
     return res.status(200).json({
-      order_id: order.id,
-      amount: order.amount,
-      currency: order.currency,
+      order_id: orderId,
+      amount: orderAmount,
+      currency: orderCurrency,
       key_id: keyId,
     });
   } catch (error: any) {
-    console.error('Razorpay Create Order API Error:', error);
-    const errorMsg = error?.error?.description || error?.message || error?.description || 'Failed to create Razorpay order.';
+    console.error('Razorpay Create Order Serverless Function Error:', error);
     return res.status(500).json({
-      error: errorMsg,
-      details: error,
+      error: error?.error?.description || error?.message || 'Failed to create Razorpay order on server.',
     });
   }
 }
