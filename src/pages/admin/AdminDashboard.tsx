@@ -86,8 +86,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
   const [registeredCustomers, setRegisteredCustomers] = useState<CustomerUser[]>([]);
 
   useEffect(() => {
-    const fetchCustomers = async () => {
+    const syncLiveAdminData = async () => {
       try {
+        // 1. Fetch Registered Customers
         const cloudCustomers = await firebaseCloudDb.getCollection('customer_users');
         const localRaw = localStorage.getItem('a1print_registered_customers_v2');
         const localCustomers: CustomerUser[] = localRaw ? JSON.parse(localRaw) : [];
@@ -95,13 +96,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
         const customerMap = new Map<string, CustomerUser>();
         localCustomers.forEach((c) => { if (c && c.phone) customerMap.set(c.phone, c); });
         (cloudCustomers || []).forEach((c) => { if (c && c.phone) customerMap.set(c.phone, c); });
-
         setRegisteredCustomers(Array.from(customerMap.values()));
       } catch (e) {}
     };
 
-    fetchCustomers();
-    const interval = setInterval(fetchCustomers, 10000);
+    syncLiveAdminData();
+    const interval = setInterval(syncLiveAdminData, 5000); // 5-Second Live Polling!
     return () => clearInterval(interval);
   }, []);
 

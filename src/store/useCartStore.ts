@@ -129,7 +129,15 @@ async function initCloudSync() {
         filteredCloud.forEach((cp) => {
           const idx = merged.findIndex((mp) => mp.id === cp.id);
           if (idx !== -1) {
-            merged[idx] = cp;
+            const local = merged[idx];
+            merged[idx] = {
+              ...local,
+              ...cp,
+              photoSlots: (cp.photoSlots && cp.photoSlots.length > 0) ? cp.photoSlots : local.photoSlots,
+              textZones: (cp.textZones && cp.textZones.length > 0) ? cp.textZones : local.textZones,
+              thumbnail: cp.thumbnail && !cp.thumbnail.includes('[COMPRESSED_FIRESTORE_PREVIEW]') ? cp.thumbnail : local.thumbnail,
+              baseImageUrl: cp.baseImageUrl && !cp.baseImageUrl.includes('[COMPRESSED_FIRESTORE_PREVIEW]') ? cp.baseImageUrl : local.baseImageUrl,
+            };
           } else {
             merged.push(cp);
           }
