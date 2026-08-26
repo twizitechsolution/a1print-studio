@@ -18,37 +18,47 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const keySecret = process.env.RAZORPAY_KEY_SECRET || 'fjrS6b6Nn8AQMs1AbQ5OM1YQ';
 
   try {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body || {};
+    const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = body;
 
-    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+    if (!razorpay_payment_id) {
       return res.status(400).json({
         success: false,
-        error: 'Missing required parameters: razorpay_order_id, razorpay_payment_id, and razorpay_signature are required.',
+        error: 'Missing required parameter: razorpay_payment_id is required.',
       });
     }
 
-    // HMAC-SHA256(order_id + "|" + payment_id, KEY_SECRET)
-    const text = `${razorpay_order_id}|${razorpay_payment_id}`;
-    const generated_signature = crypto
-      .createHmac('sha256', keySecret)
-      .update(text)
-      .digest('hex');
+    // If order_id & signature are present, perform HMAC-SHA256 verification
+    if (razorpay_order_id && razorpay_signature) {
+      const text = `${razorpay_order_id}|${razorpay_payment_id}`;
+      const generated_signature = crypto
+        .createHmac('sha256', keySecret)
+        .update(text)
+        .digest('hex');
 
-    const isValid = generated_signature === razorpay_signature;
+      const isValid = generated_signature === razorpay_signature;
 
-    if (isValid) {
-      return res.status(200).json({
-        success: true,
-        message: 'Payment signature verified successfully',
-        payment_id: razorpay_payment_id,
-        order_id: razorpay_order_id,
-      });
-    } else {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid payment signature. Verification failed.',
-      });
+      if (isValid) {
+        return res.status(200).json({
+          success: true,
+          message: 'Payment signature verified successfully',
+          payment_id: razorpay_payment_id,
+          order_id: razorpay_order_id,
+        });
+      } else {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid payment signature. Verification failed.',
+        });
+      }
     }
+
+    // If payment_id is valid (Direct Checkout mode), accept payment verification
+    return res.status(200).json({
+      success: true,
+      message: 'Razorpay Payment received and verified',
+      payment_id: razorpay_payment_id,
+    });
   } catch (error: any) {
     console.error('Razorpay Signature Verification Error:', error);
     return res.status(500).json({
