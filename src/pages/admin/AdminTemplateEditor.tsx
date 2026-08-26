@@ -4,6 +4,7 @@ import { PhotoSlotConfig, TextZoneConfig, UniversalFrameTemplate } from '../../t
 import { getFrameShapeStyles } from '../../utils/shapeStyles';
 import { useCartStore } from '../../store/useCartStore';
 import { compressImageBase64 } from '../../utils/imageCompressor';
+import { InteractiveCalendarZone } from '../../components/customizer/InteractiveCalendarZone';
 import {
   ArrowLeft,
   Upload,
