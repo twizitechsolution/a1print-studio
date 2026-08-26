@@ -42,7 +42,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const order = await razorpay.orders.create(options);
 
     if (!order || !order.id) {
-      return res.status(500).json({ error: 'Razorpay API returned empty order object.' });
+      return res.status(500).json({ error: 'Razorpay API returned empty order response.' });
     }
 
     return res.status(200).json({
@@ -53,8 +53,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   } catch (error: any) {
     console.error('Razorpay Create Order API Error:', error);
+    const errorMsg = error?.error?.description || error?.message || error?.description || 'Failed to create Razorpay order.';
     return res.status(500).json({
-      error: error.message || error.description || 'Failed to create Razorpay order on server.',
+      error: errorMsg,
       details: error,
     });
   }
