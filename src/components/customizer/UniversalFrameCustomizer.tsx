@@ -260,10 +260,9 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onload = async () => {
+      reader.onload = () => {
         const rawBase64 = reader.result as string;
-        const compressed = await compressImageBase64(rawBase64, 800, 0.8);
-        setTempUploadedImage(compressed);
+        setTempUploadedImage(rawBase64);
         setCropModalOpen(true);
       };
       reader.readAsDataURL(file);
