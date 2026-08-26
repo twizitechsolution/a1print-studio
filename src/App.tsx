@@ -111,7 +111,7 @@ export const App: React.FC = () => {
           if (val && val.startsWith('data:image')) {
             try {
               compressedPhotoValues[key] = await Promise.race([
-                compressImageBase64(val, 600, 0.70),
+                compressImageBase64(val, 500, 0.65),
                 new Promise<string>((res) => setTimeout(() => res(val), 1500)),
               ]);
             } catch (e) {

@@ -2,8 +2,8 @@
 // Converts heavy 6MB-8MB raw image uploads into crisp ~70KB JPEGs that fit cleanly within localStorage
 export const compressImageBase64 = (
   dataUrl: string,
-  maxWidth = 600,
-  quality = 0.75
+  maxWidth = 500,
+  quality = 0.65
 ): Promise<string> => {
   return new Promise((resolve) => {
     if (!dataUrl || !dataUrl.startsWith('data:image')) {
