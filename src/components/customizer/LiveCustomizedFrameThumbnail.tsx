@@ -17,10 +17,11 @@ export const LiveCustomizedFrameThumbnail: React.FC<LiveCustomizedFrameThumbnail
 }) => {
   const product = item?.product || {};
 
+  const rawPreview = item?.customizedFramePreviewUrl || item?.uploadedPhotoUrl || product?.thumbnail || product?.image;
   const previewSrc =
-    item?.customizedFramePreviewUrl ||
-    (product?.thumbnail && product.thumbnail.startsWith('data:image') ? product.thumbnail : null) ||
-    (product?.image && product.image.startsWith('data:image') ? product.image : null);
+    rawPreview && !rawPreview.includes('[COMPRESSED_FIRESTORE_PREVIEW]')
+      ? rawPreview
+      : 'https://images.unsplash.com/photo-1519689680058-324335c77eba?auto=format&fit=crop&q=80&w=600';
 
   // IF A COMPILED CUSTOMIZED FRAME IMAGE EXISTS, ALWAYS RENDER IT 100% DIRECTLY!
   if (previewSrc) {

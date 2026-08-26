@@ -217,22 +217,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
 
     // Add orders placed
     orders.forEach((ord) => {
-      const phoneKey = ord.customer.phone || ord.customer.email || ord.customer.fullName;
+      if (!ord) return;
+      const cust = ord.customer || {};
+      const phoneKey = cust.phone || cust.email || cust.fullName || ord.id || 'Guest';
       const existing = map.get(phoneKey);
+      const totalVal = Number(ord.total || ord.subtotal || 0);
+
       if (existing) {
         existing.orderCount += 1;
-        existing.totalSpent += ord.total;
-        if (ord.customer.city) existing.city = ord.customer.city;
-        if (ord.customer.state) existing.state = ord.customer.state;
+        existing.totalSpent += totalVal;
+        if (cust.city) existing.city = cust.city;
+        if (cust.state) existing.state = cust.state;
       } else {
         map.set(phoneKey, {
-          fullName: ord.customer.fullName,
-          phone: ord.customer.phone,
-          email: ord.customer.email || '',
+          fullName: cust.fullName || 'Valued Customer',
+          phone: cust.phone || 'N/A',
+          email: cust.email || '',
           orderCount: 1,
-          totalSpent: ord.total,
-          city: ord.customer.city || 'N/A',
-          state: ord.customer.state || 'N/A',
+          totalSpent: totalVal,
+          city: cust.city || 'N/A',
+          state: cust.state || 'N/A',
         });
       }
     });

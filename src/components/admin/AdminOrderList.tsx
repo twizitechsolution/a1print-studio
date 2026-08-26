@@ -284,7 +284,7 @@ export const AdminOrderList: React.FC<AdminOrderListProps> = ({
 
               {/* WhatsApp Launch Proof Button */}
               <a
-                href={`https://wa.me/91${order.customer.phone}?text=Hello%20${encodeURIComponent(order.customer.fullName)},%20your%20A1print%20order%20${order.id}%20has%20been%20received!`}
+                href={`https://wa.me/91${order.customer?.phone || ''}?text=Hello%20${encodeURIComponent(order.customer?.fullName || 'Customer')},%20your%20A1print%20order%20${order.id}%20has%20been%20received!`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md transition-colors flex items-center gap-1.5 cursor-pointer"
@@ -298,10 +298,10 @@ export const AdminOrderList: React.FC<AdminOrderListProps> = ({
               
               {/* Customer Info (4 Cols) */}
               <div className="lg:col-span-4 space-y-1">
-                <h4 className="font-bold text-white text-sm">{order.customer.fullName}</h4>
-                <p className="text-gray-400">📞 {order.customer.phone}</p>
-                <p className="text-gray-400 line-clamp-2">📍 {order.customer.address}, {order.customer.city}, {order.customer.state} - {order.customer.pincode}</p>
-                <span className="text-emerald-400 font-bold block pt-1">Paid via {order.paymentMethod} • ₹{order.total}</span>
+                <h4 className="font-bold text-white text-sm">{order.customer?.fullName || 'Valued Customer'}</h4>
+                <p className="text-gray-400">📞 {order.customer?.phone || 'N/A'}</p>
+                <p className="text-gray-400 line-clamp-2">📍 {order.customer?.address || 'N/A'}, {order.customer?.city || 'N/A'}, {order.customer?.state || 'N/A'} - {order.customer?.pincode || ''}</p>
+                <span className="text-emerald-400 font-bold block pt-1">Paid via {order.paymentMethod || 'PhonePe'} • ₹{order.total || order.subtotal || 0}</span>
               </div>
 
               {/* Order Items & Live Frame Thumbnail (8 Cols) */}

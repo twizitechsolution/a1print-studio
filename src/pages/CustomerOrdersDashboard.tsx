@@ -219,16 +219,18 @@ export const CustomerOrdersDashboard: React.FC<CustomerOrdersDashboardProps> = (
                   <div className="space-y-1">
                     <div className="flex items-center gap-3">
                       <span className="font-extrabold text-sm text-[#160E4B] font-mono">Order ID: {order.id}</span>
-                      <span className={`px-3 py-1 text-xs font-extrabold rounded-full border flex items-center gap-1 ${statusBadgeColors[order.orderStatus] || 'bg-gray-50 text-gray-700'}`}>
-                        <Clock className="w-3 h-3" /> Status: {order.orderStatus}
+                      <span className={`px-3 py-1 text-xs font-extrabold rounded-full border flex items-center gap-1 ${statusBadgeColors[order.orderStatus || 'Received'] || 'bg-gray-50 text-gray-700'}`}>
+                        <Clock className="w-3 h-3" /> Status: {order.orderStatus || 'Received'}
                       </span>
                     </div>
-                    <p className="text-[11px] text-gray-400">Placed on: {new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                    <p className="text-[11px] text-gray-400">
+                      Placed on: {order.createdAt && !isNaN(new Date(order.createdAt).getTime()) ? new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Recently'}
+                    </p>
                   </div>
 
                   <div className="text-right">
                     <span className="text-xs text-gray-400 font-bold block">Total Amount</span>
-                    <span className="font-extrabold text-base text-[#F82BA9]">₹{order.total}.00</span>
+                    <span className="font-extrabold text-base text-[#F82BA9]">₹{order.total || order.subtotal || 0}.00</span>
                   </div>
                 </div>
 
@@ -263,7 +265,7 @@ export const CustomerOrdersDashboard: React.FC<CustomerOrdersDashboardProps> = (
 
                 {/* Order Items List */}
                 <div className="space-y-4">
-                  {order.items.map((item, idx) => {
+                  {(order.items || []).map((item, idx) => {
                     const textEntries = Object.entries(item.customTextValues || {}).filter(
                       ([k, v]) => !k.startsWith('photo') && v && typeof v === 'string' && !v.startsWith('data:image')
                     );
@@ -292,9 +294,9 @@ export const CustomerOrdersDashboard: React.FC<CustomerOrdersDashboardProps> = (
                         </div>
 
                         <div className="text-xs text-right space-y-1">
-                          <span className="font-extrabold text-sm text-[#160E4B]">₹{item.itemTotalPrice}</span>
+                          <span className="font-extrabold text-sm text-[#160E4B]">₹{item.itemTotalPrice || (item.selectedSize?.price || 699) * (item.quantity || 1)}</span>
                           <span className="text-[10px] text-emerald-600 font-bold block bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                            Payment: {order.paymentMethod} ({order.paymentStatus})
+                            Payment: {order.paymentMethod || 'PhonePe'} ({order.paymentStatus || 'Paid'})
                           </span>
                         </div>
 
@@ -307,8 +309,8 @@ export const CustomerOrdersDashboard: React.FC<CustomerOrdersDashboardProps> = (
                 <div className="p-4 bg-gray-50 rounded-2xl border border-gray-200 text-xs text-gray-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                   <div>
                     <span className="font-bold text-[#160E4B] block">Delivery Shipping Address:</span>
-                    <p>{order.customer.fullName} ({order.customer.phone})</p>
-                    <p>{order.customer.address}, {order.customer.city}, {order.customer.state} - {order.customer.pincode}</p>
+                    <p>{order.customer?.fullName || 'Valued Customer'} ({order.customer?.phone || 'N/A'})</p>
+                    <p>{order.customer?.address || 'N/A'}, {order.customer?.city || 'N/A'}, {order.customer?.state || 'N/A'} - {order.customer?.pincode || ''}</p>
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0">
