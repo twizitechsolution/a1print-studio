@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { UniversalFrameTemplate } from '../../types/template';
 import { PhotoCropModal } from './PhotoCropModal';
 import { generateHighResPrintFile } from '../../utils/printExporter';
@@ -242,29 +242,32 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
   const [activeSlotId, setActiveSlotId] = useState<string | null>(null);
   const [tempUploadedImage, setTempUploadedImage] = useState<string | null>(null);
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const photoSlots = template.photoSlots || [];
   const textZones = template.textZones || [];
 
   // Handle Photo Select -> Opens Crop Modal
   const handleOpenCropModal = (slotId: string) => {
     setActiveSlotId(slotId);
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.onchange = (e: any) => {
-      const file = e.target?.files?.[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = async () => {
-          const rawBase64 = reader.result as string;
-          const compressed = await compressImageBase64(rawBase64, 800, 0.8);
-          setTempUploadedImage(compressed);
-          setCropModalOpen(true);
-        };
-        reader.readAsDataURL(file);
-      }
-    };
-    input.click();
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const rawBase64 = reader.result as string;
+        const compressed = await compressImageBase64(rawBase64, 800, 0.8);
+        setTempUploadedImage(compressed);
+        setCropModalOpen(true);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   // Handle Crop Confirmation
@@ -852,6 +855,15 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
           </div>
         </div>
       )}
+
+      {/* Hidden Native File Input Element (Guarantees 100% Cross-Browser & Mobile Compatibility!) */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        accept="image/*"
+        className="hidden"
+        onChange={handleFileChange}
+      />
 
     </div>
   );
