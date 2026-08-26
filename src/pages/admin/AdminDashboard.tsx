@@ -373,7 +373,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
             <div className="space-y-8">
               <AdminDarkStatsCards orders={orders} />
               <AdminCharts orders={orders} />
-              <AdminOrderList orders={orders} onUpdateOrderStatus={updateOrderStatus} />
+              <AdminOrderList
+                orders={orders}
+                onUpdateOrderStatus={updateOrderStatus}
+                onRecordOrderAction={recordOrderAction}
+                currentAdminUser={currentAdminUser}
+              />
             </div>
           )}
 
@@ -394,15 +399,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
             <AdminOrderList
               orders={orders}
               onUpdateOrderStatus={updateOrderStatus}
+              onRecordOrderAction={recordOrderAction}
+              currentAdminUser={currentAdminUser}
             />
           )}
 
           {/* Module 5: Registered Customers Directory */}
           {activeTab === 'customers' && (
             <div className="bg-[#121829] rounded-3xl border border-[#262E4A] p-6 space-y-4 font-jost shadow-xl">
-              <h3 className="font-playfair text-xl font-bold text-white">
-                Registered Customers Directory ({customerList.length})
-              </h3>
+              <div className="flex items-center justify-between border-b border-[#262E4A] pb-3">
+                <h3 className="font-playfair text-xl font-bold text-white">
+                  Registered Customers Directory ({customerList.length})
+                </h3>
+                <span className="text-xs text-gray-400 font-bold">10 per page</span>
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead className="bg-[#1A2035] text-gray-400 text-[11px] font-extrabold uppercase border-b border-[#262E4A]">
@@ -415,7 +425,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#262E4A] font-bold">
-                    {customerList.map((cust, i) => (
+                    {customerList.slice(0, 10).map((cust, i) => (
                       <tr key={i} className="hover:bg-[#1A2035]/50 transition-colors text-gray-200">
                         <td className="py-3 px-4 text-white font-extrabold flex items-center gap-2">
                           <div className="w-7 h-7 rounded-full bg-pink-500/20 text-pink-400 flex items-center justify-center text-xs font-black">

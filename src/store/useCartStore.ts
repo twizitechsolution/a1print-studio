@@ -377,10 +377,83 @@ export function useCartStore() {
     return newOrder;
   };
 
-  const updateOrderStatus = (orderId: string, status: Order['orderStatus']) => {
+  const updateOrderStatus = (
+    orderId: string,
+    status: Order['orderStatus'],
+    employeeName?: string,
+    employeeRole?: string
+  ) => {
     const updatedOrders = memoryData.orders.map((ord) => {
       if (ord.id === orderId) {
-        const updated = { ...ord, orderStatus: status };
+        const empName = employeeName || 'Nirod Kumar (Super Admin)';
+        const empRole = employeeRole || 'Super Admin';
+        const now = new Date().toISOString();
+
+        const historyItem = {
+          id: `hist-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+          employeeName: empName,
+          employeeRole: empRole,
+          action: `Status updated to ${status}`,
+          timestamp: now,
+        };
+
+        const existingHistory = ord.processingHistory || [];
+        const updatedHistory = [historyItem, ...existingHistory];
+
+        const updated: Order = {
+          ...ord,
+          orderStatus: status,
+          processedBy: {
+            employeeName: empName,
+            employeeRole: empRole,
+            timestamp: now,
+          },
+          processingHistory: updatedHistory,
+        };
+
+        firebaseCloudDb.setDocument('orders', updated.id, updated);
+        return updated;
+      }
+      return ord;
+    });
+
+    saveStoredLocalData({ ...memoryData, orders: updatedOrders });
+    notifyListeners();
+  };
+
+  const recordOrderAction = (
+    orderId: string,
+    action: string,
+    employeeName?: string,
+    employeeRole?: string
+  ) => {
+    const updatedOrders = memoryData.orders.map((ord) => {
+      if (ord.id === orderId) {
+        const empName = employeeName || 'Nirod Kumar (Super Admin)';
+        const empRole = employeeRole || 'Super Admin';
+        const now = new Date().toISOString();
+
+        const historyItem = {
+          id: `hist-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+          employeeName: empName,
+          employeeRole: empRole,
+          action,
+          timestamp: now,
+        };
+
+        const existingHistory = ord.processingHistory || [];
+        const updatedHistory = [historyItem, ...existingHistory];
+
+        const updated: Order = {
+          ...ord,
+          processedBy: {
+            employeeName: empName,
+            employeeRole: empRole,
+            timestamp: now,
+          },
+          processingHistory: updatedHistory,
+        };
+
         firebaseCloudDb.setDocument('orders', updated.id, updated);
         return updated;
       }
@@ -406,6 +479,7 @@ export function useCartStore() {
     updateQuantity,
     placeOrder,
     updateOrderStatus,
+    recordOrderAction,
     subtotal,
     totalItems,
   };

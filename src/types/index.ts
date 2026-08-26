@@ -66,6 +66,15 @@ export interface CustomerDetails {
   pincode: string;
 }
 
+export interface ProcessingHistoryItem {
+  id: string;
+  employeeName: string;
+  employeeRole: string;
+  action: string;
+  timestamp: string;
+  notes?: string;
+}
+
 export interface Order {
   id: string;
   customer: CustomerDetails;
@@ -79,4 +88,11 @@ export interface Order {
   orderStatus: 'Received' | 'Printing' | 'Shipped' | 'Delivered' | 'Cancelled';
   createdAt: string;
   notes?: string;
+  processedBy?: {
+    employeeName: string;
+    employeeRole: string;
+    timestamp: string;
+    avatar?: string;
+  };
+  processingHistory?: ProcessingHistoryItem[];
 }
