@@ -70,8 +70,8 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                 </div>
 
                 <div className="flex-1 space-y-1 text-xs">
-                  <h4 className="font-bold text-gray-900 line-clamp-1">{item.product.title}</h4>
-                  <span className="text-[#F82BA9] font-bold block">{item.selectedSize.name}</span>
+                  <h4 className="font-bold text-gray-900 line-clamp-1">{item.product?.title || 'Custom Photo Frame'}</h4>
+                  <span className="text-[#F82BA9] font-bold block">{item.selectedSize?.name || 'A4 (8x12 Inch)'}</span>
                   <span className="font-extrabold text-sm text-gray-900 block">₹{item.itemTotalPrice}</span>
                 </div>
 

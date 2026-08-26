@@ -15,10 +15,10 @@ export const LiveCustomizedFrameThumbnail: React.FC<LiveCustomizedFrameThumbnail
   className = '',
   fontScale,
 }) => {
-  const product = item.product;
+  const product = item?.product || {};
 
   const previewSrc =
-    item.customizedFramePreviewUrl ||
+    item?.customizedFramePreviewUrl ||
     (product?.thumbnail && product.thumbnail.startsWith('data:image') ? product.thumbnail : null) ||
     (product?.image && product.image.startsWith('data:image') ? product.image : null);
 
@@ -30,7 +30,7 @@ export const LiveCustomizedFrameThumbnail: React.FC<LiveCustomizedFrameThumbnail
       >
         <img
           src={previewSrc}
-          alt={product.title || 'Customized Frame'}
+          alt={product?.title || 'Customized Frame'}
           className="w-full h-full object-cover"
         />
       </div>

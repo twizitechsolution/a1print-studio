@@ -58,9 +58,9 @@ export const CartPage: React.FC<CartPageProps> = ({
                 </div>
 
                 <div className="space-y-1 text-xs">
-                  <h4 className="font-bold text-sm text-[#160E4B]">{item.product.title}</h4>
-                  <p className="text-[#F82BA9] font-bold">Size: {item.selectedSize.name}</p>
-                  <p className="text-gray-500">Frame Style: {item.selectedFrame.name}</p>
+                  <h4 className="font-bold text-sm text-[#160E4B]">{item.product?.title || 'Custom Photo Frame'}</h4>
+                  <p className="text-[#F82BA9] font-bold">Size: {item.selectedSize?.name || 'A4 (8x12 Inch)'}</p>
+                  <p className="text-gray-500">Frame Style: {item.selectedFrame?.name || 'Classic Black Wood'}</p>
                   
                   {/* Dynamic Custom Text Details List */}
                   <div className="p-2 bg-purple-50 rounded-lg text-[10px] space-y-0.5 mt-2 font-mono text-gray-700">

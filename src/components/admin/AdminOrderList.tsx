@@ -324,8 +324,8 @@ export const AdminOrderList: React.FC<AdminOrderListProps> = ({
                         </div>
 
                         <div className="space-y-0.5 min-w-0 flex-1">
-                          <h5 className="font-bold text-white text-xs truncate">{item.product.title}</h5>
-                          <span className="text-[#3B82F6] font-bold block text-[11px]">{item.selectedSize.name}</span>
+                          <h5 className="font-bold text-white text-xs truncate">{item.product?.title || 'Custom Photo Frame'}</h5>
+                          <span className="text-[#3B82F6] font-bold block text-[11px]">{item.selectedSize?.name || 'A4 (8x12 Inch)'}</span>
                           
                           {textEntries.length > 0 && (
                             <div className="text-[10px] text-gray-300 font-mono truncate">

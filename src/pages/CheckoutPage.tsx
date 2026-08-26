@@ -334,8 +334,8 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
                 </div>
 
                 <div className="text-center space-y-1 border-b border-gray-100 pb-3">
-                  <h3 className="font-bold text-sm text-[#160E4B]">{activeItem.product.title}</h3>
-                  <span className="text-xs text-gray-500">{activeItem.selectedSize.name} x {activeItem.quantity}</span>
+                  <h3 className="font-bold text-sm text-[#160E4B]">{activeItem.product?.title || 'Custom Photo Frame'}</h3>
+                  <span className="text-xs text-gray-500">{activeItem.selectedSize?.name || 'A4 (8x12 Inch)'} x {activeItem.quantity || 1}</span>
                   <div className="font-extrabold text-sm text-[#F82BA9]">Rs.{activeItem.itemTotalPrice}.00</div>
                 </div>
               </div>
