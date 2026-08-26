@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { firebaseCloudDb } from '../config/firebase';
 
 export interface SavedAddress {
   id: string;
@@ -62,6 +63,11 @@ function notifyAuthListeners() {
   } catch (e) {
     console.warn('Failed to persist auth state:', e);
   }
+
+  if (globalAuthState.user) {
+    firebaseCloudDb.setDocument('customer_users', globalAuthState.user.id, globalAuthState.user);
+  }
+
   listeners.forEach((l) => l());
 }
 
@@ -91,7 +97,7 @@ export function useAuthStore() {
     const existingUser = globalAuthState.user || {
       id: `cust-${Date.now()}`,
       fullName: emailOrPhone.includes('@') ? emailOrPhone.split('@')[0] : 'Valued Customer',
-      email: emailOrPhone.includes('@') ? emailOrPhone : 'customer@a1printstudio.com',
+      email: emailOrPhone.includes('@') ? emailOrPhone : `${emailOrPhone}@a1printstudio.com`,
       phone: emailOrPhone.includes('@') ? '9876543210' : emailOrPhone,
       createdAt: new Date().toISOString(),
       savedAddresses: [],
@@ -107,7 +113,7 @@ export function useAuthStore() {
     const newUser: CustomerUser = {
       id: `cust-${Date.now()}`,
       fullName,
-      email,
+      email: email || `${phone}@a1printstudio.com`,
       phone,
       createdAt: new Date().toISOString(),
       savedAddresses: [],
