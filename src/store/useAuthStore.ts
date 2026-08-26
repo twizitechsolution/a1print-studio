@@ -29,7 +29,8 @@ interface AuthState {
   authModalMode: 'login' | 'register';
 }
 
-const AUTH_STORAGE_KEY = 'a1print_customer_auth_v6';
+const AUTH_STORAGE_KEY = 'a1print_customer_auth_v7';
+const CUSTOMERS_DIRECTORY_KEY = 'a1print_registered_customers_v2';
 
 let globalAuthState: AuthState = {
   user: null,
@@ -37,6 +38,24 @@ let globalAuthState: AuthState = {
   isAuthModalOpen: false,
   authModalMode: 'login',
 };
+
+// Helper: Save customer to global persistent directory
+function saveToCustomerDirectory(customer: CustomerUser) {
+  try {
+    const raw = localStorage.getItem(CUSTOMERS_DIRECTORY_KEY);
+    let list: CustomerUser[] = raw ? JSON.parse(raw) : [];
+    const idx = list.findIndex((c) => c.id === customer.id || c.phone === customer.phone || c.email === customer.email);
+    if (idx !== -1) {
+      list[idx] = customer;
+    } else {
+      list.push(customer);
+    }
+    localStorage.setItem(CUSTOMERS_DIRECTORY_KEY, JSON.stringify(list));
+  } catch (e) {}
+
+  // Write to Cloud Firestore DB
+  firebaseCloudDb.setDocument('customer_users', customer.id, customer);
+}
 
 // Read initial state from localStorage
 try {
@@ -65,7 +84,7 @@ function notifyAuthListeners() {
   }
 
   if (globalAuthState.user) {
-    firebaseCloudDb.setDocument('customer_users', globalAuthState.user.id, globalAuthState.user);
+    saveToCustomerDirectory(globalAuthState.user);
   }
 
   listeners.forEach((l) => l());

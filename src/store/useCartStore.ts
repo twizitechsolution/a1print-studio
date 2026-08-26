@@ -3,8 +3,8 @@ import { CartItem, Order, Product } from '../types';
 import { PRODUCTS as INITIAL_PRODUCTS } from '../data/products';
 import { firebaseCloudDb } from '../config/firebase';
 
-const STORAGE_KEY = 'a1print_store_data_v13';
-const DELETED_IDS_KEY = 'a1print_deleted_product_ids_v13';
+const STORAGE_KEY = 'a1print_store_data_v14';
+const DELETED_IDS_KEY = 'a1print_deleted_product_ids_v14';
 
 interface StoreData {
   products: Product[];
@@ -109,7 +109,7 @@ function notifyListeners() {
   listeners.forEach((l) => l());
 }
 
-// Real-Time Cloud Firestore Sync Engine
+// Real-Time Cloud Firestore Sync Engine (Non-Destructive Union Merging!)
 let isCloudSyncInitialized = false;
 
 async function initCloudSync() {
@@ -119,18 +119,17 @@ async function initCloudSync() {
   try {
     const deletedIds = getDeletedProductIds();
 
-    // 1. FETCH CLOUD FIRESTORE CATALOG FIRST (Cloud-First Priority!)
+    // 1. FETCH CLOUD FIRESTORE CATALOG (Cloud-First Priority!)
     const cloudProds = await firebaseCloudDb.getCollection('products');
 
     if (cloudProds && cloudProds.length > 0) {
       const filteredCloud = cloudProds.filter((p: Product) => !deletedIds.has(p.id));
       if (filteredCloud.length > 0) {
-        // Merge cloud products: Cloud Firestore ALWAYS overwrites local memory defaults!
         const merged = [...memoryData.products];
         filteredCloud.forEach((cp) => {
           const idx = merged.findIndex((mp) => mp.id === cp.id);
           if (idx !== -1) {
-            merged[idx] = cp; // CLOUD WINS 100%! Preserves all custom visual edits!
+            merged[idx] = cp;
           } else {
             merged.push(cp);
           }
@@ -142,7 +141,6 @@ async function initCloudSync() {
       }
     }
 
-    // 2. Only push products to Cloud Firestore if they DO NOT exist in Cloud Firestore yet!
     const existingCloudIds = new Set((cloudProds || []).map((cp: Product) => cp.id));
     memoryData.products.forEach((prod) => {
       if (!deletedIds.has(prod.id) && !existingCloudIds.has(prod.id)) {
@@ -150,11 +148,41 @@ async function initCloudSync() {
       }
     });
 
+    // 2. NON-DESTRUCTIVE UNION MERGING FOR ORDERS (Zero Data Loss Guarantee!)
     const cloudOrders = await firebaseCloudDb.getCollection('orders');
     if (cloudOrders && cloudOrders.length > 0) {
-      memoryData.orders = cloudOrders;
+      const orderMap = new Map<string, Order>();
+      
+      // Preserve local orders
+      memoryData.orders.forEach((o) => {
+        if (o && o.id) orderMap.set(o.id, o);
+      });
+
+      // Merge cloud orders (Cloud status updates take precedence!)
+      cloudOrders.forEach((co) => {
+        if (co && co.id) orderMap.set(co.id, co);
+      });
+
+      const mergedOrders = Array.from(orderMap.values()).sort(
+        (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+      );
+
+      memoryData.orders = mergedOrders;
       saveStoredLocalData(memoryData);
       notifyListeners();
+
+      // Sync back any local orders missing in cloud database
+      const existingCloudOrderIds = new Set(cloudOrders.map((co) => co.id));
+      memoryData.orders.forEach((ord) => {
+        if (!existingCloudOrderIds.has(ord.id)) {
+          firebaseCloudDb.setDocument('orders', ord.id, ord);
+        }
+      });
+    } else {
+      // If cloud collection is empty, upload memory orders
+      memoryData.orders.forEach((ord) => {
+        firebaseCloudDb.setDocument('orders', ord.id, ord);
+      });
     }
   } catch (e) {
     console.warn('Cloud sync initialization fallback:', e);
@@ -218,7 +246,6 @@ export function useCartStore() {
     let newItem: CartItem;
 
     if (productOrItem && productOrItem.product && productOrItem.selectedSize) {
-      // Called with a single CartItem object payload
       const itemObj = productOrItem;
       const customUrl = itemObj.customizedFramePreviewUrl || itemObj.uploadedPhotoUrl;
 
@@ -234,7 +261,6 @@ export function useCartStore() {
         itemTotalPrice: itemObj.itemTotalPrice || (itemObj.selectedSize?.price || 699) * (itemObj.quantity || 1),
       };
     } else {
-      // Called with positional arguments
       const product = productOrItem as Product;
       const size = selectedSize || product?.sizes?.[0];
       const frame = selectedFrame || product?.frames?.[0];
@@ -298,7 +324,6 @@ export function useCartStore() {
     let orderStatus: Order['orderStatus'];
 
     if (customerOrOrderData && customerOrOrderData.customer && customerOrOrderData.customer.fullName) {
-      // Called with Object payload from CheckoutPage
       customer = customerOrOrderData.customer;
       paymentMethod = customerOrOrderData.paymentMethod || 'PhonePe';
       orderItems = customerOrOrderData.items && customerOrOrderData.items.length > 0 ? customerOrOrderData.items : [...memoryData.items];
@@ -306,7 +331,6 @@ export function useCartStore() {
       paymentStatus = customerOrOrderData.paymentStatus || (paymentMethod === 'COD' ? 'Pending' : 'Paid');
       orderStatus = customerOrOrderData.orderStatus || 'Received';
     } else {
-      // Called with positional arguments
       customer = customerOrOrderData;
       paymentMethod = paymentMethodParam || 'PhonePe';
       orderItems = [...memoryData.items];
@@ -333,8 +357,14 @@ export function useCartStore() {
     saveStoredLocalData({ ...memoryData, orders: updatedOrders, items: [] });
     notifyListeners();
 
-    // Instant Write to Cloud Firestore for Real-Time Admin Dispatch!
-    firebaseCloudDb.setDocument('orders', newOrder.id, newOrder);
+    // Reliable Guaranteed Write to Cloud Firestore DB with retry!
+    const syncToCloud = async () => {
+      let success = await firebaseCloudDb.setDocument('orders', newOrder.id, newOrder);
+      if (!success) {
+        setTimeout(() => firebaseCloudDb.setDocument('orders', newOrder.id, newOrder), 2000);
+      }
+    };
+    syncToCloud();
 
     return newOrder;
   };

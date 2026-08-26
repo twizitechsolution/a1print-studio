@@ -64,7 +64,7 @@ export const firebaseCloudDb = {
     }
   },
 
-  // Write a document to live Firebase Firestore
+  // Write a document to live Firebase Firestore (Robust 2-tier document creation & update!)
   async setDocument(collectionName: string, docId: string, payload: any): Promise<boolean> {
     try {
       const body = {
@@ -75,8 +75,18 @@ export const firebaseCloudDb = {
         },
       };
 
-      const res = await fetch(`${FIRESTORE_BASE_URL}/${collectionName}/${docId}?updateMask.fieldPaths=jsonPayload`, {
+      // Tier 1: Try PATCH without restrictive query params (creates document if missing, updates if existing!)
+      let res = await fetch(`${FIRESTORE_BASE_URL}/${collectionName}/${docId}`, {
         method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      if (res.ok) return true;
+
+      // Tier 2: Fallback to POST on collection with documentId query param
+      res = await fetch(`${FIRESTORE_BASE_URL}/${collectionName}?documentId=${encodeURIComponent(docId)}`, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });

@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Order, Product } from '../../types';
 import { AdminUser } from '../../types/admin';
 import { useCartStore } from '../../store/useCartStore';
+import { firebaseCloudDb } from '../../config/firebase';
+import { CustomerUser } from '../../store/useAuthStore';
 import { AdminLogin, SUPER_ADMIN_USER } from './AdminLogin';
 import { AdminDarkStatsCards } from '../../components/admin/AdminDarkStatsCards';
 import { AdminCharts } from '../../components/admin/AdminCharts';
@@ -80,6 +82,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
 
   const [editingTemplateProduct, setEditingTemplateProduct] = useState<Product | null>(null);
 
+  // Live Registered Customers List state from Firestore & Local Storage
+  const [registeredCustomers, setRegisteredCustomers] = useState<CustomerUser[]>([]);
+
+  useEffect(() => {
+    const fetchCustomers = async () => {
+      try {
+        const cloudCustomers = await firebaseCloudDb.getCollection('customer_users');
+        const localRaw = localStorage.getItem('a1print_registered_customers_v2');
+        const localCustomers: CustomerUser[] = localRaw ? JSON.parse(localRaw) : [];
+
+        const customerMap = new Map<string, CustomerUser>();
+        localCustomers.forEach((c) => { if (c && c.phone) customerMap.set(c.phone, c); });
+        (cloudCustomers || []).forEach((c) => { if (c && c.phone) customerMap.set(c.phone, c); });
+
+        setRegisteredCustomers(Array.from(customerMap.values()));
+      } catch (e) {}
+    };
+
+    fetchCustomers();
+    const interval = setInterval(fetchCustomers, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
   const handleLoginSuccess = (user: AdminUser) => {
     localStorage.setItem(ADMIN_AUTH_KEY, 'true');
     localStorage.setItem('a1print_admin_user', JSON.stringify(user));
@@ -127,196 +152,231 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
           'settings',
           'users',
         ]
-      : currentAdminUser.allowedTabs || ['dashboard', 'orders']
+      : currentAdminUser.allowedTabs
   );
 
   const navGroups = [
     {
-      title: 'Analytics & Main',
+      group: 'Analytics & Main',
       items: [
-        { id: 'dashboard', label: 'Dashboard Overview', icon: LayoutDashboard, color: 'text-[#3B82F6]' },
-        { id: 'reports', label: 'Financial & Sales Reports', icon: BarChart3, color: 'text-emerald-400' },
+        { id: 'dashboard' as AdminTab, label: 'Dashboard Overview', icon: LayoutDashboard },
+        { id: 'reports' as AdminTab, label: 'Financial & Sales Reports', icon: BarChart3 },
       ],
     },
     {
-      title: 'Products & Customization',
+      group: 'Products & Customization',
       items: [
-        { id: 'catalog', label: 'Frame Catalog', icon: Package, color: 'text-purple-400' },
-        { id: 'custom_fields', label: 'Customization Fields', icon: Layers, color: 'text-cyan-400' },
-        { id: 'design_preview', label: 'Live Preview Settings', icon: Palette, color: 'text-pink-400' },
+        { id: 'catalog' as AdminTab, label: 'Frame Catalog', icon: Layers },
+        { id: 'custom_fields' as AdminTab, label: 'Customization Fields', icon: Settings },
+        { id: 'design_preview' as AdminTab, label: 'Live Preview Settings', icon: Palette },
       ],
     },
     {
-      title: 'Sales & Operations',
+      group: 'Sales & Operations',
       items: [
-        { id: 'orders', label: 'Orders & Print Queue', icon: Tag, color: 'text-amber-400', badge: orders.length },
-        { id: 'customers', label: 'Customers Directory', icon: Users, color: 'text-sky-400' },
-        { id: 'shipping', label: 'Shipping Rules', icon: Truck, color: 'text-teal-400' },
-        { id: 'payments', label: 'Payments & COD', icon: CreditCard, color: 'text-emerald-400' },
+        { id: 'orders' as AdminTab, label: 'Orders & Print Queue', icon: Package, badge: orders.length },
+        { id: 'customers' as AdminTab, label: 'Customers Directory', icon: Users },
+        { id: 'shipping' as AdminTab, label: 'Shipping Rules', icon: Truck },
+        { id: 'payments' as AdminTab, label: 'Payments & COD', icon: CreditCard },
       ],
     },
     {
-      title: 'Marketing & Comms',
+      group: 'Marketing & Comms',
       items: [
-        { id: 'coupons', label: 'Coupons & Discounts', icon: Gift, color: 'text-rose-400' },
-        { id: 'notifications', label: 'WhatsApp Desk', icon: MessageSquare, color: 'text-emerald-400' },
-        { id: 'cms', label: 'Store CMS Banners', icon: FileText, color: 'text-amber-400' },
+        { id: 'coupons' as AdminTab, label: 'Coupons & Discounts', icon: Tag },
+        { id: 'notifications' as AdminTab, label: 'WhatsApp Desk', icon: MessageSquare },
+        { id: 'cms' as AdminTab, label: 'Store CMS Banners', icon: Gift },
       ],
     },
     {
-      title: 'System & Security',
+      group: 'Settings & Security',
       items: [
-        { id: 'settings', label: 'Store Settings', icon: Settings, color: 'text-pink-400' },
-        { id: 'users', label: 'Users & Roles', icon: Shield, color: 'text-indigo-400' },
+        { id: 'users' as AdminTab, label: 'User & Access Control', icon: Shield },
+        { id: 'settings' as AdminTab, label: 'Store Configuration', icon: Settings },
       ],
     },
   ];
 
+  // Merge customer directory from registered accounts AND placed orders
+  const mergedCustomerDirectory = () => {
+    const map = new Map<string, { fullName: string; phone: string; email: string; orderCount: number; totalSpent: number; city: string; state: string }>();
+
+    // Add registered accounts first
+    registeredCustomers.forEach((c) => {
+      const phoneKey = c.phone || c.email || c.id;
+      map.set(phoneKey, {
+        fullName: c.fullName,
+        phone: c.phone,
+        email: c.email,
+        orderCount: 0,
+        totalSpent: 0,
+        city: c.savedAddresses?.[0]?.city || 'N/A',
+        state: c.savedAddresses?.[0]?.state || 'N/A',
+      });
+    });
+
+    // Add orders placed
+    orders.forEach((ord) => {
+      const phoneKey = ord.customer.phone || ord.customer.email || ord.customer.fullName;
+      const existing = map.get(phoneKey);
+      if (existing) {
+        existing.orderCount += 1;
+        existing.totalSpent += ord.total;
+        if (ord.customer.city) existing.city = ord.customer.city;
+        if (ord.customer.state) existing.state = ord.customer.state;
+      } else {
+        map.set(phoneKey, {
+          fullName: ord.customer.fullName,
+          phone: ord.customer.phone,
+          email: ord.customer.email || '',
+          orderCount: 1,
+          totalSpent: ord.total,
+          city: ord.customer.city || 'N/A',
+          state: ord.customer.state || 'N/A',
+        });
+      }
+    });
+
+    return Array.from(map.values());
+  };
+
+  const customerList = mergedCustomerDirectory();
+
   return (
-    <div className="min-h-screen bg-[#0B0E1B] text-white flex font-sans select-none">
+    <div className="min-h-screen bg-[#0A0D14] text-gray-100 font-jost flex flex-col select-none">
       
-      {/* 1. Left Clean Deep-Indigo Sidebar */}
-      <aside 
-        className={`${
-          isSidebarOpen ? 'w-64' : 'w-20'
-        } bg-[#121829] border-r border-[#262E4A] transition-all duration-300 flex flex-col shrink-0 font-jost`}
-      >
-        {/* Brand Header */}
-        <div className="h-20 border-b border-[#262E4A] flex items-center justify-between px-6">
-          {isSidebarOpen ? (
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-gradient-to-tr from-[#3B82F6] to-[#8B5CF6] rounded-xl flex items-center justify-center font-extrabold text-white text-lg shadow-lg">
-                A1
-              </div>
-              <div>
-                <h1 className="font-playfair text-base font-bold text-white tracking-wide leading-none">A1print Admin</h1>
-                <span className="text-[10px] text-[#3B82F6] font-extrabold tracking-widest uppercase block pt-0.5">Control Studio</span>
-              </div>
-            </div>
-          ) : (
-            <div className="w-9 h-9 bg-gradient-to-tr from-[#3B82F6] to-[#8B5CF6] rounded-xl flex items-center justify-center font-extrabold text-white text-lg mx-auto">
+      {/* Top Admin Navigation Header */}
+      <header className="sticky top-0 z-30 bg-[#121829] border-b border-[#262E4A] px-4 sm:px-6 py-3.5 flex items-center justify-between shadow-lg">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            className="p-2 text-gray-400 hover:text-white rounded-xl bg-[#1A2035] hover:bg-[#262E4A] transition-colors cursor-pointer"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-black text-lg flex items-center justify-center shadow-md">
               A1
             </div>
-          )}
-
-          <button 
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="p-1.5 rounded-lg bg-[#1A2035] hover:bg-[#262E4A] text-gray-400 hover:text-white transition-colors cursor-pointer"
-          >
-            <Menu className="w-4 h-4" />
-          </button>
+            <div>
+              <h1 className="font-playfair text-lg sm:text-xl font-extrabold text-white leading-none">
+                A1print Admin <span className="text-purple-400 font-normal text-xs uppercase tracking-widest block font-jost mt-0.5">Control Studio</span>
+              </h1>
+            </div>
+          </div>
         </div>
 
-        {/* Dynamic Sidebar Nav Links filtered by User Permissions */}
-        <nav className="flex-1 p-3 space-y-4 text-xs font-bold overflow-y-auto">
-          {navGroups.map((group, idx) => {
-            const filteredItems = group.items.filter((item) => allowedTabsSet.has(item.id));
-            if (filteredItems.length === 0) return null;
+        <div className="flex items-center gap-3">
+          {/* Live Firebase Cloud DB Connection Status Pill */}
+          <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-extrabold">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span>Firebase Cloud DB: Live Connected</span>
+          </div>
 
-            return (
-              <div key={idx} className="space-y-1">
-                <div className="px-3 pb-1 text-[10px] text-gray-400 uppercase tracking-wider font-extrabold">
-                  {isSidebarOpen ? group.title : '•••'}
-                </div>
+          <a
+            href="/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#1A2035] hover:bg-[#262E4A] text-gray-300 hover:text-white text-xs font-bold transition-colors border border-[#262E4A]"
+          >
+            View Storefront <ExternalLink className="w-3.5 h-3.5" />
+          </a>
 
-                {filteredItems.map((item) => {
-                  const Icon = item.icon;
-                  const isActive = activeTab === item.id;
-
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={() => setActiveTab(item.id as AdminTab)}
-                      className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all cursor-pointer ${
-                        isActive
-                          ? 'bg-[#2563EB] text-white shadow-lg shadow-blue-500/25 font-extrabold'
-                          : 'text-gray-400 hover:bg-[#1A2035] hover:text-gray-200'
-                      }`}
-                    >
-                      <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : item.color}`} />
-                      {isSidebarOpen && <span className="truncate flex-1 text-left">{item.label}</span>}
-                      {isSidebarOpen && item.badge !== undefined && (
-                        <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-md text-[10px] font-mono">
-                          {item.badge}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            );
-          })}
-        </nav>
-
-        {/* Sidebar Logged In User Profile Footer */}
-        <div className="p-3 border-t border-[#262E4A] space-y-2">
-          {isSidebarOpen && (
-            <div className="p-2.5 bg-[#1A2035] rounded-xl border border-[#262E4A] flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-indigo-600/30 text-indigo-400 border border-indigo-500/40 flex items-center justify-center font-bold text-xs shrink-0">
-                <UserIcon className="w-4 h-4" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <h5 className="font-extrabold text-white text-xs truncate">{currentAdminUser.name}</h5>
-                <span className="text-[10px] text-indigo-400 font-bold block truncate">{currentAdminUser.role}</span>
-              </div>
+          {/* Active Admin Profile Pill */}
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-[#1A2035] rounded-xl border border-[#262E4A] text-xs font-bold text-white">
+            <div className="w-6 h-6 rounded-full bg-purple-600 text-white flex items-center justify-center text-[10px] font-black">
+              {currentAdminUser.name.charAt(0)}
             </div>
-          )}
+            <div className="hidden sm:block text-left">
+              <p className="leading-tight font-extrabold">{currentAdminUser.name}</p>
+              <p className="text-[10px] text-purple-400 font-medium leading-tight">{currentAdminUser.role}</p>
+            </div>
+          </div>
 
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 font-bold text-xs transition-colors cursor-pointer"
+            className="p-2 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-xl transition-colors cursor-pointer"
+            title="Sign Out Admin"
           >
-            <LogOut className="w-4 h-4 shrink-0" />
-            {isSidebarOpen && <span>Sign Out Admin</span>}
+            <LogOut className="w-5 h-5" />
           </button>
         </div>
+      </header>
 
-      </aside>
-
-      {/* 2. Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
+      {/* Main Admin Workspace Shell */}
+      <div className="flex-1 flex overflow-hidden">
         
-        {/* Top Navbar Header */}
-        <header className="h-20 bg-[#121829] border-b border-[#262E4A] px-6 sm:px-8 flex items-center justify-between gap-4 font-jost shrink-0">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-gray-400">Admin Control Center /</span>
-            <span className="text-xs font-extrabold text-white capitalize">{activeTab.replace('_', ' ')}</span>
+        {/* Left Sidebar Navigation */}
+        <aside className={`${isSidebarOpen ? 'w-64' : 'w-0 sm:w-20'} transition-all duration-300 bg-[#121829] border-r border-[#262E4A] flex flex-col shrink-0 overflow-y-auto`}>
+          <div className="p-4 space-y-6">
+            {navGroups.map((group, idx) => {
+              const visibleItems = group.items.filter((item) => allowedTabsSet.has(item.id));
+              if (visibleItems.length === 0) return null;
+
+              return (
+                <div key={idx} className="space-y-2">
+                  {isSidebarOpen && (
+                    <span className="text-[10px] uppercase font-extrabold text-gray-500 tracking-wider px-3 block">
+                      {group.group}
+                    </span>
+                  )}
+                  <div className="space-y-1">
+                    {visibleItems.map((item) => {
+                      const Icon = item.icon;
+                      const isActive = activeTab === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => setActiveTab(item.id)}
+                          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-xs font-extrabold transition-all cursor-pointer ${
+                            isActive
+                              ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg'
+                              : 'text-gray-400 hover:text-white hover:bg-[#1A2035]'
+                          }`}
+                        >
+                          <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-purple-400'}`} />
+                          {isSidebarOpen && <span className="truncate">{item.label}</span>}
+                          {isSidebarOpen && item.badge !== undefined && item.badge > 0 && (
+                            <span className="ml-auto px-2 py-0.5 bg-pink-500 text-white font-extrabold text-[10px] rounded-full">
+                              {item.badge}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
           </div>
+        </aside>
 
-          <div className="flex items-center gap-3">
-            {/* Live Database Status */}
-            <div className="hidden md:flex px-3.5 py-1.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-xl text-xs font-bold items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              🔥 Firebase Cloud DB: Live Connected
-            </div>
-
-            <a
-              href="/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-3.5 py-2 bg-[#1A2035] hover:bg-[#262E4A] text-gray-300 hover:text-white rounded-xl text-xs font-extrabold border border-[#262E4A] transition-colors flex items-center gap-1.5 cursor-pointer"
-            >
-              View Storefront <ExternalLink className="w-3.5 h-3.5" />
-            </a>
-          </div>
-        </header>
-
-        {/* Main Workspace Content Render */}
-        <main className="p-6 sm:p-8 space-y-8 flex-1">
+        {/* Right Dynamic Viewport Panel */}
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-8">
           
+          {/* Breadcrumb Header */}
+          <div className="flex items-center justify-between border-b border-[#262E4A] pb-4">
+            <div>
+              <div className="text-xs text-gray-400 font-medium">
+                Admin Control Center / <span className="text-purple-400 font-bold capitalize">{activeTab.replace('_', ' ')}</span>
+              </div>
+            </div>
+          </div>
+
           {/* Module 1: Dashboard Overview */}
           {activeTab === 'dashboard' && (
-            <>
-              <AdminDarkStatsCards orders={orders} onSelectStatusFilter={() => setActiveTab('orders')} />
-              <AdminCharts orders={orders} onNavigateOrders={() => setActiveTab('orders')} />
-            </>
+            <div className="space-y-8">
+              <AdminDarkStatsCards orders={orders} />
+              <AdminCharts orders={orders} />
+              <AdminOrderList orders={orders} onUpdateOrderStatus={updateOrderStatus} />
+            </div>
           )}
 
-          {/* Module 2: Frame Management */}
+          {/* Module 2: Frame Catalog Manager */}
           {activeTab === 'catalog' && (
             <AdminCatalogManager
-              onOpenVisualEditor={(product) => setEditingTemplateProduct(product)}
-              onOpenTemplateEditor={(product) => setEditingTemplateProduct(product)}
+              onEditTemplate={(product) => setEditingTemplateProduct(product)}
             />
           )}
 
@@ -331,29 +391,43 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
             />
           )}
 
-          {/* Module 5: Customers Directory */}
+          {/* Module 5: Registered Customers Directory */}
           {activeTab === 'customers' && (
             <div className="bg-[#121829] rounded-3xl border border-[#262E4A] p-6 space-y-4 font-jost shadow-xl">
-              <h3 className="font-playfair text-xl font-bold text-white">Registered Customers Directory ({orders.length})</h3>
+              <h3 className="font-playfair text-xl font-bold text-white">
+                Registered Customers Directory ({customerList.length})
+              </h3>
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead className="bg-[#1A2035] text-gray-400 text-[11px] font-extrabold uppercase border-b border-[#262E4A]">
                     <tr>
                       <th className="py-3 px-4">Customer Name</th>
-                      <th className="py-3 px-4">Phone Number</th>
+                      <th className="py-3 px-4">Phone Number / Email</th>
                       <th className="py-3 px-4">Orders Placed</th>
                       <th className="py-3 px-4">Total Spent</th>
-                      <th className="py-3 px-4">Shipping City</th>
+                      <th className="py-3 px-4">Shipping Location</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#262E4A] font-bold">
-                    {orders.map((ord) => (
-                      <tr key={ord.id} className="hover:bg-[#1A2035]/50 transition-colors text-gray-200">
-                        <td className="py-3 px-4 text-white font-extrabold">{ord.customer.fullName}</td>
-                        <td className="py-3 px-4 font-mono">{ord.customer.phone}</td>
-                        <td className="py-3 px-4">1 order</td>
-                        <td className="py-3 px-4 text-emerald-400 font-extrabold">₹{ord.total}.00</td>
-                        <td className="py-3 px-4">{ord.customer.city}, {ord.customer.state}</td>
+                    {customerList.map((cust, i) => (
+                      <tr key={i} className="hover:bg-[#1A2035]/50 transition-colors text-gray-200">
+                        <td className="py-3 px-4 text-white font-extrabold flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-full bg-pink-500/20 text-pink-400 flex items-center justify-center text-xs font-black">
+                            {cust.fullName.charAt(0)}
+                          </div>
+                          <span>{cust.fullName}</span>
+                        </td>
+                        <td className="py-3 px-4 font-mono">
+                          <div>{cust.phone}</div>
+                          {cust.email && <div className="text-[10px] text-gray-400 font-normal">{cust.email}</div>}
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className={`px-2.5 py-1 rounded-full text-[11px] font-extrabold ${cust.orderCount > 0 ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' : 'bg-gray-700/50 text-gray-400'}`}>
+                            {cust.orderCount} order{cust.orderCount !== 1 ? 's' : ''}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-emerald-400 font-extrabold">₹{cust.totalSpent}.00</td>
+                        <td className="py-3 px-4">{cust.city}{cust.state !== 'N/A' ? `, ${cust.state}` : ''}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -380,13 +454,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
           {/* Module 11: WhatsApp & Notifications */}
           {activeTab === 'notifications' && <AdminNotificationDesk />}
 
-          {/* Module 12: Content Management CMS */}
+          {/* Module 12: CMS & Home Banners */}
           {activeTab === 'cms' && <AdminCMSManager />}
 
           {/* Module 13: Store Settings */}
           {activeTab === 'settings' && <AdminStoreSettings />}
 
-          {/* Module 14: Users & Access Roles */}
+          {/* Module 14: User & Role Access Control */}
           {activeTab === 'users' && <AdminUserRoleManager />}
 
         </main>
