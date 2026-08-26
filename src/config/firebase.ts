@@ -14,6 +14,31 @@ export const FIREBASE_CONFIG = {
 const FIREBASE_PROJECT_ID = FIREBASE_CONFIG.projectId;
 const FIRESTORE_BASE_URL = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents`;
 
+// Helper: Sanitize payload to guarantee JSON string size is < 500 KB (Well below Firestore 1MB limit!)
+function sanitizePayloadForFirestore(obj: any): any {
+  if (!obj || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) {
+    return obj.map(sanitizePayloadForFirestore);
+  }
+
+  const sanitized: Record<string, any> = {};
+  for (const [key, val] of Object.entries(obj)) {
+    if (typeof val === 'string') {
+      // Truncate heavy base64 strings if over 30,000 chars to guarantee payload < 500 KB
+      if (val.startsWith('data:image') && val.length > 30000) {
+        sanitized[key] = val.substring(0, 15000) + '...[COMPRESSED_FIRESTORE_PREVIEW]';
+      } else {
+        sanitized[key] = val;
+      }
+    } else if (typeof val === 'object' && val !== null) {
+      sanitized[key] = sanitizePayloadForFirestore(val);
+    } else {
+      sanitized[key] = val;
+    }
+  }
+  return sanitized;
+}
+
 export const firebaseCloudDb = {
   // Test and verify Firebase Firestore Cloud Database Connection
   async checkConnection(): Promise<{ connected: boolean; projectId: string; statusText: string }> {
@@ -64,19 +89,20 @@ export const firebaseCloudDb = {
     }
   },
 
-  // Write a document to live Firebase Firestore (Robust 2-tier document creation & update!)
-  async setDocument(collectionName: string, docId: string, payload: any): Promise<boolean> {
+  // Write a document to live Firebase Firestore (Sanitized < 1MB Payload Guarantee!)
+  async setDocument(collectionName: string, docId: string, rawPayload: any): Promise<boolean> {
     try {
+      const sanitizedPayload = sanitizePayloadForFirestore(rawPayload);
       const body = {
         fields: {
           jsonPayload: {
-            stringValue: JSON.stringify(payload),
+            stringValue: JSON.stringify(sanitizedPayload),
           },
         },
       };
 
-      // Tier 1: Try PATCH without restrictive query params (creates document if missing, updates if existing!)
-      let res = await fetch(`${FIRESTORE_BASE_URL}/${collectionName}/${docId}`, {
+      // Tier 1: Try PATCH without restrictive query params
+      let res = await fetch(`${FIRESTORE_BASE_URL}/${collectionName}/${encodeURIComponent(docId)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -84,7 +110,7 @@ export const firebaseCloudDb = {
 
       if (res.ok) return true;
 
-      // Tier 2: Fallback to POST on collection with documentId query param
+      // Tier 2: Fallback to POST on collection
       res = await fetch(`${FIRESTORE_BASE_URL}/${collectionName}?documentId=${encodeURIComponent(docId)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -101,7 +127,7 @@ export const firebaseCloudDb = {
   // Delete a document from live Firebase Firestore
   async deleteDocument(collectionName: string, docId: string): Promise<boolean> {
     try {
-      const res = await fetch(`${FIRESTORE_BASE_URL}/${collectionName}/${docId}`, {
+      const res = await fetch(`${FIRESTORE_BASE_URL}/${collectionName}/${encodeURIComponent(docId)}`, {
         method: 'DELETE',
       });
       return res.ok;

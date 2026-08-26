@@ -96,6 +96,21 @@ export const CustomerOrdersDashboard: React.FC<CustomerOrdersDashboardProps> = (
     );
   }
 
+  // Filter orders specifically for the currently logged in customer profile!
+  const customerOrders = orders.filter((ord) => {
+    if (!user) return false;
+    const uPhone = (user.phone || '').trim();
+    const uEmail = (user.email || '').trim().toLowerCase();
+    const oPhone = (ord.customer?.phone || '').trim();
+    const oEmail = (ord.customer?.email || '').trim().toLowerCase();
+
+    if (uPhone && oPhone && uPhone === oPhone) return true;
+    if (uEmail && oEmail && uEmail === oEmail) return true;
+    if (user.fullName && ord.customer?.fullName && user.fullName.toLowerCase() === ord.customer.fullName.toLowerCase()) return true;
+
+    return false;
+  });
+
   return (
     <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8 font-jost select-none">
       
@@ -141,7 +156,7 @@ export const CustomerOrdersDashboard: React.FC<CustomerOrdersDashboardProps> = (
               : 'text-gray-500 hover:text-gray-900'
           }`}
         >
-          <Package className="w-4 h-4" /> Order History ({orders.length})
+          <Package className="w-4 h-4" /> Order History ({customerOrders.length})
         </button>
 
         <button
@@ -181,7 +196,7 @@ export const CustomerOrdersDashboard: React.FC<CustomerOrdersDashboardProps> = (
       {/* TAB 1: ORDER HISTORY & LIVE TRACKING QUEUE */}
       {activeTab === 'orders' && (
         <div className="space-y-6">
-          {orders.length === 0 ? (
+          {customerOrders.length === 0 ? (
             <div className="p-12 bg-white rounded-3xl border border-gray-200 text-center space-y-4 shadow-xs">
               <div className="w-16 h-16 bg-pink-50 text-[#F82BA9] rounded-full flex items-center justify-center mx-auto">
                 <Package className="w-8 h-8" />
@@ -196,7 +211,7 @@ export const CustomerOrdersDashboard: React.FC<CustomerOrdersDashboardProps> = (
               </button>
             </div>
           ) : (
-            orders.map((order) => (
+            customerOrders.map((order) => (
               <div key={order.id} className="bg-white rounded-3xl border border-gray-200 shadow-xs p-6 space-y-6">
                 
                 {/* Order Top Bar Header */}
