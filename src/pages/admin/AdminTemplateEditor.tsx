@@ -41,7 +41,7 @@ export const AdminTemplateEditor: React.FC<AdminTemplateEditorProps> = ({
   const { updateProduct } = useCartStore();
 
   const [baseFrameUrl, setBaseFrameUrl] = useState<string>(
-    product.thumbnail || 'https://lovecraftbyse.com/wp-content/uploads/2025/02/welcome-baby-boy-scaled.webp'
+    product.baseImageUrl || product.thumbnail || (product.images && product.images[0]) || 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80'
   );
 
   const [workspaceZoom, setWorkspaceZoom] = useState<number>(100);
@@ -265,6 +265,7 @@ export const AdminTemplateEditor: React.FC<AdminTemplateEditorProps> = ({
     );
 
     updateProduct(product.id, {
+      baseImageUrl: baseFrameUrl,
       thumbnail: baseFrameUrl,
       images: [baseFrameUrl],
       photoSlots: sortedPhotos,
