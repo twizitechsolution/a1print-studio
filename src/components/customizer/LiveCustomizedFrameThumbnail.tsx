@@ -17,20 +17,21 @@ export const LiveCustomizedFrameThumbnail: React.FC<LiveCustomizedFrameThumbnail
 }) => {
   const product = item?.product || {};
 
-  const rawPreview = item?.customizedFramePreviewUrl || item?.uploadedPhotoUrl || product?.thumbnail || product?.image;
-  const previewSrc =
-    rawPreview && !rawPreview.includes('[COMPRESSED_FIRESTORE_PREVIEW]')
-      ? rawPreview
-      : 'https://images.unsplash.com/photo-1519689680058-324335c77eba?auto=format&fit=crop&q=80&w=600';
+  const rawCustomizedUrl = item?.customizedFramePreviewUrl || '';
+  const isCompiledBase64 =
+    rawCustomizedUrl.startsWith('data:image') &&
+    !rawCustomizedUrl.includes('[COMPRESSED_FIRESTORE_PREVIEW]') &&
+    rawCustomizedUrl !== product?.thumbnail &&
+    rawCustomizedUrl !== product?.baseImageUrl;
 
-  // IF A COMPILED CUSTOMIZED FRAME IMAGE EXISTS, ALWAYS RENDER IT 100% DIRECTLY!
-  if (previewSrc) {
+  // IF A VALID COMPILED DATA URI preview EXISTS, RENDER IT DIRECTLY!
+  if (isCompiledBase64) {
     return (
       <div
         className={`relative w-full aspect-[3/4.4] rounded-xs border-2 sm:border-4 border-black shadow-lg bg-white overflow-hidden ${className}`}
       >
         <img
-          src={previewSrc}
+          src={rawCustomizedUrl}
           alt={product?.title || 'Customized Frame'}
           className="w-full h-full object-cover"
         />
@@ -50,20 +51,32 @@ export const LiveCustomizedFrameThumbnail: React.FC<LiveCustomizedFrameThumbnail
       : 0.25
   );
 
+  const basePosterSrc =
+    (product.baseImageUrl && !product.baseImageUrl.includes('[COMPRESSED_FIRESTORE_PREVIEW]') ? product.baseImageUrl : null) ||
+    (product.thumbnail && !product.thumbnail.includes('[COMPRESSED_FIRESTORE_PREVIEW]') ? product.thumbnail : null) ||
+    (product.image && !product.image.includes('[COMPRESSED_FIRESTORE_PREVIEW]') ? product.image : null) ||
+    'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80';
+
   return (
     <div
       className={`relative w-full aspect-[3/4.4] rounded-xs border-4 sm:border-8 border-black shadow-xl bg-white overflow-hidden font-serif select-none ${className}`}
     >
-      {/* Base Poster Background Image */}
+      {/* Base Poster Background Image with onError Fallback Guard */}
       <img
-        src={product.thumbnail || product.image}
+        src={basePosterSrc}
         alt={product.title}
         className="w-full h-full object-cover absolute inset-0 pointer-events-none"
+        onError={(e) => {
+          e.currentTarget.src = 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80';
+        }}
       />
 
       {/* Render Customer Uploaded Photos */}
       {photoSlots.map((slot) => {
-        const photoSrc = customText[slot.id] || (slot.id === 'photo-1' || slot.id === 'babyPhoto' ? item.uploadedPhotoUrl : '');
+        const photoSrc =
+          customText[slot.id] ||
+          (slot.id === 'photo-1' || slot.id === 'babyPhoto' ? item.uploadedPhotoUrl : '') ||
+          (Object.values(customText).find((val) => val && typeof val === 'string' && val.startsWith('data:image')) as string || '');
         if (!photoSrc) return null;
         const shapeStyles = getFrameShapeStyles(slot.shape);
 

@@ -115,8 +115,11 @@ export const AdminOrderList: React.FC<AdminOrderListProps> = ({
 
       // 2. Draw Base Poster Template Image matching DOM object-cover inside inner bounds
       const printSrc =
-        item.customizedFramePreviewUrl ||
-        (item.product?.thumbnail && item.product.thumbnail.startsWith('data:image') ? item.product.thumbnail : item.product.thumbnail);
+        (item.product?.baseImageUrl && !item.product.baseImageUrl.includes('[COMPRESSED_FIRESTORE_PREVIEW]') ? item.product.baseImageUrl : null) ||
+        (item.product?.thumbnail && !item.product.thumbnail.includes('[COMPRESSED_FIRESTORE_PREVIEW]') ? item.product.thumbnail : null) ||
+        (item.product?.image && !item.product.image.includes('[COMPRESSED_FIRESTORE_PREVIEW]') ? item.product.image : null) ||
+        'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80';
+
       const baseDataUri = await urlToBase64DataUri(printSrc);
       const baseImg = await loadBase64Image(baseDataUri, 4000);
 
@@ -139,14 +142,15 @@ export const AdminOrderList: React.FC<AdminOrderListProps> = ({
         ctx.fillRect(innerX, innerY, innerW, innerH);
       }
 
-      const photoSlots = item.product.photoSlots || [];
-      const textZones = item.product.textZones || [];
+      const photoSlots = item.product?.photoSlots || [];
+      const textZones = item.product?.textZones || [];
 
       // 3. Draw customer uploaded photos inside inner bounds
       for (const slot of photoSlots) {
         const photoUrl =
-          item.customTextValues[slot.id] ||
-          (slot.id === 'photo-1' || slot.id === 'babyPhoto' ? item.uploadedPhotoUrl : '');
+          item.customTextValues?.[slot.id] ||
+          (slot.id === 'photo-1' || slot.id === 'babyPhoto' ? item.uploadedPhotoUrl : '') ||
+          (Object.values(item.customTextValues || {}).find((val) => typeof val === 'string' && val.startsWith('data:image')) as string || '');
         if (!photoUrl) continue;
 
         const photoDataUri = await urlToBase64DataUri(photoUrl);
