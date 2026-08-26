@@ -8,12 +8,14 @@ import { AdminProductListingModal } from './AdminProductListingModal';
 interface AdminCatalogManagerProps {
   onOpenTemplateEditor?: (product: Product) => void;
   onOpenVisualEditor?: (product: Product) => void;
+  onEditTemplate?: (product: Product) => void;
   products?: Product[];
 }
 
 export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
   onOpenTemplateEditor,
   onOpenVisualEditor,
+  onEditTemplate,
 }) => {
   const { products, addProduct, updateProduct, deleteProduct } = useCartStore();
 
@@ -40,10 +42,12 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
   };
 
   const handleVisualWorkspaceClick = (product: Product) => {
-    if (onOpenVisualEditor) {
-      onOpenVisualEditor(product);
+    if (onEditTemplate) {
+      onEditTemplate(product);
     } else if (onOpenTemplateEditor) {
       onOpenTemplateEditor(product);
+    } else if (onOpenVisualEditor) {
+      onOpenVisualEditor(product);
     }
   };
 
