@@ -86,34 +86,16 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
   };
 
   return (
-    <div className="space-y-6 font-jost select-none">
+    <div className="space-y-6 font-sans select-none">
       
-      {/* Top Controls Header */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-[#121829] p-6 rounded-3xl border border-[#262E4A] shadow-xl">
-        <div>
-          <h2 className="font-playfair text-2xl font-bold text-white flex items-center gap-2">
-            Frame Product Catalog ({activeProducts.length})
-          </h2>
-          <p className="text-xs text-gray-400">Manage frame catalog products, categories, stock inventory, and recycle bin (10 per page)</p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Category Desk Button */}
-          <button
-            onClick={() => setIsCategoryModalOpen(true)}
-            className="px-4 py-2.5 bg-pink-500/10 hover:bg-pink-500/20 text-[#F82BA9] font-extrabold text-xs rounded-xl border border-pink-500/30 transition-all flex items-center gap-1.5 cursor-pointer"
-          >
-            <FolderPlus className="w-4 h-4" /> Category Manager ({categories.length})
-          </button>
-
       {/* Frame Catalog Header & Toolbar */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold tracking-tight text-zinc-100">
-            Frame Product Catalog
+            Frame Product Catalog ({activeProducts.length})
           </h2>
           <p className="text-xs text-zinc-400 mt-0.5">
-            Manage photo frame products, stock inventory, categories, and multi-angle galleries.
+            Manage frame products, stock inventory, categories, and multi-angle galleries.
           </p>
         </div>
 
