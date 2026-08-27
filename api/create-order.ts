@@ -15,12 +15,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed. Use POST.' });
   }
 
-  const keyId = process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_TUVA8GMaELbV0a';
-  const keySecret = process.env.RAZORPAY_KEY_SECRET || 'fjrS6b6Nn8AQMs1AbQ5OM1YQ';
-
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
-    const { amount, currency = 'INR', receipt } = body;
+    const { amount, currency = 'INR', receipt, customKeyId, customKeySecret } = body;
+
+    const keyId = customKeyId || process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_TUVA8GMaELbV0a';
+    const keySecret = customKeySecret || process.env.RAZORPAY_KEY_SECRET || 'fjrS6b6Nn8AQMs1AbQ5OM1YQ';
 
     const amountInPaise = Number(amount);
     if (!amountInPaise || isNaN(amountInPaise) || amountInPaise < 100) {

@@ -1,16 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PaymentSetting } from '../../types/admin';
-import { CreditCard, DollarSign, ShieldCheck, CheckCircle2, AlertCircle } from 'lucide-react';
+import { CreditCard, DollarSign, ShieldCheck, Key, Save, CheckCircle2, RefreshCw } from 'lucide-react';
 
 export const AdminPaymentManager: React.FC = () => {
   const [methods, setMethods] = useState<PaymentSetting[]>([
     {
       id: 'p1',
-      name: 'Razorpay Payment Gateway (Cards, NetBanking, Wallets)',
+      name: 'Razorpay Payment Gateway (Cards, NetBanking, Wallets, UPI)',
       provider: 'razorpay',
       enabled: true,
       extraFee: 0,
-      description: 'Instant online card & netbanking gateway integration.',
+      description: 'Instant online card, UPI, & netbanking gateway integration.',
     },
     {
       id: 'p2',
@@ -31,6 +31,16 @@ export const AdminPaymentManager: React.FC = () => {
   ]);
 
   const [codFee, setCodFee] = useState<number>(50);
+  const [keyId, setKeyId] = useState<string>('rzp_test_TUVA8GMaELbV0a');
+  const [keySecret, setKeySecret] = useState<string>('fjrS6b6Nn8AQMs1AbQ5OM1YQ');
+  const [savedStatus, setSavedStatus] = useState<string | null>(null);
+
+  useEffect(() => {
+    const savedKeyId = localStorage.getItem('razorpay_key_id');
+    const savedKeySecret = localStorage.getItem('razorpay_key_secret');
+    if (savedKeyId) setKeyId(savedKeyId);
+    if (savedKeySecret) setKeySecret(savedKeySecret);
+  }, []);
 
   const toggleMethod = (id: string) => {
     setMethods(
@@ -45,6 +55,14 @@ export const AdminPaymentManager: React.FC = () => {
     );
   };
 
+  const handleSaveCredentials = (e: React.FormEvent) => {
+    e.preventDefault();
+    localStorage.setItem('razorpay_key_id', keyId.trim());
+    localStorage.setItem('razorpay_key_secret', keySecret.trim());
+    setSavedStatus('Razorpay API Keys saved successfully!');
+    setTimeout(() => setSavedStatus(null), 4000);
+  };
+
   return (
     <div className="space-y-6 font-jost">
       <div className="flex items-center justify-between">
@@ -52,9 +70,65 @@ export const AdminPaymentManager: React.FC = () => {
           <h3 className="font-playfair text-xl font-bold text-white flex items-center gap-2">
             <CreditCard className="w-5 h-5 text-emerald-400" /> Payment Gateways & COD Rules Manager
           </h3>
-          <p className="text-xs text-gray-400">Configure online payment gateways, UPI QR codes, and Cash on Delivery charges.</p>
+          <p className="text-xs text-gray-400">Configure online payment gateways, Razorpay API Keys, UPI QR codes, and Cash on Delivery charges.</p>
         </div>
       </div>
+
+      {savedStatus && (
+        <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl text-xs font-bold text-emerald-400 flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4" /> {savedStatus}
+        </div>
+      )}
+
+      {/* Razorpay API Keys Settings Card */}
+      <form onSubmit={handleSaveCredentials} className="p-6 bg-[#121829] rounded-3xl border border-[#262E4A] space-y-4 shadow-xl">
+        <div className="flex items-center justify-between border-b border-[#262E4A] pb-3">
+          <h4 className="font-bold text-sm text-white flex items-center gap-2">
+            <Key className="w-4 h-4 text-pink-400" /> Razorpay Gateway Credentials Settings
+          </h4>
+          <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-pink-500/10 text-[#F82BA9] font-bold border border-pink-500/20">
+            Active Merchant Gateway
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-bold">
+          <div className="space-y-1">
+            <label className="text-gray-300">RAZORPAY KEY ID :</label>
+            <input
+              type="text"
+              required
+              placeholder="rzp_test_..."
+              value={keyId}
+              onChange={(e) => setKeyId(e.target.value)}
+              className="w-full bg-[#1A2035] border border-[#262E4A] px-4 py-2.5 rounded-xl text-white font-mono focus:outline-hidden focus:border-[#F82BA9]"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-gray-300">RAZORPAY KEY SECRET :</label>
+            <input
+              type="password"
+              required
+              placeholder="Key Secret from Razorpay Dashboard"
+              value={keySecret}
+              onChange={(e) => setKeySecret(e.target.value)}
+              className="w-full bg-[#1A2035] border border-[#262E4A] px-4 py-2.5 rounded-xl text-white font-mono focus:outline-hidden focus:border-[#F82BA9]"
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between pt-2">
+          <p className="text-[11px] text-gray-400">
+            Paste your Key ID & Secret from <strong className="text-white">Razorpay Dashboard ➔ Settings ➔ API Keys</strong>.
+          </p>
+          <button
+            type="submit"
+            className="px-5 py-2.5 bg-[#F82BA9] hover:bg-[#D61B90] text-white font-bold text-xs rounded-xl shadow-lg transition-all flex items-center gap-1.5 cursor-pointer"
+          >
+            <Save className="w-4 h-4" /> Save API Keys
+          </button>
+        </div>
+      </form>
 
       {/* COD Configuration Card */}
       <div className="p-5 bg-[#121829] rounded-2xl border border-[#262E4A] space-y-3 shadow-xl">
