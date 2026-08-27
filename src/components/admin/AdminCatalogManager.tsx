@@ -125,10 +125,10 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
       </div>
 
       {/* Frame Catalog Table */}
-      <div className="bg-[#121829] rounded-3xl border border-[#262E4A] shadow-xl overflow-hidden">
+      <div className="bg-[#131B2E] rounded-3xl border border-[#1E293B] shadow-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-[#1A2035] text-gray-400 text-[11px] font-extrabold uppercase border-b border-[#262E4A]">
+            <thead className="bg-[#0E1322] text-gray-400 text-[10px] font-extrabold uppercase tracking-widest border-b border-[#1E293B]">
               <tr>
                 <th className="p-4">Product Poster</th>
                 <th className="p-4">Frame Title & Details</th>

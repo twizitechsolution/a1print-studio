@@ -309,10 +309,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
       </header>
 
       {/* Main Admin Workspace Shell */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden relative">
         
-        {/* Left Sidebar Navigation */}
-        <aside className={`${isSidebarOpen ? 'w-64' : 'w-0 sm:w-20'} transition-all duration-300 bg-[#121829] border-r border-[#262E4A] flex flex-col shrink-0 overflow-y-auto`}>
+        {/* Mobile Backdrop Overlay */}
+        {isSidebarOpen && (
+          <div
+            onClick={() => setIsSidebarOpen(false)}
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs z-30 lg:hidden cursor-pointer"
+          />
+        )}
+
+        {/* Left Sidebar Navigation (Desktop Static & Mobile Fixed Drawer) */}
+        <aside
+          className={`fixed lg:static inset-y-0 left-0 z-40 ${
+            isSidebarOpen ? 'w-64 translate-x-0' : '-translate-x-full lg:translate-x-0 lg:w-20'
+          } transition-all duration-300 bg-[#0E1322] border-r border-[#1E293B] flex flex-col shrink-0 overflow-y-auto shadow-2xl lg:shadow-none`}
+        >
           <div className="p-4 space-y-6">
             {navGroups.map((group, idx) => {
               const visibleItems = group.items.filter((item) => allowedTabsSet.has(item.id));
@@ -321,7 +333,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
               return (
                 <div key={idx} className="space-y-2">
                   {isSidebarOpen && (
-                    <span className="text-[10px] uppercase font-extrabold text-gray-500 tracking-wider px-3 block">
+                    <span className="text-[10px] uppercase font-extrabold text-gray-400 tracking-widest px-3 block">
                       {group.group}
                     </span>
                   )}
@@ -332,17 +344,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
                       return (
                         <button
                           key={item.id}
-                          onClick={() => setActiveTab(item.id)}
-                          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-xs font-extrabold transition-all cursor-pointer ${
+                          onClick={() => {
+                            setActiveTab(item.id);
+                            // On mobile screens, auto-close sidebar after selection!
+                            if (window.innerWidth < 1024) {
+                              setIsSidebarOpen(false);
+                            }
+                          }}
+                          className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-xs font-extrabold transition-all cursor-pointer ${
                             isActive
-                              ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg'
+                              ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-600/30'
                               : 'text-gray-400 hover:text-white hover:bg-[#1A2035]'
                           }`}
                         >
                           <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-purple-400'}`} />
                           {isSidebarOpen && <span className="truncate">{item.label}</span>}
                           {isSidebarOpen && item.badge !== undefined && item.badge > 0 && (
-                            <span className="ml-auto px-2 py-0.5 bg-pink-500 text-white font-extrabold text-[10px] rounded-full">
+                            <span className="ml-auto px-2 py-0.5 bg-[#F82BA9] text-white font-extrabold text-[10px] rounded-full shadow-xs">
                               {item.badge}
                             </span>
                           )}

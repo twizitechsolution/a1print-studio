@@ -413,12 +413,12 @@ export const AdminOrderList: React.FC<AdminOrderListProps> = ({
             return (
               <div
                 key={order.id}
-                className="p-5 bg-[#121829] rounded-2xl border border-[#262E4A] shadow-xl space-y-4 text-gray-300 select-none"
+                className="p-5 bg-[#131B2E] rounded-2xl border border-[#1E293B] shadow-xl space-y-4 text-gray-300 select-none hover:border-purple-500/30 transition-all"
               >
                 {/* Top Order Row Header */}
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-[#262E4A] pb-3">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-[#1E293B] pb-3.5">
                   <div className="flex flex-wrap items-center gap-3">
-                    <span className="font-extrabold text-sm text-white font-mono">{order.id}</span>
+                    <span className="font-mono font-black text-white text-base tracking-tight">{order.id}</span>
 
                     {/* Order Date & Time Badge */}
                     <span className="px-2.5 py-1 bg-[#1A2035] text-pink-300 font-bold text-[11px] rounded-lg border border-[#262E4A] flex items-center gap-1.5">

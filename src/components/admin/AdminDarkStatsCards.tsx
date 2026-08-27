@@ -175,27 +175,27 @@ export const AdminDarkStatsCards: React.FC<AdminDarkStatsCardsProps> = ({
             <div
               key={idx}
               onClick={card.onClick}
-              className={`p-4 bg-[#121829] rounded-2xl border border-[#262E4A] shadow-xl hover:border-blue-500/50 transition-all cursor-pointer group flex flex-col justify-between space-y-3 ${
-                card.onClick ? 'hover:scale-[1.01]' : ''
+              className={`p-5 bg-[#131B2E] rounded-2xl border border-[#1E293B] shadow-xl hover:border-purple-500/40 transition-all cursor-pointer group flex flex-col justify-between space-y-3 ${
+                card.onClick ? 'hover:translate-y-[-2px]' : ''
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">
                   {card.label}
                 </span>
                 <div
-                  className={`w-9 h-9 rounded-xl bg-gradient-to-tr ${card.color} text-white flex items-center justify-center shadow-md group-hover:rotate-6 transition-transform`}
+                  className={`w-9 h-9 rounded-xl bg-gradient-to-tr ${card.color} text-white flex items-center justify-center shadow-md shadow-black/40 group-hover:scale-110 transition-transform`}
                 >
-                  <IconComp className="w-4 h-4" />
+                  <IconComp className="w-4.5 h-4.5" />
                 </div>
               </div>
 
-              <div className="space-y-1">
-                <h4 className="font-playfair font-extrabold text-2xl text-white tracking-tight">
+              <div className="space-y-1.5">
+                <h4 className="font-mono font-black text-2xl text-white tracking-tight">
                   {card.value}
                 </h4>
                 <div className="flex items-center gap-1.5 text-[11px] font-bold">
-                  <span className={`px-2 py-0.5 rounded-md border ${card.badgeBg}`}>
+                  <span className={`px-2.5 py-0.5 rounded-lg border ${card.badgeBg}`}>
                     {card.subtext}
                   </span>
                 </div>
