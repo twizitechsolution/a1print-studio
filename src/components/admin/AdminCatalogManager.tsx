@@ -38,9 +38,13 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
   const [selectedStockProduct, setSelectedStockProduct] = useState<Product | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
+  // Defensive array guards to eliminate any runtime TypeError
+  const safeProducts = Array.isArray(products) ? products.filter(Boolean) : [];
+  const safeCategories = Array.isArray(categories) ? categories.filter(Boolean) : [];
+
   // Active Live Products vs Soft-Deleted Recycle Bin Products
-  const activeProducts = products.filter((p) => !p.isDeleted);
-  const deletedProducts = products.filter((p) => p.isDeleted);
+  const activeProducts = safeProducts.filter((p) => p && !p.isDeleted);
+  const deletedProducts = safeProducts.filter((p) => p && p.isDeleted);
 
   // 10-Item Pagination State
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -91,10 +95,10 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
       {/* Frame Catalog Header & Toolbar */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold tracking-tight text-zinc-100">
+          <h2 className="text-xl font-bold tracking-tight dark:text-zinc-100 text-slate-900">
             Frame Product Catalog ({activeProducts.length})
           </h2>
-          <p className="text-xs text-zinc-400 mt-0.5">
+          <p className="text-xs dark:text-zinc-400 text-slate-500 mt-0.5">
             Manage frame products, stock inventory, categories, and multi-angle galleries.
           </p>
         </div>
@@ -103,15 +107,15 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
           {/* Category Manager Button */}
           <button
             onClick={() => setIsCategoryModalOpen(true)}
-            className="px-3 py-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 font-medium text-xs rounded-lg border border-zinc-800 transition-colors flex items-center gap-1.5 cursor-pointer"
+            className="px-3 py-2 dark:bg-zinc-900 bg-white dark:hover:bg-zinc-800 hover:bg-slate-100 dark:text-zinc-300 text-slate-700 font-medium text-xs rounded-lg border dark:border-zinc-800 border-slate-200 transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
           >
-            <FolderPlus className="w-3.5 h-3.5" /> Categories ({categories.length})
+            <FolderPlus className="w-3.5 h-3.5" /> Categories ({safeCategories.length})
           </button>
 
           {/* Recycle Bin Button */}
           <button
             onClick={() => setIsRecycleBinOpen(true)}
-            className="px-3 py-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 font-medium text-xs rounded-lg border border-zinc-800 transition-colors flex items-center gap-1.5 cursor-pointer"
+            className="px-3 py-2 dark:bg-zinc-900 bg-white dark:hover:bg-zinc-800 hover:bg-slate-100 dark:text-zinc-300 text-slate-700 font-medium text-xs rounded-lg border dark:border-zinc-800 border-slate-200 transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
           >
             <Trash2 className="w-3.5 h-3.5 text-zinc-400" /> Recycle Bin ({deletedProducts.length})
           </button>
@@ -119,7 +123,7 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
           {/* Add Product Button */}
           <button
             onClick={handleOpenAddModal}
-            className="px-3.5 py-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-950 font-semibold text-xs rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+            className="px-3.5 py-2 dark:bg-zinc-100 bg-slate-900 dark:hover:bg-zinc-200 hover:bg-slate-800 dark:text-zinc-950 text-white font-semibold text-xs rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
           >
             <Plus className="w-3.5 h-3.5" /> Add Product
           </button>
@@ -127,10 +131,10 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
       </div>
 
       {/* Frame Catalog Table */}
-      <div className="bg-zinc-900/40 rounded-xl border border-zinc-800 shadow-xs overflow-hidden">
+      <div className="dark:bg-zinc-900/40 bg-white rounded-xl border dark:border-zinc-800 border-slate-200 shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-zinc-900 text-zinc-400 text-[11px] font-medium uppercase tracking-wider border-b border-zinc-800">
+            <thead className="dark:bg-zinc-900 bg-slate-100 dark:text-zinc-400 text-slate-600 text-[11px] font-medium uppercase tracking-wider border-b dark:border-zinc-800 border-slate-200">
               <tr>
                 <th className="p-3.5">Poster</th>
                 <th className="p-3.5">Product Title & Details</th>
@@ -141,17 +145,18 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
                 <th className="p-3.5 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-800/60 font-medium">
+            <tbody className="divide-y dark:divide-zinc-800/60 divide-slate-200 font-medium">
               {paginatedProducts.map((product) => {
+                if (!product) return null;
                 const posterSrc = product.baseImageUrl || product.thumbnail || product.images?.[0];
                 const priceVal = (product as any).price || (product.sizes && product.sizes[0] ? product.sizes[0].price : 699);
                 const catName = product.categoryLabel || product.category || 'Custom Frame';
                 const stockQty = product.stockQuantity !== undefined ? product.stockQuantity : 50;
 
                 return (
-                  <tr key={product.id} className="hover:bg-zinc-900/60 transition-colors text-zinc-200">
+                  <tr key={product.id} className="dark:hover:bg-zinc-900/60 hover:bg-slate-50 transition-colors dark:text-zinc-200 text-slate-800">
                     <td className="p-3.5">
-                      <div className="w-10 h-14 rounded-md overflow-hidden border border-zinc-800 bg-zinc-950 shrink-0">
+                      <div className="w-10 h-14 rounded-md overflow-hidden border dark:border-zinc-800 border-slate-200 bg-slate-100 shrink-0">
                         <img
                           src={posterSrc}
                           alt={product.title}
@@ -165,16 +170,16 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
 
                     <td className="p-3.5">
                       <div className="space-y-0.5">
-                        <h4 className="font-semibold text-zinc-100 text-xs">{product.title}</h4>
-                        <span className="text-zinc-500 font-mono text-[10px] block">ID: {product.id}</span>
+                        <h4 className="font-semibold dark:text-zinc-100 text-slate-900 text-xs">{product.title}</h4>
+                        <span className="dark:text-zinc-500 text-slate-400 font-mono text-[10px] block">ID: {product.id}</span>
                         {product.images && product.images.length > 1 && (
-                          <span className="text-[10px] text-zinc-400 block font-normal">📸 {product.images.length} Angle Photos</span>
+                          <span className="text-[10px] dark:text-zinc-400 text-slate-500 block font-normal">📸 {product.images.length} Angle Photos</span>
                         )}
                       </div>
                     </td>
 
                     <td className="p-3.5">
-                      <span className="px-2 py-0.5 rounded-md bg-zinc-950 text-zinc-300 font-medium text-[11px] border border-zinc-800 inline-block">
+                      <span className="px-2 py-0.5 rounded-md dark:bg-zinc-950 bg-slate-100 dark:text-zinc-300 text-slate-700 font-medium text-[11px] border dark:border-zinc-800 border-slate-200 inline-block">
                         {catName}
                       </span>
                     </td>

@@ -20,6 +20,8 @@ import { AdminAdvancedReports } from '../../components/admin/AdminAdvancedReport
 import { AdminNotificationDesk } from '../../components/admin/AdminNotificationDesk';
 import { AdminCMSManager } from '../../components/admin/AdminCMSManager';
 import { AdminUserRoleManager } from '../../components/admin/AdminUserRoleManager';
+import { AdminThemeProvider } from '../../context/AdminThemeContext';
+import { AdminThemeSwitch } from '../../components/admin/AdminThemeSwitch';
 
 import {
   LayoutDashboard,
@@ -247,10 +249,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
   const customerList = mergedCustomerDirectory();
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 font-sans flex flex-col select-none">
-      
-      {/* Top Admin Navigation Header (shadcn-admin style) */}
-      <header className="sticky top-0 z-30 bg-zinc-950/80 border-b border-zinc-800/80 px-4 sm:px-6 py-3 flex items-center justify-between backdrop-blur-md">
+    <AdminThemeProvider>
+      <div className="min-h-screen dark:bg-zinc-950 bg-slate-50 dark:text-zinc-100 text-slate-900 font-sans flex flex-col select-none transition-colors">
+        
+        {/* Top Admin Navigation Header (shadcn-admin style) */}
+        <header className="sticky top-0 z-30 dark:bg-zinc-950/80 bg-white/80 border-b dark:border-zinc-800/80 border-slate-200 px-4 sm:px-6 py-3 flex items-center justify-between backdrop-blur-md">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -272,9 +275,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
+          {/* Sun / Moon Light & Dark Theme Switcher Dropdown */}
+          <AdminThemeSwitch />
+
           {/* Live Firebase Cloud DB Connection Status Pill */}
-          <div className="hidden md:flex items-center gap-2 px-2.5 py-1 rounded-full bg-emerald-950/30 border border-emerald-800/40 text-emerald-400 text-[11px] font-medium">
+          <div className="hidden md:flex items-center gap-2 px-2.5 py-1 rounded-full dark:bg-emerald-950/30 bg-emerald-50 border dark:border-emerald-800/40 border-emerald-200 dark:text-emerald-400 text-emerald-700 text-[11px] font-medium">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
             <span>Cloud Sync: Live</span>
           </div>
@@ -283,14 +289,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
             href="/"
             target="_blank"
             rel="noopener noreferrer"
-            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-zinc-100 text-xs font-medium transition-colors border border-zinc-800"
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg dark:bg-zinc-900 bg-white dark:hover:bg-zinc-800 hover:bg-slate-100 dark:text-zinc-300 text-slate-700 hover:text-zinc-100 text-xs font-medium transition-colors border dark:border-zinc-800 border-slate-200 shadow-xs"
           >
             Storefront <ExternalLink className="w-3 h-3 text-zinc-400" />
           </a>
 
           {/* Active Admin Profile Pill */}
-          <div className="flex items-center gap-2 px-2.5 py-1 bg-zinc-900 rounded-lg border border-zinc-800 text-xs text-zinc-200">
-            <div className="w-5 h-5 rounded-full bg-zinc-700 text-zinc-100 flex items-center justify-center text-[10px] font-bold">
+          <div className="flex items-center gap-2 px-2.5 py-1 dark:bg-zinc-900 bg-white rounded-lg border dark:border-zinc-800 border-slate-200 text-xs dark:text-zinc-200 text-slate-800 shadow-xs">
+            <div className="w-5 h-5 rounded-full dark:bg-zinc-700 bg-slate-200 dark:text-zinc-100 text-slate-800 flex items-center justify-center text-[10px] font-bold">
               {currentAdminUser.name.charAt(0)}
             </div>
             <div className="hidden sm:block text-left">
@@ -300,7 +306,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
 
           <button
             onClick={handleLogout}
-            className="p-1.5 text-zinc-400 hover:text-red-400 hover:bg-red-950/20 rounded-lg border border-transparent hover:border-red-900/40 transition-colors cursor-pointer"
+            className="p-1.5 text-zinc-400 hover:text-red-500 hover:bg-red-500/10 rounded-lg border border-transparent hover:border-red-500/20 transition-colors cursor-pointer"
             title="Sign Out Admin"
           >
             <LogOut className="w-4 h-4" />
@@ -323,7 +329,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
         <aside
           className={`fixed lg:static inset-y-0 left-0 z-40 ${
             isSidebarOpen ? 'w-60 translate-x-0' : '-translate-x-full lg:translate-x-0 lg:w-16'
-          } transition-all duration-200 bg-zinc-950 border-r border-zinc-800/80 flex flex-col shrink-0 overflow-y-auto`}
+          } transition-all duration-200 dark:bg-zinc-950 bg-white border-r dark:border-zinc-800/80 border-slate-200 flex flex-col shrink-0 overflow-y-auto shadow-xs`}
         >
           <div className="p-3 space-y-5">
             {navGroups.map((group, idx) => {
@@ -333,7 +339,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
               return (
                 <div key={idx} className="space-y-1">
                   {isSidebarOpen && (
-                    <span className="text-[10px] uppercase font-medium text-zinc-500 tracking-wider px-2 py-1 block">
+                    <span className="text-[10px] uppercase font-medium dark:text-zinc-500 text-slate-400 tracking-wider px-2 py-1 block">
                       {group.group}
                     </span>
                   )}
@@ -352,14 +358,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
                           }}
                           className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
                             isActive
-                              ? 'bg-zinc-800/90 text-zinc-100 font-semibold'
-                              : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60'
+                              ? 'dark:bg-zinc-800/90 bg-slate-100 dark:text-zinc-100 text-slate-900 font-semibold'
+                              : 'dark:text-zinc-400 text-slate-600 dark:hover:text-zinc-200 hover:text-slate-900 dark:hover:bg-zinc-900/60 hover:bg-slate-50'
                           }`}
                         >
-                          <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-zinc-100' : 'text-zinc-400'}`} />
+                          <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'dark:text-zinc-100 text-slate-900' : 'dark:text-zinc-400 text-slate-500'}`} />
                           {isSidebarOpen && <span className="truncate">{item.label}</span>}
                           {isSidebarOpen && item.badge !== undefined && item.badge > 0 && (
-                            <span className="ml-auto px-1.5 py-0.2 bg-zinc-800 text-zinc-200 font-mono text-[10px] rounded border border-zinc-700">
+                            <span className="ml-auto px-1.5 py-0.2 dark:bg-zinc-800 bg-slate-200 dark:text-zinc-200 text-slate-800 font-mono text-[10px] rounded border dark:border-zinc-700 border-slate-300">
                               {item.badge}
                             </span>
                           )}
@@ -374,13 +380,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
         </aside>
 
         {/* Right Dynamic Viewport Panel */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 bg-zinc-950">
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 dark:bg-zinc-950 bg-slate-50">
           
           {/* Breadcrumb Header */}
-          <div className="flex items-center justify-between border-b border-zinc-800/80 pb-3.5">
+          <div className="flex items-center justify-between border-b dark:border-zinc-800/80 border-slate-200 pb-3.5">
             <div>
-              <div className="text-xs text-zinc-400 font-normal">
-                Dashboard / <span className="text-zinc-100 font-semibold capitalize">{activeTab.replace('_', ' ')}</span>
+              <div className="text-xs dark:text-zinc-400 text-slate-500 font-normal">
+                Dashboard / <span className="dark:text-zinc-100 text-slate-900 font-semibold capitalize">{activeTab.replace('_', ' ')}</span>
               </div>
             </div>
           </div>
@@ -499,7 +505,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
         </main>
 
       </div>
-
-    </div>
+    </AdminThemeProvider>
   );
 };

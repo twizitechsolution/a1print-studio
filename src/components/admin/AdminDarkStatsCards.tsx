@@ -161,10 +161,10 @@ export const AdminDarkStatsCards: React.FC<AdminDarkStatsCardsProps> = ({
   return (
     <div className="space-y-4 font-sans">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-bold tracking-tight text-zinc-100">
+        <h3 className="text-lg font-bold tracking-tight dark:text-zinc-100 text-slate-900">
           Dashboard Overview
         </h3>
-        <span className="text-xs text-zinc-400 font-medium bg-zinc-900 px-2.5 py-1 rounded-md border border-zinc-800">
+        <span className="text-xs dark:text-zinc-400 text-slate-500 font-medium dark:bg-zinc-900 bg-white px-2.5 py-1 rounded-md border dark:border-zinc-800 border-slate-200 shadow-xs">
           12 Core Metrics
         </span>
       </div>
@@ -177,23 +177,23 @@ export const AdminDarkStatsCards: React.FC<AdminDarkStatsCardsProps> = ({
             <div
               key={idx}
               onClick={card.onClick}
-              className={`p-5 bg-zinc-900/50 rounded-xl border border-zinc-800 shadow-xs hover:border-zinc-700 transition-colors cursor-pointer group flex flex-col justify-between space-y-3 ${
-                card.onClick ? 'hover:bg-zinc-900/80' : ''
+              className={`p-5 dark:bg-zinc-900/50 bg-white rounded-xl border dark:border-zinc-800 border-slate-200 shadow-xs dark:hover:border-zinc-700 hover:border-slate-300 transition-colors cursor-pointer group flex flex-col justify-between space-y-3 ${
+                card.onClick ? 'dark:hover:bg-zinc-900/80 hover:bg-slate-50' : ''
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-zinc-400">
+                <span className="text-xs font-medium dark:text-zinc-400 text-slate-500">
                   {card.label}
                 </span>
-                <IconComp className="w-4 h-4 text-zinc-500 group-hover:text-zinc-300 transition-colors" />
+                <IconComp className="w-4 h-4 dark:text-zinc-500 text-slate-400 dark:group-hover:text-zinc-300 group-hover:text-slate-700 transition-colors" />
               </div>
 
               <div className="space-y-1">
-                <h4 className="font-mono text-2xl font-bold tracking-tight text-zinc-100">
+                <h4 className="font-mono text-2xl font-bold tracking-tight dark:text-zinc-100 text-slate-900">
                   {card.value}
                 </h4>
                 <div className="flex items-center gap-1.5 text-[11px]">
-                  <span className="px-2 py-0.5 rounded-md border border-zinc-800 bg-zinc-950 text-zinc-400 font-medium">
+                  <span className="px-2 py-0.5 rounded-md border dark:border-zinc-800 border-slate-200 dark:bg-zinc-950 bg-slate-100 dark:text-zinc-400 text-slate-600 font-medium">
                     {card.subtext}
                   </span>
                 </div>
