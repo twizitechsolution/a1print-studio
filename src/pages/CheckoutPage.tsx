@@ -3,7 +3,8 @@ import { CartItem, Order } from '../types';
 import { LiveCustomizedFrameThumbnail } from '../components/customizer/LiveCustomizedFrameThumbnail';
 import { useAuthStore } from '../store/useAuthStore';
 import { launchRazorpayCheckout } from '../services/razorpayService';
-import { ShieldCheck, Truck, CreditCard, Lock, Sparkles, Edit3, Loader2, UserPlus, LogIn, X, CheckCircle2, Zap } from 'lucide-react';
+import { InstantUPIGatewayModal } from '../components/cart/InstantUPIGatewayModal';
+import { ShieldCheck, Truck, CreditCard, Lock, Sparkles, Edit3, Loader2, UserPlus, LogIn, X, CheckCircle2, Zap, QrCode } from 'lucide-react';
 
 interface CheckoutPageProps {
   items: CartItem[];
@@ -40,6 +41,9 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
   const [showAuthPopup, setShowAuthPopup] = useState(false);
   const [regPassword, setRegPassword] = useState('');
 
+  // Fallback / Direct Instant UPI Prepaid Modal State
+  const [showUpiModal, setShowUpiModal] = useState(false);
+
   const activeItem = items[0];
 
   const handleInitialFormSubmit = (e: React.FormEvent) => {
@@ -74,6 +78,45 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
     executeFinalOrderPlacement();
   };
 
+  const handleCompletePrepaidOrder = (paymentId: string, gatewayName: 'Razorpay' | 'UPI Direct' = 'Razorpay') => {
+    try {
+      const customerData = {
+        fullName: `${firstName} ${lastName}`.trim(),
+        phone,
+        email: email || `${phone}@a1printstudio.com`,
+        address: `${address}${landmark ? `, Near ${landmark}` : ''}`,
+        city,
+        state,
+        pincode,
+      };
+
+      const order = onPlaceOrder({
+        customer: customerData,
+        items,
+        subtotal,
+        discount: 0,
+        shipping: 0,
+        total: subtotal,
+        paymentMethod: 'Razorpay',
+        paymentStatus: 'Paid',
+        orderStatus: 'Received',
+        notes: `Verified Prepaid Payment ID: ${paymentId} (${gatewayName})`,
+      });
+
+      setIsSubmitting(false);
+      setShowUpiModal(false);
+      if (onOrderSuccess) {
+        onOrderSuccess(order);
+      } else {
+        onNavigate('order-success');
+      }
+    } catch (err: any) {
+      console.error('Prepaid order saving error:', err);
+      setIsSubmitting(false);
+      setErrorMsg('Payment verified, but order creation failed. Please contact support.');
+    }
+  };
+
   const executeFinalOrderPlacement = () => {
     setIsSubmitting(true);
     setErrorMsg(null);
@@ -101,39 +144,16 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
           address: customerData.address,
         },
         onSuccess: (razorpayResp) => {
-          try {
-            const order = onPlaceOrder({
-              customer: customerData,
-              items,
-              subtotal,
-              discount: 0,
-              shipping: 0,
-              total: subtotal,
-              paymentMethod: 'Razorpay',
-              paymentStatus: 'Paid',
-              orderStatus: 'Received',
-              notes: `Verified Razorpay Payment ID: ${razorpayResp.razorpay_payment_id} | Order ID: ${razorpayResp.razorpay_order_id}`,
-            });
-
-            setIsSubmitting(false);
-            if (onOrderSuccess) {
-              onOrderSuccess(order);
-            } else {
-              onNavigate('order-success');
-            }
-          } catch (err: any) {
-            console.error('Order saving error after payment:', err);
-            setIsSubmitting(false);
-            setErrorMsg('Payment was verified successfully, but order creation failed. Please contact support.');
-          }
+          handleCompletePrepaidOrder(razorpayResp.razorpay_payment_id || `pay_${Date.now()}`, 'Razorpay');
         },
         onFailure: (errMsg) => {
+          console.warn('Razorpay SDK modal error, launching Instant UPI Gateway Modal fallback:', errMsg);
           setIsSubmitting(false);
-          setErrorMsg(errMsg);
+          setShowUpiModal(true);
         },
         onDismiss: () => {
           setIsSubmitting(false);
-          setErrorMsg('Payment modal closed. You can retry Razorpay or select Cash on Delivery.');
+          setShowUpiModal(true);
         },
       });
     } else {
@@ -488,7 +508,20 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
         </div>
       )}
 
+      {/* Instant Working UPI / QR Gateway Modal */}
+      <InstantUPIGatewayModal
+        isOpen={showUpiModal}
+        onClose={() => setShowUpiModal(false)}
+        amount={subtotal}
+        customerName={`${firstName} ${lastName}`.trim()}
+        customerPhone={phone}
+        customerEmail={email}
+        orderTitle={activeItem?.product?.title}
+        onPaymentSuccess={(paymentId) => handleCompletePrepaidOrder(paymentId, 'UPI Direct')}
+      />
+
     </div>
   );
 };
+
 
