@@ -364,6 +364,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
                             </span>
                           )}
                         </button>
+                      );
+                    })}
                   </div>
                 </div>
               );
