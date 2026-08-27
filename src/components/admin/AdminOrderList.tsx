@@ -413,16 +413,16 @@ export const AdminOrderList: React.FC<AdminOrderListProps> = ({
             return (
               <div
                 key={order.id}
-                className="p-5 bg-[#131B2E] rounded-2xl border border-[#1E293B] shadow-xl space-y-4 text-gray-300 select-none hover:border-purple-500/30 transition-all"
+                className="p-5 bg-zinc-900/50 rounded-xl border border-zinc-800 shadow-xs space-y-4 text-zinc-300 hover:border-zinc-700 transition-colors"
               >
                 {/* Top Order Row Header */}
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-[#1E293B] pb-3.5">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <span className="font-mono font-black text-white text-base tracking-tight">{order.id}</span>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-zinc-800/80 pb-3">
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <span className="font-mono font-bold text-zinc-100 text-sm tracking-tight">{order.id}</span>
 
                     {/* Order Date & Time Badge */}
-                    <span className="px-2.5 py-1 bg-[#1A2035] text-pink-300 font-bold text-[11px] rounded-lg border border-[#262E4A] flex items-center gap-1.5">
-                      <Calendar className="w-3.5 h-3.5 text-[#F82BA9]" />
+                    <span className="px-2 py-0.5 bg-zinc-950 text-zinc-400 font-medium text-[11px] rounded-md border border-zinc-800 flex items-center gap-1.5">
+                      <Calendar className="w-3 h-3 text-zinc-500" />
                       <span>{formattedDate}</span>
                     </span>
                     

@@ -196,22 +196,22 @@ export const AdminProductListingModal: React.FC<AdminProductListingModalProps> =
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs font-jost animate-fadeIn select-none">
-      <div className="relative bg-[#121829] text-gray-100 rounded-3xl p-6 sm:p-8 max-w-4xl w-full shadow-2xl border border-[#262E4A] space-y-6 max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/80 backdrop-blur-xs font-sans select-none">
+      <div className="relative bg-zinc-950 text-zinc-100 rounded-xl p-6 sm:p-7 max-w-4xl w-full shadow-2xl border border-zinc-800 space-y-6 max-h-[90vh] overflow-y-auto">
         
         {/* Modal Header */}
-        <div className="flex items-center justify-between border-b border-[#262E4A] pb-4">
+        <div className="flex items-center justify-between border-b border-zinc-800/80 pb-4">
           <div>
-            <h2 className="font-playfair text-2xl font-extrabold text-white">
+            <h2 className="text-lg font-bold text-zinc-100 tracking-tight">
               {editingProduct ? 'Edit Frame Product' : 'Add New Frame Product'}
             </h2>
-            <p className="text-xs text-gray-400 mt-0.5">Enter product details, upload multiple angle photos, and set available stock quantity.</p>
+            <p className="text-xs text-zinc-400 mt-0.5">Enter product details, upload multiple angle photos, and set available stock quantity.</p>
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-gray-400 hover:text-white rounded-full bg-[#1A2035] hover:bg-[#262E4A] transition-colors cursor-pointer"
+            className="p-1.5 text-zinc-400 hover:text-zinc-100 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 transition-colors cursor-pointer"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
@@ -219,25 +219,25 @@ export const AdminProductListingModal: React.FC<AdminProductListingModalProps> =
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           
           {/* Left Column: Form Inputs (6 Cols) */}
-          <div className="lg:col-span-6 space-y-4 text-xs font-bold">
+          <div className="lg:col-span-6 space-y-4 text-xs">
             
-            <div className="space-y-1">
-              <label className="text-gray-300">Frame Product Title :</label>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-zinc-300 block">Product Title :</label>
               <input
                 type="text"
                 placeholder="e.g. Personalized Dad Heartbeat Photo Collage Frame"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="w-full px-4 py-3 bg-[#1A2035] border border-[#262E4A] rounded-xl text-white focus:outline-hidden focus:border-[#3B82F6]"
+                className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 text-xs focus:outline-none focus:border-zinc-500 font-medium transition-colors"
               />
             </div>
 
-            <div className="space-y-1">
-              <label className="text-gray-300">Category :</label>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-zinc-300 block">Category :</label>
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                className="w-full px-4 py-3 bg-[#1A2035] border border-[#262E4A] rounded-xl text-white"
+                className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 text-xs focus:outline-none focus:border-zinc-500 transition-colors"
               >
                 {categories.map((c) => (
                   <option key={c.id} value={c.slug}>

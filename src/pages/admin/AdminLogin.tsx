@@ -85,76 +85,82 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess }) => {
   };
 
   return (
-    <div className="min-h-screen bg-[#0B0E1B] text-white flex items-center justify-center p-4 font-jost select-none">
-      
-      {/* Background Decorative Radial Gradient */}
-      <div className="fixed inset-0 pointer-events-none opacity-20 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-blue-600 via-purple-900 to-transparent" />
-
-      <div className="max-w-md w-full bg-[#121829] p-8 rounded-3xl border border-[#262E4A] shadow-2xl space-y-6 relative z-10">
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center justify-center p-4 font-sans select-none">
+      <div className="w-full max-w-sm space-y-6">
         
         {/* Brand Header */}
-        <div className="text-center space-y-2">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-[#3B82F6] to-[#8B5CF6] text-white font-black text-2xl flex items-center justify-center mx-auto shadow-xl">
+        <div className="flex flex-col items-center text-center space-y-2">
+          <div className="w-10 h-10 rounded-xl bg-zinc-100 text-zinc-950 font-bold text-lg flex items-center justify-center shadow-sm">
             A1
           </div>
-          <div>
-            <h2 className="font-playfair text-2xl font-extrabold text-white tracking-tight">
-              A1print <span className="text-[#3B82F6]">Admin</span> Portal
-            </h2>
-            <p className="text-xs text-gray-400 mt-0.5">
-              Storefront Control & Management Studio
+          <div className="space-y-1">
+            <h1 className="text-2xl font-bold tracking-tight text-zinc-100">
+              Admin Portal
+            </h1>
+            <p className="text-xs text-zinc-400">
+              Sign in to manage storefront operations
             </p>
           </div>
         </div>
 
-        {error && (
-          <div className="p-3.5 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs font-bold text-rose-400 flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            <span>{error}</span>
-          </div>
-        )}
+        {/* Auth Card Container */}
+        <div className="bg-zinc-900/60 border border-zinc-800/80 rounded-xl p-6 shadow-2xl space-y-5">
+          {error && (
+            <div className="p-3 bg-red-950/40 border border-red-800/50 rounded-lg text-xs font-medium text-red-400 flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
 
-        <form onSubmit={handleLogin} className="space-y-4 text-xs">
-          <div className="space-y-1.5">
-            <label className="font-bold text-gray-300 flex items-center gap-1.5">
-              <User className="w-3.5 h-3.5 text-[#3B82F6]" /> Login ID / Username
-            </label>
-            <input
-              type="text"
-              required
-              placeholder="Enter Login ID (e.g. admin)"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="w-full px-4 py-3 bg-[#1A2035] border border-[#262E4A] text-white rounded-xl focus:outline-hidden focus:border-[#3B82F6] text-sm font-mono"
-            />
-          </div>
+          <form onSubmit={handleLogin} className="space-y-4 text-xs">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-zinc-300 block">
+                Username / Login ID
+              </label>
+              <input
+                type="text"
+                required
+                placeholder="e.g. admin"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-zinc-500 text-xs font-mono transition-colors"
+              />
+            </div>
 
-          <div className="space-y-1.5">
-            <label className="font-bold text-gray-300 flex items-center gap-1.5">
-              <Key className="w-3.5 h-3.5 text-[#3B82F6]" /> Password / Passcode
-            </label>
-            <input
-              type="password"
-              required
-              placeholder="Enter Password (e.g. 123456)"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 bg-[#1A2035] border border-[#262E4A] text-white rounded-xl focus:outline-hidden focus:border-[#3B82F6] text-sm"
-            />
-          </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-zinc-300 block">
+                Password / Passcode
+              </label>
+              <input
+                type="password"
+                required
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-zinc-500 text-xs transition-colors"
+              />
+            </div>
 
-          <div className="p-3 bg-[#1A2035] rounded-xl text-[11px] text-gray-300 font-semibold border border-[#262E4A] flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-[#3B82F6] shrink-0" />
-            <span>Super Admin Quick Passcode: <strong className="text-white">123456</strong></span>
-          </div>
+            <div className="p-3 bg-zinc-950/80 rounded-lg text-[11px] text-zinc-400 border border-zinc-800/60 flex items-center justify-between">
+              <span className="flex items-center gap-1.5 font-medium">
+                <Sparkles className="w-3.5 h-3.5 text-zinc-300" /> Default Passcode:
+              </span>
+              <code className="text-zinc-200 font-mono font-bold bg-zinc-900 px-2 py-0.5 rounded border border-zinc-800">123456</code>
+            </div>
 
-          <button
-            type="submit"
-            className="w-full py-3.5 bg-gradient-to-r from-[#3B82F6] to-[#8B5CF6] hover:from-[#2563EB] hover:to-[#7C3AED] text-white font-bold text-sm rounded-xl shadow-xl transition-all flex items-center justify-center gap-2 cursor-pointer"
-          >
-            <Lock className="w-4 h-4" /> Sign In to Admin Panel
-          </button>
-        </form>
+            <button
+              type="submit"
+              className="w-full py-2.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-950 font-semibold text-xs rounded-lg transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+            >
+              <Lock className="w-3.5 h-3.5" /> Sign In
+            </button>
+          </form>
+        </div>
+
+        {/* Footer info */}
+        <p className="text-center text-[11px] text-zinc-500">
+          A1print Studio Enterprise Admin v2.0
+        </p>
 
       </div>
     </div>

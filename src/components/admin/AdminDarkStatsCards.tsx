@@ -159,12 +159,14 @@ export const AdminDarkStatsCards: React.FC<AdminDarkStatsCardsProps> = ({
   ];
 
   return (
-    <div className="space-y-4 font-jost">
+    <div className="space-y-4 font-sans">
       <div className="flex items-center justify-between">
-        <h3 className="font-playfair text-lg font-bold text-white flex items-center gap-2">
-          <span>📊</span> Key Performance Metrics & Status Summary
+        <h3 className="text-lg font-bold tracking-tight text-zinc-100">
+          Dashboard Overview
         </h3>
-        <span className="text-xs text-gray-400 font-bold">12 Dashboard KPI Cards</span>
+        <span className="text-xs text-zinc-400 font-medium bg-zinc-900 px-2.5 py-1 rounded-md border border-zinc-800">
+          12 Core Metrics
+        </span>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -175,27 +177,23 @@ export const AdminDarkStatsCards: React.FC<AdminDarkStatsCardsProps> = ({
             <div
               key={idx}
               onClick={card.onClick}
-              className={`p-5 bg-[#131B2E] rounded-2xl border border-[#1E293B] shadow-xl hover:border-purple-500/40 transition-all cursor-pointer group flex flex-col justify-between space-y-3 ${
-                card.onClick ? 'hover:translate-y-[-2px]' : ''
+              className={`p-5 bg-zinc-900/50 rounded-xl border border-zinc-800 shadow-xs hover:border-zinc-700 transition-colors cursor-pointer group flex flex-col justify-between space-y-3 ${
+                card.onClick ? 'hover:bg-zinc-900/80' : ''
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">
+                <span className="text-xs font-medium text-zinc-400">
                   {card.label}
                 </span>
-                <div
-                  className={`w-9 h-9 rounded-xl bg-gradient-to-tr ${card.color} text-white flex items-center justify-center shadow-md shadow-black/40 group-hover:scale-110 transition-transform`}
-                >
-                  <IconComp className="w-4.5 h-4.5" />
-                </div>
+                <IconComp className="w-4 h-4 text-zinc-500 group-hover:text-zinc-300 transition-colors" />
               </div>
 
-              <div className="space-y-1.5">
-                <h4 className="font-mono font-black text-2xl text-white tracking-tight">
+              <div className="space-y-1">
+                <h4 className="font-mono text-2xl font-bold tracking-tight text-zinc-100">
                   {card.value}
                 </h4>
-                <div className="flex items-center gap-1.5 text-[11px] font-bold">
-                  <span className={`px-2.5 py-0.5 rounded-lg border ${card.badgeBg}`}>
+                <div className="flex items-center gap-1.5 text-[11px]">
+                  <span className="px-2 py-0.5 rounded-md border border-zinc-800 bg-zinc-950 text-zinc-400 font-medium">
                     {card.subtext}
                   </span>
                 </div>

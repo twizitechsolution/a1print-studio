@@ -106,52 +106,70 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
             <FolderPlus className="w-4 h-4" /> Category Manager ({categories.length})
           </button>
 
+      {/* Frame Catalog Header & Toolbar */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-bold tracking-tight text-zinc-100">
+            Frame Product Catalog
+          </h2>
+          <p className="text-xs text-zinc-400 mt-0.5">
+            Manage photo frame products, stock inventory, categories, and multi-angle galleries.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Category Manager Button */}
+          <button
+            onClick={() => setIsCategoryModalOpen(true)}
+            className="px-3 py-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 font-medium text-xs rounded-lg border border-zinc-800 transition-colors flex items-center gap-1.5 cursor-pointer"
+          >
+            <FolderPlus className="w-3.5 h-3.5" /> Categories ({categories.length})
+          </button>
+
           {/* Recycle Bin Button */}
           <button
             onClick={() => setIsRecycleBinOpen(true)}
-            className="px-4 py-2.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 font-extrabold text-xs rounded-xl border border-amber-500/30 transition-all flex items-center gap-1.5 cursor-pointer"
+            className="px-3 py-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 font-medium text-xs rounded-lg border border-zinc-800 transition-colors flex items-center gap-1.5 cursor-pointer"
           >
-            <Trash2 className="w-4 h-4" /> Recycle Bin ({deletedProducts.length})
+            <Trash2 className="w-3.5 h-3.5 text-zinc-400" /> Recycle Bin ({deletedProducts.length})
           </button>
 
           {/* Add Product Button */}
           <button
             onClick={handleOpenAddModal}
-            className="px-5 py-2.5 bg-[#3B82F6] hover:bg-blue-600 text-white font-extrabold text-xs rounded-xl shadow-lg transition-colors flex items-center gap-2 cursor-pointer"
+            className="px-3.5 py-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-950 font-semibold text-xs rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
           >
-            <Plus className="w-4 h-4" /> Add New Frame Product
+            <Plus className="w-3.5 h-3.5" /> Add Product
           </button>
         </div>
       </div>
 
       {/* Frame Catalog Table */}
-      <div className="bg-[#131B2E] rounded-3xl border border-[#1E293B] shadow-xl overflow-hidden">
+      <div className="bg-zinc-900/40 rounded-xl border border-zinc-800 shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-[#0E1322] text-gray-400 text-[10px] font-extrabold uppercase tracking-widest border-b border-[#1E293B]">
+            <thead className="bg-zinc-900 text-zinc-400 text-[11px] font-medium uppercase tracking-wider border-b border-zinc-800">
               <tr>
-                <th className="p-4">Product Poster</th>
-                <th className="p-4">Frame Title & Details</th>
-                <th className="p-4">Category</th>
-                <th className="p-4">Starting Price</th>
-                <th className="p-4">Available Stock</th>
-                <th className="p-4">Bestseller Status</th>
-                <th className="p-4">Discount Badge</th>
-                <th className="p-4 text-right">Actions</th>
+                <th className="p-3.5">Poster</th>
+                <th className="p-3.5">Product Title & Details</th>
+                <th className="p-3.5">Category</th>
+                <th className="p-3.5">Price</th>
+                <th className="p-3.5">Inventory Stock</th>
+                <th className="p-3.5">Bestseller</th>
+                <th className="p-3.5 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#262E4A] font-bold">
+            <tbody className="divide-y divide-zinc-800/60 font-medium">
               {paginatedProducts.map((product) => {
                 const posterSrc = product.baseImageUrl || product.thumbnail || product.images?.[0];
                 const priceVal = (product as any).price || (product.sizes && product.sizes[0] ? product.sizes[0].price : 699);
-                const origVal = product.sizes && product.sizes[0] ? product.sizes[0].originalPrice : null;
                 const catName = product.categoryLabel || product.category || 'Custom Frame';
                 const stockQty = product.stockQuantity !== undefined ? product.stockQuantity : 50;
 
                 return (
-                  <tr key={product.id} className="hover:bg-[#1A2035]/50 transition-colors text-gray-200">
-                    <td className="p-4">
-                      <div className="w-12 h-16 rounded-lg overflow-hidden border border-[#262E4A] bg-gray-900 shrink-0">
+                  <tr key={product.id} className="hover:bg-zinc-900/60 transition-colors text-zinc-200">
+                    <td className="p-3.5">
+                      <div className="w-10 h-14 rounded-md overflow-hidden border border-zinc-800 bg-zinc-950 shrink-0">
                         <img
                           src={posterSrc}
                           alt={product.title}
@@ -163,18 +181,18 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
                       </div>
                     </td>
 
-                    <td className="p-4">
+                    <td className="p-3.5">
                       <div className="space-y-0.5">
-                        <h4 className="font-extrabold text-white text-sm">{product.title}</h4>
-                        <span className="text-gray-400 font-mono text-[10px] block">ID: {product.id}</span>
+                        <h4 className="font-semibold text-zinc-100 text-xs">{product.title}</h4>
+                        <span className="text-zinc-500 font-mono text-[10px] block">ID: {product.id}</span>
                         {product.images && product.images.length > 1 && (
-                          <span className="text-[10px] text-pink-400 block font-bold">📸 {product.images.length} Angle Photos</span>
+                          <span className="text-[10px] text-zinc-400 block font-normal">📸 {product.images.length} Angle Photos</span>
                         )}
                       </div>
                     </td>
 
-                    <td className="p-4">
-                      <span className="px-2.5 py-1 rounded-full bg-blue-500/10 text-[#3B82F6] font-extrabold text-[11px] border border-blue-500/20 inline-block">
+                    <td className="p-3.5">
+                      <span className="px-2 py-0.5 rounded-md bg-zinc-950 text-zinc-300 font-medium text-[11px] border border-zinc-800 inline-block">
                         {catName}
                       </span>
                     </td>

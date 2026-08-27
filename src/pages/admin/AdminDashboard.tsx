@@ -247,25 +247,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
   const customerList = mergedCustomerDirectory();
 
   return (
-    <div className="min-h-screen bg-[#0A0D14] text-gray-100 font-jost flex flex-col select-none">
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 font-sans flex flex-col select-none">
       
-      {/* Top Admin Navigation Header */}
-      <header className="sticky top-0 z-30 bg-[#121829] border-b border-[#262E4A] px-4 sm:px-6 py-3.5 flex items-center justify-between shadow-lg">
-        <div className="flex items-center gap-4">
+      {/* Top Admin Navigation Header (shadcn-admin style) */}
+      <header className="sticky top-0 z-30 bg-zinc-950/80 border-b border-zinc-800/80 px-4 sm:px-6 py-3 flex items-center justify-between backdrop-blur-md">
+        <div className="flex items-center gap-3">
           <button
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="p-2 text-gray-400 hover:text-white rounded-xl bg-[#1A2035] hover:bg-[#262E4A] transition-colors cursor-pointer"
+            className="p-1.5 text-zinc-400 hover:text-zinc-100 rounded-lg hover:bg-zinc-900 border border-zinc-800 transition-colors cursor-pointer"
+            title="Toggle Sidebar Navigation"
           >
-            <Menu className="w-5 h-5" />
+            <Menu className="w-4 h-4" />
           </button>
 
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-black text-lg flex items-center justify-center shadow-md">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-zinc-100 text-zinc-950 font-bold text-sm flex items-center justify-center shadow-xs">
               A1
             </div>
             <div>
-              <h1 className="font-playfair text-lg sm:text-xl font-extrabold text-white leading-none">
-                A1print Admin <span className="text-purple-400 font-normal text-xs uppercase tracking-widest block font-jost mt-0.5">Control Studio</span>
+              <h1 className="text-sm font-bold text-zinc-100 leading-tight flex items-center gap-2">
+                A1print Studio <span className="text-[10px] font-medium text-zinc-400 bg-zinc-900 px-2 py-0.5 rounded border border-zinc-800">Admin</span>
               </h1>
             </div>
           </div>
@@ -273,37 +274,36 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
 
         <div className="flex items-center gap-3">
           {/* Live Firebase Cloud DB Connection Status Pill */}
-          <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-extrabold">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span>Firebase Cloud DB: Live Connected</span>
+          <div className="hidden md:flex items-center gap-2 px-2.5 py-1 rounded-full bg-emerald-950/30 border border-emerald-800/40 text-emerald-400 text-[11px] font-medium">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span>Cloud Sync: Live</span>
           </div>
 
           <a
             href="/"
             target="_blank"
             rel="noopener noreferrer"
-            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#1A2035] hover:bg-[#262E4A] text-gray-300 hover:text-white text-xs font-bold transition-colors border border-[#262E4A]"
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-zinc-100 text-xs font-medium transition-colors border border-zinc-800"
           >
-            View Storefront <ExternalLink className="w-3.5 h-3.5" />
+            Storefront <ExternalLink className="w-3 h-3 text-zinc-400" />
           </a>
 
           {/* Active Admin Profile Pill */}
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-[#1A2035] rounded-xl border border-[#262E4A] text-xs font-bold text-white">
-            <div className="w-6 h-6 rounded-full bg-purple-600 text-white flex items-center justify-center text-[10px] font-black">
+          <div className="flex items-center gap-2 px-2.5 py-1 bg-zinc-900 rounded-lg border border-zinc-800 text-xs text-zinc-200">
+            <div className="w-5 h-5 rounded-full bg-zinc-700 text-zinc-100 flex items-center justify-center text-[10px] font-bold">
               {currentAdminUser.name.charAt(0)}
             </div>
             <div className="hidden sm:block text-left">
-              <p className="leading-tight font-extrabold">{currentAdminUser.name}</p>
-              <p className="text-[10px] text-purple-400 font-medium leading-tight">{currentAdminUser.role}</p>
+              <p className="leading-none text-xs font-semibold">{currentAdminUser.name}</p>
             </div>
           </div>
 
           <button
             onClick={handleLogout}
-            className="p-2 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-xl transition-colors cursor-pointer"
+            className="p-1.5 text-zinc-400 hover:text-red-400 hover:bg-red-950/20 rounded-lg border border-transparent hover:border-red-900/40 transition-colors cursor-pointer"
             title="Sign Out Admin"
           >
-            <LogOut className="w-5 h-5" />
+            <LogOut className="w-4 h-4" />
           </button>
         </div>
       </header>
@@ -315,29 +315,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
         {isSidebarOpen && (
           <div
             onClick={() => setIsSidebarOpen(false)}
-            className="fixed inset-0 bg-black/60 backdrop-blur-xs z-30 lg:hidden cursor-pointer"
+            className="fixed inset-0 bg-zinc-950/80 backdrop-blur-xs z-30 lg:hidden cursor-pointer"
           />
         )}
 
         {/* Left Sidebar Navigation (Desktop Static & Mobile Fixed Drawer) */}
         <aside
           className={`fixed lg:static inset-y-0 left-0 z-40 ${
-            isSidebarOpen ? 'w-64 translate-x-0' : '-translate-x-full lg:translate-x-0 lg:w-20'
-          } transition-all duration-300 bg-[#0E1322] border-r border-[#1E293B] flex flex-col shrink-0 overflow-y-auto shadow-2xl lg:shadow-none`}
+            isSidebarOpen ? 'w-60 translate-x-0' : '-translate-x-full lg:translate-x-0 lg:w-16'
+          } transition-all duration-200 bg-zinc-950 border-r border-zinc-800/80 flex flex-col shrink-0 overflow-y-auto`}
         >
-          <div className="p-4 space-y-6">
+          <div className="p-3 space-y-5">
             {navGroups.map((group, idx) => {
               const visibleItems = group.items.filter((item) => allowedTabsSet.has(item.id));
               if (visibleItems.length === 0) return null;
 
               return (
-                <div key={idx} className="space-y-2">
+                <div key={idx} className="space-y-1">
                   {isSidebarOpen && (
-                    <span className="text-[10px] uppercase font-extrabold text-gray-400 tracking-widest px-3 block">
+                    <span className="text-[10px] uppercase font-medium text-zinc-500 tracking-wider px-2 py-1 block">
                       {group.group}
                     </span>
                   )}
-                  <div className="space-y-1">
+                  <div className="space-y-0.5">
                     {visibleItems.map((item) => {
                       const Icon = item.icon;
                       const isActive = activeTab === item.id;
@@ -346,21 +346,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
                           key={item.id}
                           onClick={() => {
                             setActiveTab(item.id);
-                            // On mobile screens, auto-close sidebar after selection!
                             if (window.innerWidth < 1024) {
                               setIsSidebarOpen(false);
                             }
                           }}
-                          className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-xs font-extrabold transition-all cursor-pointer ${
+                          className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
                             isActive
-                              ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-600/30'
-                              : 'text-gray-400 hover:text-white hover:bg-[#1A2035]'
+                              ? 'bg-zinc-800/90 text-zinc-100 font-semibold'
+                              : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60'
                           }`}
                         >
-                          <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-purple-400'}`} />
+                          <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-zinc-100' : 'text-zinc-400'}`} />
                           {isSidebarOpen && <span className="truncate">{item.label}</span>}
                           {isSidebarOpen && item.badge !== undefined && item.badge > 0 && (
-                            <span className="ml-auto px-2 py-0.5 bg-[#F82BA9] text-white font-extrabold text-[10px] rounded-full shadow-xs">
+                            <span className="ml-auto px-1.5 py-0.2 bg-zinc-800 text-zinc-200 font-mono text-[10px] rounded border border-zinc-700">
                               {item.badge}
                             </span>
                           )}
@@ -368,20 +367,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
                       );
                     })}
                   </div>
-                </div>
-              );
-            })}
           </div>
         </aside>
 
         {/* Right Dynamic Viewport Panel */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-8">
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 bg-zinc-950">
           
           {/* Breadcrumb Header */}
-          <div className="flex items-center justify-between border-b border-[#262E4A] pb-4">
+          <div className="flex items-center justify-between border-b border-zinc-800/80 pb-3.5">
             <div>
-              <div className="text-xs text-gray-400 font-medium">
-                Admin Control Center / <span className="text-purple-400 font-bold capitalize">{activeTab.replace('_', ' ')}</span>
+              <div className="text-xs text-zinc-400 font-normal">
+                Dashboard / <span className="text-zinc-100 font-semibold capitalize">{activeTab.replace('_', ' ')}</span>
               </div>
             </div>
           </div>
