@@ -187,13 +187,9 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
   const rawAngleImages = (template as any).product?.images || (template as any).images || [];
   const baseImg = template.baseImageUrl || 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80';
   
-  const availableAngleImages: string[] = rawAngleImages.length >= 2 ? rawAngleImages : [
-    baseImg,
-    'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?auto=format&fit=crop&w=800&q=80',
-    'https://images.unsplash.com/photo-1582562124811-c09040d0a901?auto=format&fit=crop&w=800&q=80',
-    'https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=800&q=80',
-    'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=800&q=80',
-  ];
+  const availableAngleImages: string[] = Array.isArray(rawAngleImages) && rawAngleImages.length > 0
+    ? rawAngleImages
+    : [baseImg];
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState<boolean>(false);
   const [compiledPreviewUrl, setCompiledPreviewUrl] = useState<string | null>(null);
   const [isLoadingPreview, setIsLoadingPreview] = useState<boolean>(false);
@@ -444,31 +440,32 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
             )}
 
           </div>
-
-          {/* Interactive Multi-Angle Photo Thumbnails Selection Carousel (Matching giftingstudio.in) */}
-          {availableAngleImages.length > 0 && (
-            <div className="pt-3 text-center space-y-2">
-              <span className="text-xs font-extrabold text-gray-700 block">Select Frame Angle View:</span>
-              <div className="flex items-center justify-center gap-2.5 overflow-x-auto py-1 px-2">
-                {availableAngleImages.map((imgUrl: string, idx: number) => {
-                  const isActive = (activeAngleImage || template.baseImageUrl) === imgUrl;
-                  return (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => setActiveAngleImage(imgUrl)}
-                      className={`relative w-14 sm:w-16 h-16 sm:h-20 rounded-2xl overflow-hidden border-2 transition-all cursor-pointer shrink-0 shadow-xs ${
-                        isActive ? 'border-[#F82BA9] ring-4 ring-[#F82BA9]/20 scale-105 shadow-md' : 'border-gray-300 hover:border-pink-300 opacity-75 hover:opacity-100'
-                      }`}
-                    >
-                      <img src={imgUrl} alt={`Angle ${idx + 1}`} className="w-full h-full object-cover" />
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
         </div>
+
+        {/* Dedicated Standalone Multi-Angle Photo Selection Carousel (Matching giftingstudio.in OUTSIDE showcase box) */}
+        {availableAngleImages.length > 1 && (
+          <div className="w-full bg-white p-4 rounded-3xl border border-gray-200 shadow-xs text-center space-y-2">
+            <span className="text-xs font-extrabold text-gray-800 block">Select Frame Angle View:</span>
+            <div className="flex items-center justify-center gap-3 overflow-x-auto py-1 px-2">
+              {availableAngleImages.map((imgUrl: string, idx: number) => {
+                const isActive = (activeAngleImage || template.baseImageUrl) === imgUrl;
+                return (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setActiveAngleImage(imgUrl)}
+                    className={`relative w-16 sm:w-20 h-20 sm:h-24 rounded-2xl overflow-hidden border-2 transition-all cursor-pointer shrink-0 shadow-xs ${
+                      isActive ? 'border-[#F82BA9] ring-4 ring-[#F82BA9]/20 scale-105 shadow-md' : 'border-gray-300 hover:border-pink-300 opacity-75 hover:opacity-100'
+                    }`}
+                  >
+                    <img src={imgUrl} alt={`Angle ${idx + 1}`} className="w-full h-full object-cover" />
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
       </div>
 
       {/* Right Column: LovecraftbySE Product Header & Form Controls (7 Cols) */}
