@@ -175,7 +175,16 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
 }) => {
   const [photoValues, setPhotoValues] = useState<Record<string, string>>({});
   const [textValues, setTextValues] = useState<Record<string, string>>({});
-  const [selectedSize, setSelectedSize] = useState<string>('A4');
+  const [selectedSize, setSelectedSize] = useState<string>('A4 (8x12 in)');
+  const [activeSlotForCrop, setActiveSlotForCrop] = useState<any | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [previewModalOpen, setPreviewModalOpen] = useState(false);
+  const [previewModalImage, setPreviewModalImage] = useState<string | null>(null);
+
+  // Active Angle Image state for multi-angle photo gallery switching
+  const [activeAngleImage, setActiveAngleImage] = useState<string | null>(null);
+
+  const availableAngleImages = (template as any).product?.images || (template as any).images || [];
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState<boolean>(false);
   const [compiledPreviewUrl, setCompiledPreviewUrl] = useState<string | null>(null);
   const [isLoadingPreview, setIsLoadingPreview] = useState<boolean>(false);
@@ -332,7 +341,7 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
           >
             {/* Base Frame Poster Image with Bulletproof Fallback & onError Guard */}
             <img
-              src={template.baseImageUrl && !template.baseImageUrl.includes('[COMPRESSED_FIRESTORE_PREVIEW]') ? template.baseImageUrl : 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80'}
+              src={activeAngleImage || (template.baseImageUrl && !template.baseImageUrl.includes('[COMPRESSED_FIRESTORE_PREVIEW]') ? template.baseImageUrl : 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80')}
               alt={template.title}
               className="w-full h-full object-cover absolute inset-0 pointer-events-none"
               onError={(e) => {
@@ -426,6 +435,31 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
             )}
 
           </div>
+
+          {/* Interactive Multi-Angle Photo Thumbnails Switcher */}
+          {availableAngleImages.length > 1 && (
+            <div className="pt-2 text-center space-y-1.5">
+              <span className="text-[11px] font-bold text-gray-500 block">Click to Switch Frame Angle View:</span>
+              <div className="flex items-center justify-center gap-2 overflow-x-auto py-1">
+                {availableAngleImages.map((imgUrl: string, idx: number) => {
+                  const isActive = (activeAngleImage || template.baseImageUrl) === imgUrl;
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setActiveAngleImage(imgUrl)}
+                      className={`relative w-12 h-14 rounded-xl overflow-hidden border-2 transition-all cursor-pointer ${
+                        isActive ? 'border-[#F82BA9] ring-2 ring-[#F82BA9]/30 scale-105 shadow-md' : 'border-gray-200 hover:border-pink-300 opacity-70 hover:opacity-100'
+                      }`}
+                    >
+                      <img src={imgUrl} alt={`Angle ${idx + 1}`} className="w-full h-full object-cover" />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
         </div>
 
         {/* 👁️ Preview Customized Frame Button */}

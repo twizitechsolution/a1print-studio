@@ -2,6 +2,27 @@ import { PhotoSlotConfig, TextZoneConfig } from './template';
 
 export * from './admin';
 
+export interface Category {
+  id: string;
+  slug: string;
+  name: string;
+  description?: string;
+  icon?: string;
+  color?: string;
+  createdAt: string;
+}
+
+export interface StockLogItem {
+  id: string;
+  type: 'credit' | 'debit';
+  quantity: number;
+  previousStock: number;
+  newStock: number;
+  reason: string; // e.g. "Customer Order #ORD-849201" or "Admin Manual Restock"
+  timestamp: string;
+  performedBy?: string;
+}
+
 export interface FrameOption {
   id: string;
   name: string;
@@ -39,6 +60,10 @@ export interface Product {
   frames: FrameOption[];
   photoSlots?: PhotoSlotConfig[];
   textZones?: TextZoneConfig[];
+  stockQuantity?: number;
+  isDeleted?: boolean;
+  deletedAt?: string;
+  stockLogs?: StockLogItem[];
 }
 
 export interface CartItem {

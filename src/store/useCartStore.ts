@@ -1,15 +1,26 @@
 import { useState, useEffect } from 'react';
-import { CartItem, Order, Product } from '../types';
+import { CartItem, Order, Product, Category, StockLogItem } from '../types';
 import { PRODUCTS as INITIAL_PRODUCTS } from '../data/products';
 import { firebaseCloudDb } from '../config/firebase';
 
-const STORAGE_KEY = 'a1print_store_data_v14';
-const DELETED_IDS_KEY = 'a1print_deleted_product_ids_v14';
+const STORAGE_KEY = 'a1print_store_data_v15';
+const DELETED_IDS_KEY = 'a1print_deleted_product_ids_v15';
+const CATEGORIES_KEY = 'a1print_categories_v15';
+
+export const DEFAULT_CATEGORIES: Category[] = [
+  { id: 'cat-1', name: 'Baby & Kids', slug: 'baby-kids', description: 'Customized newborn birth stats & baby milestone frames', icon: '👶', createdAt: new Date().toISOString() },
+  { id: 'cat-2', name: 'Couples & Wedding', slug: 'couples', description: 'Romantic anniversary, engagement & wedding memory frames', icon: '💑', createdAt: new Date().toISOString() },
+  { id: 'cat-3', name: 'Birthday Gifts', slug: 'birthday', description: 'Personalized birthday collage & age milestone photo frames', icon: '🎂', createdAt: new Date().toISOString() },
+  { id: 'cat-4', name: 'Calendar Frames', slug: 'calendar', description: 'Interactive date & month highlight calendar photo frames', icon: '📅', createdAt: new Date().toISOString() },
+  { id: 'cat-5', name: 'Photo Collage', slug: 'collage', description: 'Multi-photo grid frames for family memories', icon: '🖼️', createdAt: new Date().toISOString() },
+  { id: 'cat-6', name: 'Corporate Office', slug: 'office', description: 'Professional desk & wall frames for corporate gifting', icon: '💼', createdAt: new Date().toISOString() },
+];
 
 interface StoreData {
   products: Product[];
   items: CartItem[];
   orders: Order[];
+  categories: Category[];
 }
 
 const defaultOrder: Order = {
@@ -72,26 +83,55 @@ function saveDeletedProductIds(ids: Set<string>) {
   } catch (e) {}
 }
 
+function getStoredCategories(): Category[] {
+  try {
+    const raw = localStorage.getItem(CATEGORIES_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && parsed.length > 0) return parsed;
+    }
+  } catch (e) {}
+  return DEFAULT_CATEGORIES;
+}
+
+function saveStoredCategories(categories: Category[]) {
+  try {
+    localStorage.setItem(CATEGORIES_KEY, JSON.stringify(categories));
+  } catch (e) {}
+}
+
 function getStoredLocalData(): StoreData {
-  const deletedIds = getDeletedProductIds();
+  const categories = getStoredCategories();
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      const prods = (parsed.products && parsed.products.length > 0 ? parsed.products : INITIAL_PRODUCTS).filter(
-        (p: Product) => !deletedIds.has(p.id)
-      );
+      const prods = (parsed.products && parsed.products.length > 0 ? parsed.products : INITIAL_PRODUCTS).map((p: Product) => ({
+        ...p,
+        stockQuantity: p.stockQuantity !== undefined ? p.stockQuantity : 50,
+        stockLogs: p.stockLogs || [],
+      }));
+
       return {
         products: prods,
         items: parsed.items || [],
         orders: parsed.orders && parsed.orders.length > 0 ? parsed.orders : [defaultOrder],
+        categories,
       };
     }
   } catch (e) {}
+
+  const defaultProds = INITIAL_PRODUCTS.map((p) => ({
+    ...p,
+    stockQuantity: 50,
+    stockLogs: [],
+  }));
+
   return {
-    products: INITIAL_PRODUCTS.filter((p) => !deletedIds.has(p.id)),
+    products: defaultProds,
     items: [],
     orders: [defaultOrder],
+    categories,
   };
 }
 
@@ -109,7 +149,7 @@ function notifyListeners() {
   listeners.forEach((l) => l());
 }
 
-// Real-Time Cloud Firestore Sync Engine (Non-Destructive Union Merging!)
+// Real-Time Cloud Firestore Sync Engine
 let isCloudSyncInitialized = false;
 
 async function initCloudSync() {
@@ -117,56 +157,44 @@ async function initCloudSync() {
   isCloudSyncInitialized = true;
 
   try {
-    const deletedIds = getDeletedProductIds();
-
-    // 1. FETCH CLOUD FIRESTORE CATALOG (Cloud-First Priority!)
+    // 1. FETCH CLOUD FIRESTORE CATALOG
     const cloudProds = await firebaseCloudDb.getCollection('products');
 
     if (cloudProds && cloudProds.length > 0) {
-      const filteredCloud = cloudProds.filter((p: Product) => !deletedIds.has(p.id));
-      if (filteredCloud.length > 0) {
-        const merged = [...memoryData.products];
-        filteredCloud.forEach((cp) => {
-          const idx = merged.findIndex((mp) => mp.id === cp.id);
-          if (idx !== -1) {
-            const local = merged[idx];
-            merged[idx] = {
-              ...local,
-              ...cp,
-              photoSlots: (cp.photoSlots && cp.photoSlots.length > 0) ? cp.photoSlots : local.photoSlots,
-              textZones: (cp.textZones && cp.textZones.length > 0) ? cp.textZones : local.textZones,
-              thumbnail: cp.thumbnail && !cp.thumbnail.includes('[COMPRESSED_FIRESTORE_PREVIEW]') ? cp.thumbnail : local.thumbnail,
-              baseImageUrl: cp.baseImageUrl && !cp.baseImageUrl.includes('[COMPRESSED_FIRESTORE_PREVIEW]') ? cp.baseImageUrl : local.baseImageUrl,
-            };
-          } else {
-            merged.push(cp);
-          }
-        });
+      const merged = [...memoryData.products];
+      cloudProds.forEach((cp) => {
+        const idx = merged.findIndex((mp) => mp.id === cp.id);
+        if (idx !== -1) {
+          const local = merged[idx];
+          merged[idx] = {
+            ...local,
+            ...cp,
+            stockQuantity: cp.stockQuantity !== undefined ? cp.stockQuantity : (local.stockQuantity ?? 50),
+            stockLogs: (cp.stockLogs && cp.stockLogs.length > 0) ? cp.stockLogs : (local.stockLogs || []),
+            isDeleted: cp.isDeleted !== undefined ? cp.isDeleted : local.isDeleted,
+            deletedAt: cp.deletedAt || local.deletedAt,
+          };
+        } else {
+          merged.push({
+            ...cp,
+            stockQuantity: cp.stockQuantity !== undefined ? cp.stockQuantity : 50,
+            stockLogs: cp.stockLogs || [],
+          });
+        }
+      });
 
-        memoryData.products = merged;
-        saveStoredLocalData(memoryData);
-        notifyListeners();
-      }
+      memoryData.products = merged;
+      saveStoredLocalData(memoryData);
+      notifyListeners();
     }
 
-    const existingCloudIds = new Set((cloudProds || []).map((cp: Product) => cp.id));
-    memoryData.products.forEach((prod) => {
-      if (!deletedIds.has(prod.id) && !existingCloudIds.has(prod.id)) {
-        firebaseCloudDb.setDocument('products', prod.id, prod);
-      }
-    });
-
-    // 2. NON-DESTRUCTIVE UNION MERGING FOR ORDERS (Zero Data Loss Guarantee!)
+    // 2. NON-DESTRUCTIVE UNION MERGING FOR ORDERS
     const cloudOrders = await firebaseCloudDb.getCollection('orders');
     if (cloudOrders && cloudOrders.length > 0) {
       const orderMap = new Map<string, Order>();
-      
-      // Preserve local orders
       memoryData.orders.forEach((o) => {
         if (o && o.id) orderMap.set(o.id, o);
       });
-
-      // Merge cloud orders (Cloud status updates take precedence!)
       cloudOrders.forEach((co) => {
         if (co && co.id) orderMap.set(co.id, co);
       });
@@ -178,19 +206,6 @@ async function initCloudSync() {
       memoryData.orders = mergedOrders;
       saveStoredLocalData(memoryData);
       notifyListeners();
-
-      // Sync back any local orders missing in cloud database
-      const existingCloudOrderIds = new Set(cloudOrders.map((co) => co.id));
-      memoryData.orders.forEach((ord) => {
-        if (!existingCloudOrderIds.has(ord.id)) {
-          firebaseCloudDb.setDocument('orders', ord.id, ord);
-        }
-      });
-    } else {
-      // If cloud collection is empty, upload memory orders
-      memoryData.orders.forEach((ord) => {
-        firebaseCloudDb.setDocument('orders', ord.id, ord);
-      });
     }
   } catch (e) {
     console.warn('Cloud sync initialization fallback:', e);
@@ -209,11 +224,47 @@ export function useCartStore() {
     };
   }, []);
 
+  const addCategory = (categoryData: Omit<Category, 'id' | 'createdAt'>) => {
+    const newCategory: Category = {
+      ...categoryData,
+      id: `cat-${Date.now()}`,
+      createdAt: new Date().toISOString(),
+    };
+    const updatedCategories = [...memoryData.categories, newCategory];
+    saveStoredCategories(updatedCategories);
+    saveStoredLocalData({ ...memoryData, categories: updatedCategories });
+    notifyListeners();
+  };
+
+  const deleteCategory = (id: string) => {
+    const updatedCategories = memoryData.categories.filter((c) => c.id !== id);
+    saveStoredCategories(updatedCategories);
+    saveStoredLocalData({ ...memoryData, categories: updatedCategories });
+    notifyListeners();
+  };
+
   const addProduct = (newProduct: Product) => {
-    const updated = [...memoryData.products, newProduct];
+    const prodWithStock: Product = {
+      ...newProduct,
+      stockQuantity: newProduct.stockQuantity !== undefined ? newProduct.stockQuantity : 50,
+      stockLogs: newProduct.stockLogs || [
+        {
+          id: `log-${Date.now()}`,
+          type: 'credit',
+          quantity: newProduct.stockQuantity || 50,
+          previousStock: 0,
+          newStock: newProduct.stockQuantity || 50,
+          reason: 'Initial Product Listing Creation',
+          timestamp: new Date().toISOString(),
+          performedBy: 'Super Admin',
+        },
+      ],
+    };
+
+    const updated = [...memoryData.products, prodWithStock];
     saveStoredLocalData({ ...memoryData, products: updated });
     notifyListeners();
-    firebaseCloudDb.setDocument('products', newProduct.id, newProduct);
+    firebaseCloudDb.setDocument('products', prodWithStock.id, prodWithStock);
   };
 
   const updateProduct = (id: string, updates: Partial<Product>) => {
@@ -230,7 +281,46 @@ export function useCartStore() {
     notifyListeners();
   };
 
-  const deleteProduct = (id: string) => {
+  // Soft Delete Product (Moved to Recycle Bin)
+  const softDeleteProduct = (id: string) => {
+    const updatedProducts = memoryData.products.map((p) => {
+      if (p.id === id) {
+        const updated: Product = {
+          ...p,
+          isDeleted: true,
+          deletedAt: new Date().toISOString(),
+        };
+        firebaseCloudDb.setDocument('products', updated.id, updated);
+        return updated;
+      }
+      return p;
+    });
+
+    saveStoredLocalData({ ...memoryData, products: updatedProducts });
+    notifyListeners();
+  };
+
+  // Restore Soft-Deleted Product from Recycle Bin
+  const restoreProduct = (id: string) => {
+    const updatedProducts = memoryData.products.map((p) => {
+      if (p.id === id) {
+        const updated: Product = {
+          ...p,
+          isDeleted: false,
+          deletedAt: undefined,
+        };
+        firebaseCloudDb.setDocument('products', updated.id, updated);
+        return updated;
+      }
+      return p;
+    });
+
+    saveStoredLocalData({ ...memoryData, products: updatedProducts });
+    notifyListeners();
+  };
+
+  // Permanent Delete Product
+  const permanentDeleteProduct = (id: string) => {
     const deletedIds = getDeletedProductIds();
     deletedIds.add(id);
     saveDeletedProductIds(deletedIds);
@@ -240,6 +330,39 @@ export function useCartStore() {
     notifyListeners();
 
     firebaseCloudDb.deleteDocument('products', id);
+  };
+
+  // Restock / Credit Stock Quantity
+  const updateStockQuantity = (productId: string, addedQuantity: number, reason: string) => {
+    const updatedProducts = memoryData.products.map((p) => {
+      if (p.id === productId) {
+        const prev = p.stockQuantity !== undefined ? p.stockQuantity : 50;
+        const newStock = prev + addedQuantity;
+        const newLog: StockLogItem = {
+          id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+          type: 'credit',
+          quantity: addedQuantity,
+          previousStock: prev,
+          newStock,
+          reason: reason || 'Admin Manual Restock',
+          timestamp: new Date().toISOString(),
+          performedBy: 'Super Admin',
+        };
+
+        const updated: Product = {
+          ...p,
+          stockQuantity: newStock,
+          stockLogs: [newLog, ...(p.stockLogs || [])],
+        };
+
+        firebaseCloudDb.setDocument('products', updated.id, updated);
+        return updated;
+      }
+      return p;
+    });
+
+    saveStoredLocalData({ ...memoryData, products: updatedProducts });
+    notifyListeners();
   };
 
   const addToCart = (
@@ -361,11 +484,41 @@ export function useCartStore() {
       createdAt: new Date().toISOString(),
     };
 
+    // Automated Stock Debit on Order Placement!
+    const updatedProducts = memoryData.products.map((prod) => {
+      const orderedItem = orderItems.find((item) => item.product?.id === prod.id);
+      if (orderedItem) {
+        const prevStock = prod.stockQuantity !== undefined ? prod.stockQuantity : 50;
+        const debitQty = orderedItem.quantity || 1;
+        const newStock = Math.max(0, prevStock - debitQty);
+
+        const debitLog: StockLogItem = {
+          id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+          type: 'debit',
+          quantity: debitQty,
+          previousStock: prevStock,
+          newStock,
+          reason: `Customer Order #${newOrder.id}`,
+          timestamp: new Date().toISOString(),
+          performedBy: customer.fullName || 'Customer Order',
+        };
+
+        const updatedProd: Product = {
+          ...prod,
+          stockQuantity: newStock,
+          stockLogs: [debitLog, ...(prod.stockLogs || [])],
+        };
+
+        firebaseCloudDb.setDocument('products', updatedProd.id, updatedProd);
+        return updatedProd;
+      }
+      return prod;
+    });
+
     const updatedOrders = [newOrder, ...memoryData.orders];
-    saveStoredLocalData({ ...memoryData, orders: updatedOrders, items: [] });
+    saveStoredLocalData({ ...memoryData, products: updatedProducts, orders: updatedOrders, items: [] });
     notifyListeners();
 
-    // Reliable Guaranteed Write to Cloud Firestore DB with retry!
     const syncToCloud = async () => {
       let success = await firebaseCloudDb.setDocument('orders', newOrder.id, newOrder);
       if (!success) {
@@ -471,9 +624,16 @@ export function useCartStore() {
     products: store.products,
     items: store.items,
     orders: store.orders,
+    categories: store.categories || DEFAULT_CATEGORIES,
+    addCategory,
+    deleteCategory,
     addProduct,
     updateProduct,
-    deleteProduct,
+    deleteProduct: softDeleteProduct, // Soft delete fallback
+    softDeleteProduct,
+    restoreProduct,
+    permanentDeleteProduct,
+    updateStockQuantity,
     addToCart,
     removeFromCart,
     updateQuantity,
