@@ -184,7 +184,16 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
   // Active Angle Image state for multi-angle photo gallery switching
   const [activeAngleImage, setActiveAngleImage] = useState<string | null>(null);
 
-  const availableAngleImages = (template as any).product?.images || (template as any).images || [];
+  const rawAngleImages = (template as any).product?.images || (template as any).images || [];
+  const baseImg = template.baseImageUrl || 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80';
+  
+  const availableAngleImages: string[] = rawAngleImages.length >= 2 ? rawAngleImages : [
+    baseImg,
+    'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?auto=format&fit=crop&w=800&q=80',
+    'https://images.unsplash.com/photo-1582562124811-c09040d0a901?auto=format&fit=crop&w=800&q=80',
+    'https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=800&q=80',
+    'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=800&q=80',
+  ];
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState<boolean>(false);
   const [compiledPreviewUrl, setCompiledPreviewUrl] = useState<string | null>(null);
   const [isLoadingPreview, setIsLoadingPreview] = useState<boolean>(false);
@@ -436,11 +445,11 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
 
           </div>
 
-          {/* Interactive Multi-Angle Photo Thumbnails Switcher */}
-          {availableAngleImages.length > 1 && (
-            <div className="pt-2 text-center space-y-1.5">
-              <span className="text-[11px] font-bold text-gray-500 block">Click to Switch Frame Angle View:</span>
-              <div className="flex items-center justify-center gap-2 overflow-x-auto py-1">
+          {/* Interactive Multi-Angle Photo Thumbnails Selection Carousel (Matching giftingstudio.in) */}
+          {availableAngleImages.length > 0 && (
+            <div className="pt-3 text-center space-y-2">
+              <span className="text-xs font-extrabold text-gray-700 block">Select Frame Angle View:</span>
+              <div className="flex items-center justify-center gap-2.5 overflow-x-auto py-1 px-2">
                 {availableAngleImages.map((imgUrl: string, idx: number) => {
                   const isActive = (activeAngleImage || template.baseImageUrl) === imgUrl;
                   return (
@@ -448,8 +457,8 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                       key={idx}
                       type="button"
                       onClick={() => setActiveAngleImage(imgUrl)}
-                      className={`relative w-12 h-14 rounded-xl overflow-hidden border-2 transition-all cursor-pointer ${
-                        isActive ? 'border-[#F82BA9] ring-2 ring-[#F82BA9]/30 scale-105 shadow-md' : 'border-gray-200 hover:border-pink-300 opacity-70 hover:opacity-100'
+                      className={`relative w-14 sm:w-16 h-16 sm:h-20 rounded-2xl overflow-hidden border-2 transition-all cursor-pointer shrink-0 shadow-xs ${
+                        isActive ? 'border-[#F82BA9] ring-4 ring-[#F82BA9]/20 scale-105 shadow-md' : 'border-gray-300 hover:border-pink-300 opacity-75 hover:opacity-100'
                       }`}
                     >
                       <img src={imgUrl} alt={`Angle ${idx + 1}`} className="w-full h-full object-cover" />
@@ -459,18 +468,7 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
               </div>
             </div>
           )}
-
         </div>
-
-        {/* 👁️ Preview Customized Frame Button */}
-        <button
-          type="button"
-          onClick={handleOpenPreviewModal}
-          className="w-full py-3.5 bg-[#F82BA9]/10 hover:bg-[#F82BA9]/20 text-[#F82BA9] font-extrabold text-xs rounded-2xl border border-[#F82BA9]/30 transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
-        >
-          <Eye className="w-4 h-4" /> 👁️ Preview High-Res Customized Frame
-        </button>
-
       </div>
 
       {/* Right Column: LovecraftbySE Product Header & Form Controls (7 Cols) */}
@@ -737,6 +735,15 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                 Proceed to Checkout <ArrowRight className="w-4 h-4" />
               </>
             )}
+          </button>
+
+          {/* 👁️ Preview High-Res Customized Frame Button (Moved under Proceed to Checkout) */}
+          <button
+            type="button"
+            onClick={handleOpenPreviewModal}
+            className="w-full py-3.5 bg-[#F82BA9]/10 hover:bg-[#F82BA9]/20 text-[#F82BA9] font-extrabold text-xs rounded-2xl border border-[#F82BA9]/30 transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
+          >
+            <Eye className="w-4 h-4" /> 👁️ Preview High-Res Customized Frame
           </button>
 
           {/* Live Customers Viewing Counter Ticker (LovecraftbySE Urgency Ticker) */}
