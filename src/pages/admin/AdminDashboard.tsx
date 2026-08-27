@@ -503,8 +503,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
           {activeTab === 'users' && <AdminUserRoleManager />}
 
         </main>
-
       </div>
-    </AdminThemeProvider>
+    </div>
+  </AdminThemeProvider>
   );
 };
