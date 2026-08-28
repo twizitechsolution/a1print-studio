@@ -429,16 +429,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
 
           {/* Module 5: Registered Customers Directory */}
           {activeTab === 'customers' && (
-            <div className="bg-[#121829] rounded-3xl border border-[#262E4A] p-6 space-y-4 font-jost shadow-xl">
-              <div className="flex items-center justify-between border-b border-[#262E4A] pb-3">
-                <h3 className="font-playfair text-xl font-bold text-white">
+            <div className="dark:bg-zinc-900/40 bg-white rounded-xl border dark:border-zinc-800 border-slate-200 p-5 space-y-4 font-sans shadow-xs">
+              <div className="flex items-center justify-between border-b dark:border-zinc-800 border-slate-200 pb-3">
+                <h3 className="text-xl font-bold tracking-tight dark:text-zinc-100 text-slate-900">
                   Registered Customers Directory ({customerList.length})
                 </h3>
-                <span className="text-xs text-gray-400 font-bold">10 per page</span>
+                <span className="text-xs dark:text-zinc-400 text-slate-500 font-medium dark:bg-zinc-900 bg-slate-100 px-2.5 py-1 rounded-md border dark:border-zinc-800 border-slate-200">10 per page</span>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-[#1A2035] text-gray-400 text-[11px] font-extrabold uppercase border-b border-[#262E4A]">
+                  <thead className="dark:bg-zinc-900 bg-slate-100 dark:text-zinc-400 text-slate-600 text-[11px] font-medium uppercase border-b dark:border-zinc-800 border-slate-200">
                     <tr>
                       <th className="py-3 px-4">Customer Name</th>
                       <th className="py-3 px-4">Phone Number / Email</th>
@@ -447,25 +447,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
                       <th className="py-3 px-4">Shipping Location</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#262E4A] font-bold">
+                  <tbody className="divide-y dark:divide-zinc-800/60 divide-slate-200 font-medium">
                     {customerList.slice(0, 10).map((cust, i) => (
-                      <tr key={i} className="hover:bg-[#1A2035]/50 transition-colors text-gray-200">
-                        <td className="py-3 px-4 text-white font-extrabold flex items-center gap-2">
-                          <div className="w-7 h-7 rounded-full bg-pink-500/20 text-pink-400 flex items-center justify-center text-xs font-black">
+                      <tr key={i} className="dark:hover:bg-zinc-900/60 hover:bg-slate-50 transition-colors dark:text-zinc-200 text-slate-800">
+                        <td className="py-3 px-4 dark:text-zinc-100 text-slate-900 font-semibold flex items-center gap-2">
+                          <div className="w-6 h-6 rounded-full dark:bg-zinc-800 bg-slate-200 dark:text-zinc-200 text-slate-700 flex items-center justify-center text-xs font-bold">
                             {cust.fullName.charAt(0)}
                           </div>
                           <span>{cust.fullName}</span>
                         </td>
                         <td className="py-3 px-4 font-mono">
                           <div>{cust.phone}</div>
-                          {cust.email && <div className="text-[10px] text-gray-400 font-normal">{cust.email}</div>}
+                          {cust.email && <div className="text-[10px] dark:text-zinc-400 text-slate-500 font-normal">{cust.email}</div>}
                         </td>
                         <td className="py-3 px-4">
-                          <span className={`px-2.5 py-1 rounded-full text-[11px] font-extrabold ${cust.orderCount > 0 ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' : 'bg-gray-700/50 text-gray-400'}`}>
+                          <span className={`px-2 py-0.5 rounded-md text-[11px] font-medium border ${cust.orderCount > 0 ? 'dark:bg-purple-950/40 bg-purple-50 dark:text-purple-300 text-purple-700 dark:border-purple-800/40 border-purple-200' : 'dark:bg-zinc-950 bg-slate-100 dark:text-zinc-500 text-slate-500 dark:border-zinc-800 border-slate-200'}`}>
                             {cust.orderCount} order{cust.orderCount !== 1 ? 's' : ''}
                           </span>
                         </td>
-                        <td className="py-3 px-4 text-emerald-400 font-extrabold">₹{cust.totalSpent}.00</td>
+                        <td className="py-3 px-4 text-emerald-500 font-bold font-mono">₹{cust.totalSpent}.00</td>
                         <td className="py-3 px-4">{cust.city}{cust.state !== 'N/A' ? `, ${cust.state}` : ''}</td>
                       </tr>
                     ))}

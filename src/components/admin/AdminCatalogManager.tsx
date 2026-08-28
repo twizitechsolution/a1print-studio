@@ -150,6 +150,7 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
                 if (!product) return null;
                 const posterSrc = product.baseImageUrl || product.thumbnail || product.images?.[0];
                 const priceVal = (product as any).price || (product.sizes && product.sizes[0] ? product.sizes[0].price : 699);
+                const origVal = product.sizes && product.sizes[0] ? product.sizes[0].originalPrice : null;
                 const catName = product.categoryLabel || product.category || 'Custom Frame';
                 const stockQty = product.stockQuantity !== undefined ? product.stockQuantity : 50;
 

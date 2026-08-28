@@ -34,25 +34,25 @@ export const AdminAdvancedReports: React.FC<AdminAdvancedReportsProps> = ({ orde
   };
 
   return (
-    <div className="space-y-6 font-jost">
+    <div className="space-y-6 font-sans">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h3 className="font-playfair text-xl font-bold text-white flex items-center gap-2">
-            <BarChart3 className="w-5 h-5 text-emerald-400" /> Advanced Business Reports & Data Export
+          <h3 className="text-xl font-bold tracking-tight dark:text-zinc-100 text-slate-900 flex items-center gap-2">
+            <BarChart3 className="w-5 h-5 text-emerald-500" /> Advanced Business Reports & Data Export
           </h3>
-          <p className="text-xs text-gray-400">Generate financial sales reports, order velocity logs, customer summaries, and export CSV spreadsheets.</p>
+          <p className="text-xs dark:text-zinc-400 text-slate-500 mt-0.5">Generate financial sales reports, order velocity logs, customer summaries, and export CSV spreadsheets.</p>
         </div>
 
         <button
           onClick={exportToCSV}
-          className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center gap-2 cursor-pointer shrink-0"
+          className="px-3.5 py-2 dark:bg-emerald-600 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-lg transition-colors flex items-center gap-2 cursor-pointer shrink-0 shadow-xs"
         >
           <FileSpreadsheet className="w-4 h-4" /> Download CSV Report
         </button>
       </div>
 
       {/* Report Type Filter Buttons */}
-      <div className="flex flex-wrap items-center gap-2 p-1.5 bg-[#121829] rounded-2xl border border-[#262E4A]">
+      <div className="flex flex-wrap items-center gap-2 p-1.5 dark:bg-zinc-900/60 bg-white rounded-xl border dark:border-zinc-800 border-slate-200 shadow-xs">
         {[
           { id: 'sales', label: 'Sales & Revenue Report' },
           { id: 'orders', label: 'Order Status Log' },
@@ -62,10 +62,10 @@ export const AdminAdvancedReports: React.FC<AdminAdvancedReportsProps> = ({ orde
           <button
             key={t.id}
             onClick={() => setReportType(t.id as any)}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
               reportType === t.id
-                ? 'bg-[#3B82F6] text-white shadow-md'
-                : 'text-gray-400 hover:bg-[#1A2035] hover:text-white'
+                ? 'dark:bg-zinc-100 bg-slate-900 dark:text-zinc-950 text-white font-semibold shadow-xs'
+                : 'dark:text-zinc-400 text-slate-600 dark:hover:bg-zinc-800 hover:bg-slate-100 dark:hover:text-zinc-100'
             }`}
           >
             {t.label}
@@ -74,11 +74,11 @@ export const AdminAdvancedReports: React.FC<AdminAdvancedReportsProps> = ({ orde
       </div>
 
       {/* Data Table */}
-      <div className="p-5 bg-[#121829] rounded-2xl border border-[#262E4A] shadow-xl space-y-3">
-        <h4 className="font-bold text-sm text-white capitalize">{reportType} Breakdown ({orders.length} Entries)</h4>
+      <div className="p-5 dark:bg-zinc-900/40 bg-white rounded-xl border dark:border-zinc-800 border-slate-200 shadow-xs space-y-3">
+        <h4 className="font-semibold text-sm dark:text-zinc-100 text-slate-900 capitalize">{reportType} Breakdown ({orders.length} Entries)</h4>
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs font-jost">
-            <thead className="bg-[#1A2035] text-gray-400 text-[10px] font-extrabold uppercase border-b border-[#262E4A]">
+          <table className="w-full text-left text-xs">
+            <thead className="dark:bg-zinc-900 bg-slate-100 dark:text-zinc-400 text-slate-600 text-[11px] font-medium uppercase tracking-wider border-b dark:border-zinc-800 border-slate-200">
               <tr>
                 <th className="py-3 px-4">Order ID</th>
                 <th className="py-3 px-4">Customer Name</th>
@@ -89,17 +89,17 @@ export const AdminAdvancedReports: React.FC<AdminAdvancedReportsProps> = ({ orde
                 <th className="py-3 px-4">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#262E4A] font-bold text-gray-200">
+            <tbody className="divide-y dark:divide-zinc-800/60 divide-slate-200 font-medium dark:text-zinc-200 text-slate-800">
               {orders.map((o) => (
-                <tr key={o.id} className="hover:bg-[#1A2035]/40 transition-colors">
-                  <td className="py-3 px-4 font-mono font-extrabold text-white">{o.id}</td>
+                <tr key={o.id} className="dark:hover:bg-zinc-900/60 hover:bg-slate-50 transition-colors">
+                  <td className="py-3 px-4 font-mono font-bold dark:text-zinc-100 text-slate-900">{o.id}</td>
                   <td className="py-3 px-4">{o.customer?.fullName}</td>
                   <td className="py-3 px-4 font-mono">{o.customer?.phone}</td>
                   <td className="py-3 px-4">{o.customer?.city}</td>
-                  <td className="py-3 px-4 text-emerald-400 font-extrabold">₹{o.total}</td>
+                  <td className="py-3 px-4 text-emerald-500 font-bold">₹{o.total}</td>
                   <td className="py-3 px-4">{o.paymentMethod}</td>
                   <td className="py-3 px-4">
-                    <span className="px-2 py-0.5 rounded-full text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                    <span className="px-2 py-0.5 rounded-full text-[11px] font-medium border dark:bg-zinc-950 bg-slate-100 dark:border-zinc-800 border-slate-200">
                       {o.orderStatus || 'Received'}
                     </span>
                   </td>
