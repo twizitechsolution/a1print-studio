@@ -552,8 +552,7 @@ export const AdminOrderList: React.FC<AdminOrderListProps> = ({
                       );
                     })}
                   </div>
-                </div>       </div>
-
+                </div>
               </div>
             );
           })}
