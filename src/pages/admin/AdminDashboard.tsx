@@ -393,15 +393,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
 
           {/* Module 1: Dashboard Overview */}
           {activeTab === 'dashboard' && (
-            <div className="space-y-8">
+            <div className="space-y-6">
               <AdminDarkStatsCards orders={orders} />
               <AdminCharts orders={orders} />
-              <AdminOrderList
-                orders={orders}
-                onUpdateOrderStatus={updateOrderStatus}
-                onRecordOrderAction={recordOrderAction}
-                currentAdminUser={currentAdminUser}
-              />
             </div>
           )}
 

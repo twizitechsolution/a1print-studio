@@ -460,12 +460,11 @@ export const AdminOrderList: React.FC<AdminOrderListProps> = ({
                     )}
                   </div>
 
-                  {/* WhatsApp Launch Proof Button */}
                   <a
                     href={`https://wa.me/91${order.customer?.phone || ''}?text=Hello%20${encodeURIComponent(order.customer?.fullName || 'Customer')},%20your%20A1print%20order%20${order.id}%20has%20been%20received!`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md transition-colors flex items-center gap-1.5 cursor-pointer"
+                    className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
                   >
                     💬 WhatsApp Proof
                   </a>
@@ -476,10 +475,10 @@ export const AdminOrderList: React.FC<AdminOrderListProps> = ({
                   
                   {/* Customer Info (4 Cols) */}
                   <div className="lg:col-span-4 space-y-1">
-                    <h4 className="font-bold text-white text-sm">{order.customer?.fullName || 'Valued Customer'}</h4>
-                    <p className="text-gray-400">📞 {order.customer?.phone || 'N/A'}</p>
-                    <p className="text-gray-400 line-clamp-2">📍 {order.customer?.address || 'N/A'}, {order.customer?.city || 'N/A'}, {order.customer?.state || 'N/A'} - {order.customer?.pincode || ''}</p>
-                    <span className="text-emerald-400 font-bold block pt-1">Paid via {order.paymentMethod || 'PhonePe'} • ₹{order.total || order.subtotal || 0}</span>
+                    <h4 className="font-bold dark:text-zinc-100 text-slate-900 text-sm">{order.customer?.fullName || 'Valued Customer'}</h4>
+                    <p className="dark:text-zinc-400 text-slate-600 text-xs">📞 {order.customer?.phone || 'N/A'}</p>
+                    <p className="dark:text-zinc-400 text-slate-600 text-xs line-clamp-2">📍 {order.customer?.address || 'N/A'}, {order.customer?.city || 'N/A'}, {order.customer?.state || 'N/A'} - {order.customer?.pincode || ''}</p>
+                    <span className="text-emerald-500 font-bold block pt-1 text-xs font-mono">Paid via {order.paymentMethod || 'PhonePe'} • ₹{order.total || order.subtotal || 0}</span>
                   </div>
 
                   {/* Order Items & Live Frame Thumbnail (8 Cols) */}
@@ -492,7 +491,7 @@ export const AdminOrderList: React.FC<AdminOrderListProps> = ({
                       );
 
                       return (
-                        <div key={idx} className="p-3.5 bg-[#1A2035] rounded-xl border border-[#262E4A] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        <div key={idx} className="p-3.5 dark:bg-zinc-950 bg-slate-50 rounded-xl border dark:border-zinc-800 border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                           
                           <div className="flex items-center gap-3 flex-1 min-w-0">
                             {/* Live Frame Preview Thumbnail */}
@@ -501,11 +500,11 @@ export const AdminOrderList: React.FC<AdminOrderListProps> = ({
                             </div>
 
                             <div className="space-y-0.5 min-w-0 flex-1">
-                              <h5 className="font-bold text-white text-xs truncate">{item.product?.title || 'Custom Photo Frame'}</h5>
-                              <span className="text-[#3B82F6] font-bold block text-[11px]">{item.selectedSize?.name || 'A4 (8x12 Inch)'}</span>
+                              <h5 className="font-bold dark:text-zinc-100 text-slate-900 text-xs truncate">{item.product?.title || 'Custom Photo Frame'}</h5>
+                              <span className="text-blue-500 font-bold block text-[11px]">{item.selectedSize?.name || 'A4 (8x12 Inch)'}</span>
                               
                               {textEntries.length > 0 && (
-                                <div className="text-[10px] text-gray-300 font-mono truncate">
+                                <div className="text-[10px] dark:text-zinc-400 text-slate-600 font-mono truncate">
                                   {textEntries.map(([k, v]) => `${k}:${v}`).join(' | ')}
                                 </div>
                               )}
@@ -517,17 +516,17 @@ export const AdminOrderList: React.FC<AdminOrderListProps> = ({
                             {/* Processing Log Audit Button */}
                             <button
                               onClick={() => setSelectedAuditOrder(order)}
-                              className="px-3 py-2 bg-[#262E4A] hover:bg-gray-700 text-gray-200 text-[11px] font-bold rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer shrink-0"
+                              className="px-3 py-2 dark:bg-zinc-900 bg-white hover:bg-slate-100 dark:hover:bg-zinc-800 dark:text-zinc-300 text-slate-700 text-[11px] font-medium rounded-lg border dark:border-zinc-800 border-slate-200 transition-colors flex items-center gap-1.5 cursor-pointer shrink-0 shadow-xs"
                               title="View Processing Audit Log"
                             >
-                              <FileText className="w-3.5 h-3.5 text-pink-400" /> View Log
+                              <FileText className="w-3.5 h-3.5 text-pink-500" /> View Log
                             </button>
 
                             {/* Direct High-Res Canvas Download Button */}
                             <button
                               disabled={isDownloading}
                               onClick={() => handleDownloadCustomerPrintFile(order, idx)}
-                              className="px-4 py-2.5 bg-gradient-to-r from-[#3B82F6] to-[#8B5CF6] hover:from-[#2563EB] hover:to-[#7C3AED] text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5 shrink-0 cursor-pointer disabled:opacity-50"
+                              className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-lg shadow-xs transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer disabled:opacity-50"
                             >
                               {isDownloading ? (
                                 <>
@@ -543,19 +542,17 @@ export const AdminOrderList: React.FC<AdminOrderListProps> = ({
                             {/* Print Preview Modal Button */}
                             <button
                               onClick={() => setPrintPreviewItem({ order, item })}
-                              className="p-2.5 bg-[#262E4A] hover:bg-gray-700 text-gray-200 rounded-xl transition-colors cursor-pointer shrink-0"
+                              className="p-2 dark:bg-zinc-900 bg-white hover:bg-slate-100 dark:hover:bg-zinc-800 dark:text-zinc-300 text-slate-700 rounded-lg border dark:border-zinc-800 border-slate-200 transition-colors cursor-pointer shrink-0 shadow-xs"
                               title="Print Preview Modal"
                             >
                               <Printer className="w-4 h-4" />
                             </button>
                           </div>
-
                         </div>
                       );
                     })}
                   </div>
-
-                </div>
+                </div>       </div>
 
               </div>
             );
