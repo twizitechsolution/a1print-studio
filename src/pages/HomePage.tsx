@@ -314,61 +314,8 @@ export const HomePage: React.FC<HomePageProps> = ({ onSelectProduct, onNavigate 
       {/* 5. Complete Product Grid */}
       <ProductGrid onSelectProduct={onSelectProduct} />
 
-      {/* 5.5. PRODUCTS IN MOTION UGC Video Reels Section (media_1787985141028.png) */}
+      {/* 5.5. PRODUCTS IN MOTION UGC Video Reels Auto-Scrolling Carousel (media_1787985141028.png) */}
       <ProductsInMotionReel />
-
-      {/* 5.6. Dedicated Homepage Check Delivery Date by Pincode & Stats Section (media_1787985196856.png) */}
-      <section className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 font-sans">
-        <div className="bg-gradient-to-r from-pink-50 via-purple-50 to-pink-100/70 rounded-3xl p-6 sm:p-10 border border-pink-200 shadow-xs grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-          
-          {/* Left Column: Pink Gift Banner Artwork & Stats Counters */}
-          <div className="lg:col-span-6 space-y-6">
-            <div className="relative rounded-3xl overflow-hidden shadow-md bg-white border border-pink-200 p-6 flex flex-col sm:flex-row items-center gap-6">
-              <div className="w-32 h-32 shrink-0 bg-pink-100 rounded-2xl flex items-center justify-center text-5xl shadow-inner">
-                🎁
-              </div>
-              <div className="space-y-2 text-center sm:text-left">
-                <span className="text-xs font-black text-[#F82BA9] uppercase tracking-wider block">Express Delivery Pan-India</span>
-                <h3 className="text-2xl font-black font-playfair text-[#160E4B]">Check Delivery Timelines For Your Location</h3>
-                <p className="text-xs font-medium text-gray-600">Enter your 6-digit Indian Pincode to view guaranteed delivery dates and cash on delivery availability.</p>
-              </div>
-            </div>
-
-            {/* Stats Counter Boxes matching reference screenshot media_1787985196856.png */}
-            <div className="grid grid-cols-3 gap-3">
-              <div className="bg-white p-4 rounded-2xl border border-pink-100 shadow-2xs text-center space-y-0.5">
-                <div className="w-8 h-8 rounded-full bg-pink-100 text-[#F82BA9] flex items-center justify-center mx-auto mb-1">
-                  <ShoppingBag className="w-4 h-4" />
-                </div>
-                <h4 className="font-extrabold text-lg text-[#160E4B] font-playfair">90 k</h4>
-                <span className="text-[11px] font-bold text-gray-500 block">Total Sales</span>
-              </div>
-
-              <div className="bg-white p-4 rounded-2xl border border-pink-100 shadow-2xs text-center space-y-0.5">
-                <div className="w-8 h-8 rounded-full bg-pink-100 text-[#F82BA9] flex items-center justify-center mx-auto mb-1">
-                  <Heart className="w-4 h-4" />
-                </div>
-                <h4 className="font-extrabold text-lg text-[#160E4B] font-playfair">50 k</h4>
-                <span className="text-[11px] font-bold text-gray-500 block">Happy Clients</span>
-              </div>
-
-              <div className="bg-white p-4 rounded-2xl border border-pink-100 shadow-2xs text-center space-y-0.5">
-                <div className="w-8 h-8 rounded-full bg-pink-100 text-[#F82BA9] flex items-center justify-center mx-auto mb-1">
-                  <Users className="w-4 h-4" />
-                </div>
-                <h4 className="font-extrabold text-lg text-[#160E4B] font-playfair">150 k</h4>
-                <span className="text-[11px] font-bold text-gray-500 block">Team Workers</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Right Column: Interactive Delivery Pincode Checker Card */}
-          <div className="lg:col-span-6">
-            <DeliveryPincodeChecker variant="homepage" />
-          </div>
-
-        </div>
-      </section>
 
       {/* 6. Material & Quality Showcase Section */}
       <section className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 font-jost">
@@ -443,6 +390,59 @@ export const HomePage: React.FC<HomePageProps> = ({ onSelectProduct, onNavigate 
               </div>
             );
           })}
+        </div>
+      </section>
+
+      {/* 8. Dedicated Bottom Check Delivery Date by Pincode & Stats Section (media_1787985196856.png) */}
+      <section className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 font-sans">
+        <div className="bg-gradient-to-r from-pink-50 via-purple-50 to-pink-100/70 rounded-3xl p-6 sm:p-10 border border-pink-200 shadow-xs grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+          
+          {/* Left Column: Pink Gift Banner Artwork & Stats Counters */}
+          <div className="lg:col-span-6 space-y-6">
+            <div className="relative rounded-3xl overflow-hidden shadow-md bg-white border border-pink-200 p-6 flex flex-col sm:flex-row items-center gap-6">
+              <div className="w-32 h-32 shrink-0 bg-pink-100 rounded-2xl flex items-center justify-center text-5xl shadow-inner">
+                🎁
+              </div>
+              <div className="space-y-2 text-center sm:text-left">
+                <span className="text-xs font-black text-[#F82BA9] uppercase tracking-wider block">Express Delivery Pan-India</span>
+                <h3 className="text-2xl font-black font-playfair text-[#160E4B]">Check Delivery Timelines For Your Location</h3>
+                <p className="text-xs font-medium text-gray-600">Enter your 6-digit Indian Pincode to view guaranteed delivery dates and cash on delivery availability.</p>
+              </div>
+            </div>
+
+            {/* Stats Counter Boxes matching reference screenshot media_1787985196856.png */}
+            <div className="grid grid-cols-3 gap-3">
+              <div className="bg-white p-4 rounded-2xl border border-pink-100 shadow-2xs text-center space-y-0.5">
+                <div className="w-8 h-8 rounded-full bg-pink-100 text-[#F82BA9] flex items-center justify-center mx-auto mb-1">
+                  <ShoppingBag className="w-4 h-4" />
+                </div>
+                <h4 className="font-extrabold text-lg text-[#160E4B] font-playfair">90 k</h4>
+                <span className="text-[11px] font-bold text-gray-500 block">Total Sales</span>
+              </div>
+
+              <div className="bg-white p-4 rounded-2xl border border-pink-100 shadow-2xs text-center space-y-0.5">
+                <div className="w-8 h-8 rounded-full bg-pink-100 text-[#F82BA9] flex items-center justify-center mx-auto mb-1">
+                  <Heart className="w-4 h-4" />
+                </div>
+                <h4 className="font-extrabold text-lg text-[#160E4B] font-playfair">50 k</h4>
+                <span className="text-[11px] font-bold text-gray-500 block">Happy Clients</span>
+              </div>
+
+              <div className="bg-white p-4 rounded-2xl border border-pink-100 shadow-2xs text-center space-y-0.5">
+                <div className="w-8 h-8 rounded-full bg-pink-100 text-[#F82BA9] flex items-center justify-center mx-auto mb-1">
+                  <Users className="w-4 h-4" />
+                </div>
+                <h4 className="font-extrabold text-lg text-[#160E4B] font-playfair">150 k</h4>
+                <span className="text-[11px] font-bold text-gray-500 block">Team Workers</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column: Interactive Delivery Pincode Checker Card */}
+          <div className="lg:col-span-6">
+            <DeliveryPincodeChecker variant="homepage" />
+          </div>
+
         </div>
       </section>
 

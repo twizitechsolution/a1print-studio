@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Play, X, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
 
 export interface UGCVideoItem {
@@ -51,6 +51,30 @@ export const INITIAL_UGC_VIDEOS: UGCVideoItem[] = [
     videoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-mother-holding-her-newborn-baby-41269-large.mp4',
     active: true,
   },
+  {
+    id: 'v6',
+    title: 'Marriage Anniversary Heartbeat Frame Gift',
+    influencerName: '@rohit_neha_life',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?auto=format&fit=crop&w=400&q=80',
+    videoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-couple-looking-at-a-photo-album-41582-large.mp4',
+    active: true,
+  },
+  {
+    id: 'v7',
+    title: 'Gifts for Mom & Dad Special Memory Wall',
+    influencerName: '@family_first_divya',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1511895426328-dc8714191300?auto=format&fit=crop&w=400&q=80',
+    videoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-hands-holding-a-photo-frame-41584-large.mp4',
+    active: true,
+  },
+  {
+    id: 'v8',
+    title: 'First Birthday Customized Poster Frame',
+    influencerName: '@baby_aisha_mom',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1544126592-807ade215a0b?auto=format&fit=crop&w=400&q=80',
+    videoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-happy-mother-holding-her-baby-41270-large.mp4',
+    active: true,
+  },
 ];
 
 interface ProductsInMotionReelProps {
@@ -62,11 +86,39 @@ export const ProductsInMotionReel: React.FC<ProductsInMotionReelProps> = ({
 }) => {
   const activeVideos = videos.filter((v) => v.active);
   const [selectedVideo, setSelectedVideo] = useState<UGCVideoItem | null>(null);
+  const carouselRef = useRef<HTMLDivElement>(null);
+  const [isHovered, setIsHovered] = useState(false);
+
+  // Manual scroll handler
+  const scroll = (direction: 'left' | 'right') => {
+    if (carouselRef.current) {
+      const scrollAmount = direction === 'left' ? -220 : 220;
+      carouselRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+    }
+  };
+
+  // Continuous Auto-Slide Carousel Effect (Slides every 3.5 seconds)
+  useEffect(() => {
+    if (isHovered || selectedVideo) return;
+
+    const interval = setInterval(() => {
+      if (carouselRef.current) {
+        const { scrollLeft, scrollWidth, clientWidth } = carouselRef.current;
+        if (scrollLeft + clientWidth >= scrollWidth - 10) {
+          carouselRef.current.scrollTo({ left: 0, behavior: 'smooth' });
+        } else {
+          carouselRef.current.scrollBy({ left: 180, behavior: 'smooth' });
+        }
+      }
+    }, 3500);
+
+    return () => clearInterval(interval);
+  }, [isHovered, selectedVideo]);
 
   return (
     <section className="py-12 px-4 sm:px-6 lg:px-8 max-w-[1400px] mx-auto space-y-8 font-sans select-none">
       
-      {/* Section Heading matching LovecraftbySE reference screenshot media_1787985141028.png */}
+      {/* Section Heading matching LovecraftbySE reference screenshot */}
       <div className="text-center space-y-2">
         <h2 className="text-3xl sm:text-4xl font-black font-playfair tracking-tight text-[#160E4B] uppercase">
           PRODUCTS IN MOTION
@@ -76,9 +128,26 @@ export const ProductsInMotionReel: React.FC<ProductsInMotionReelProps> = ({
         </p>
       </div>
 
-      {/* Horizontal Circular Video Thumbnail Carousel */}
-      <div className="relative">
-        <div className="flex items-center justify-start sm:justify-center gap-4 sm:gap-6 overflow-x-auto py-4 px-2 scrollbar-none">
+      {/* Auto-Scrolling Circular Video Carousel Container with Left/Right Arrow Controls */}
+      <div
+        className="relative group/reel px-4 sm:px-8"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
+        {/* Left Arrow Button */}
+        <button
+          onClick={() => scroll('left')}
+          className="absolute left-0 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white/90 hover:bg-white text-[#160E4B] border border-gray-200 shadow-lg flex items-center justify-center transition-all opacity-80 hover:opacity-100 hover:scale-110 cursor-pointer"
+          title="Scroll Left"
+        >
+          <ChevronLeft className="w-6 h-6 text-[#160E4B]" />
+        </button>
+
+        {/* Scrollable Container */}
+        <div
+          ref={carouselRef}
+          className="flex items-center justify-start gap-4 sm:gap-6 overflow-x-auto py-4 px-2 scrollbar-none scroll-smooth"
+        >
           {activeVideos.map((video) => (
             <div
               key={video.id}
@@ -109,6 +178,15 @@ export const ProductsInMotionReel: React.FC<ProductsInMotionReelProps> = ({
             </div>
           ))}
         </div>
+
+        {/* Right Arrow Button */}
+        <button
+          onClick={() => scroll('right')}
+          className="absolute right-0 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white/90 hover:bg-white text-[#160E4B] border border-gray-200 shadow-lg flex items-center justify-center transition-all opacity-80 hover:opacity-100 hover:scale-110 cursor-pointer"
+          title="Scroll Right"
+        >
+          <ChevronRight className="w-6 h-6 text-[#160E4B]" />
+        </button>
       </div>
 
       {/* UGC Video Popup Reel Modal */}

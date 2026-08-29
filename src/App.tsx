@@ -21,6 +21,7 @@ import { ContactPage } from './pages/ContactPage';
 
 import { CartDrawer } from './components/cart/CartDrawer';
 import { ProductGrid } from './components/catalog/ProductGrid';
+import { ShopProductGrid } from './components/catalog/ShopProductGrid';
 import { CustomerAuthModal } from './components/auth/CustomerAuthModal';
 
 export const App: React.FC = () => {
@@ -181,13 +182,13 @@ export const App: React.FC = () => {
           />
         )}
 
-        {currentPage === 'catalog' && (
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-6">
+        {(currentPage === 'catalog' || currentPage === 'shop') && (
+          <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
             <div className="text-center space-y-2">
-              <h1 className="font-playfair text-3xl font-bold text-[#160E4B]">Custom Photo Frames & Collage Gifts</h1>
+              <h1 className="font-playfair text-3xl sm:text-4xl font-extrabold text-[#160E4B]">Custom Photo Frames & Collage Gifts</h1>
               <p className="text-xs text-gray-500 max-w-xl mx-auto">Explore premium handcrafted frames with 300 GSM archival paper and shatter-proof acrylic glass overlay.</p>
             </div>
-            <ProductGrid onSelectProduct={handleSelectProduct} categoryFilter={currentParam} />
+            <ShopProductGrid onSelectProduct={handleSelectProduct} initialCategory={currentParam || 'all'} />
           </div>
         )}
 
