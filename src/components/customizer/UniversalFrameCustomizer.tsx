@@ -5,7 +5,7 @@ import { generateHighResPrintFile } from '../../utils/printExporter';
 import { Eye, ArrowRight, Image as ImageIcon, Sparkles, Loader2, X, ShieldCheck, Truck, CreditCard, RefreshCw, Star, Tag, Clock, Flame, Wand2 } from 'lucide-react';
 import { InteractiveCalendarZone } from './InteractiveCalendarZone';
 import { getRandomBirthdayMessage } from '../../data/messageBank';
-import { getFrameShapeStyles } from '../../utils/shapeStyles';
+import { DeliveryPincodeChecker } from '../cart/DeliveryPincodeChecker';
 
 interface UniversalFrameCustomizerProps {
   template: UniversalFrameTemplate;
@@ -512,7 +512,14 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
 
             <span className="px-3 py-1.5 bg-pink-100 text-pink-900 rounded-xl border border-pink-200 flex items-center gap-1.5 text-[11px]">
               <Clock className="w-3.5 h-3.5 text-[#F82BA9]" />
-              <span>47 orders Placed in last 24 hours.</span>
+              <span>
+                {(() => {
+                  const currentHourSeed = Math.floor(Date.now() / (1000 * 60 * 60));
+                  const idHash = (template.productId || 'prod-1').split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+                  const dynamicOrderCount = 25 + ((idHash * 37 + currentHourSeed * 13) % 38);
+                  return dynamicOrderCount;
+                })()} orders Placed in last 24 hours.
+              </span>
             </span>
           </div>
         </div>
@@ -745,11 +752,14 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
 
           {/* Live Customers Viewing Counter Ticker (LovecraftbySE Urgency Ticker) */}
           <div className="flex items-center justify-center gap-2 py-2.5 px-4 bg-orange-50/80 border border-orange-200 rounded-2xl text-xs font-extrabold text-orange-900 shadow-2xs">
-            <span className="text-base animate-pulse">🔥</span>
+            <span className="text-base animate-pulse">👁️</span>
             <span>
-              <strong className="text-orange-600 font-black text-sm">{liveViewers}</strong> customers are currently viewing this product
+              <strong className="text-orange-600 font-black text-sm">{liveViewers}</strong> customers are viewing this product
             </span>
           </div>
+
+          {/* Delivery Pincode Checker & Cash on Delivery Available Section */}
+          <DeliveryPincodeChecker className="pt-2" />
         </div>
 
       </div>
