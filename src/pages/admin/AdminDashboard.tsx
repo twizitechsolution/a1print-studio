@@ -80,7 +80,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
 
-  const { products, orders, updateOrderStatus, recordOrderAction } = useCartStore();
+  const { products, orders, updateOrderStatus, updatePaymentStatus, updateOrderAdminRemark, recordOrderAction } = useCartStore();
 
   const [editingTemplateProduct, setEditingTemplateProduct] = useState<Product | null>(null);
 
@@ -430,6 +430,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
             <AdminOrderList
               orders={orders}
               onUpdateOrderStatus={updateOrderStatus}
+              onUpdatePaymentStatus={updatePaymentStatus}
+              onUpdateAdminRemark={updateOrderAdminRemark}
               onRecordOrderAction={recordOrderAction}
               currentAdminUser={currentAdminUser}
             />

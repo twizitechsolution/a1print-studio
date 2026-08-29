@@ -109,10 +109,14 @@ export interface Order {
   shipping: number;
   total: number;
   paymentMethod: 'Razorpay' | 'PhonePe' | 'GPay' | 'Paytm' | 'Card' | 'COD';
-  paymentStatus: 'Paid' | 'Pending' | 'COD';
-  orderStatus: 'Received' | 'Printing' | 'Shipped' | 'Delivered' | 'Cancelled';
+  paymentStatus: 'Paid' | 'Pending' | 'COD' | 'Refund';
+  orderStatus: 'New' | 'Design' | 'Printing' | 'QC' | 'Packing' | 'Shipped' | 'Delivered' | 'Cancelled' | 'Received' | 'Reprint' | 'RTO';
   createdAt: string;
   notes?: string;
+  adminRemark?: string;
+  adminRemarkTimestamp?: string;
+  trackingNumber?: string;
+  courierPartner?: string;
   processedBy?: {
     employeeName: string;
     employeeRole: string;

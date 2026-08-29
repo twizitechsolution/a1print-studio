@@ -617,6 +617,75 @@ export function useCartStore() {
     notifyListeners();
   };
 
+  const updatePaymentStatus = (
+    orderId: string,
+    paymentStatus: Order['paymentStatus'],
+    employeeName?: string
+  ) => {
+    const updatedOrders = memoryData.orders.map((ord) => {
+      if (ord.id === orderId) {
+        const empName = employeeName || 'Nirod Kumar (Super Admin)';
+        const now = new Date().toISOString();
+
+        const historyItem = {
+          id: `hist-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+          employeeName: empName,
+          employeeRole: 'Super Admin',
+          action: `Payment status updated to ${paymentStatus}`,
+          timestamp: now,
+        };
+
+        const updated: Order = {
+          ...ord,
+          paymentStatus,
+          processingHistory: [historyItem, ...(ord.processingHistory || [])],
+        };
+
+        firebaseCloudDb.setDocument('orders', updated.id, updated);
+        return updated;
+      }
+      return ord;
+    });
+
+    saveStoredLocalData({ ...memoryData, orders: updatedOrders });
+    notifyListeners();
+  };
+
+  const updateOrderAdminRemark = (
+    orderId: string,
+    remark: string,
+    employeeName?: string
+  ) => {
+    const updatedOrders = memoryData.orders.map((ord) => {
+      if (ord.id === orderId) {
+        const empName = employeeName || 'Nirod Kumar (Super Admin)';
+        const now = new Date().toISOString();
+
+        const historyItem = {
+          id: `hist-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+          employeeName: empName,
+          employeeRole: 'Super Admin',
+          action: `Admin Remark: "${remark}"`,
+          timestamp: now,
+        };
+
+        const updated: Order = {
+          ...ord,
+          adminRemark: remark,
+          adminRemarkTimestamp: now,
+          processingHistory: [historyItem, ...(ord.processingHistory || [])],
+        };
+
+        firebaseCloudDb.setDocument('orders', updated.id, updated);
+        return updated;
+      }
+      return ord;
+    });
+
+    saveStoredLocalData({ ...memoryData, orders: updatedOrders });
+    notifyListeners();
+  };
+
   const subtotal = store.items.reduce((sum, item) => sum + item.itemTotalPrice, 0);
   const totalItems = store.items.reduce((sum, item) => sum + item.quantity, 0);
 
@@ -639,6 +708,8 @@ export function useCartStore() {
     updateQuantity,
     placeOrder,
     updateOrderStatus,
+    updatePaymentStatus,
+    updateOrderAdminRemark,
     recordOrderAction,
     subtotal,
     totalItems,

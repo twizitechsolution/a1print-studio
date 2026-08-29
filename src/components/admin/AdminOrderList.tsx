@@ -6,6 +6,8 @@ import { Download, Loader2, Printer, X, Calendar, Clock, User, Filter, ChevronLe
 interface AdminOrderListProps {
   orders: Order[];
   onUpdateOrderStatus: (orderId: string, status: Order['orderStatus'], employeeName?: string, employeeRole?: string) => void;
+  onUpdatePaymentStatus?: (orderId: string, paymentStatus: Order['paymentStatus'], employeeName?: string) => void;
+  onUpdateAdminRemark?: (orderId: string, remark: string, employeeName?: string) => void;
   onRecordOrderAction?: (orderId: string, action: string, employeeName?: string, employeeRole?: string) => void;
   currentAdminUser?: { name: string; roleName: string } | null;
 }
@@ -96,6 +98,9 @@ export const AdminOrderList: React.FC<AdminOrderListProps> = ({
   // 10-Item Pagination State
   const [currentPage, setCurrentPage] = useState<number>(1);
   const pageSize = 10;
+
+  // Admin Remarks State
+  const [remarkInputs, setRemarkInputs] = useState<Record<string, string>>({});
 
   // Filter Orders by Date Range & Specific Date
   const filteredOrders = orders.filter((order) => {
@@ -394,10 +399,24 @@ export const AdminOrderList: React.FC<AdminOrderListProps> = ({
         <div className="space-y-4">
           {paginatedOrders.map((order) => {
             const statusColors: Record<string, string> = {
-              Received: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-              Printing: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-              Shipped: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
-              Delivered: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+              New: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
+              Received: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
+              Design: 'bg-purple-500/10 text-purple-400 border-purple-500/30',
+              Printing: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
+              QC: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30',
+              Packing: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30',
+              Shipped: 'bg-sky-500/10 text-sky-400 border-sky-500/30',
+              Delivered: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
+              Cancelled: 'bg-rose-500/10 text-rose-400 border-rose-500/30',
+              Reprint: 'bg-rose-500/10 text-rose-400 border-rose-500/30',
+              RTO: 'bg-rose-500/10 text-rose-400 border-rose-500/30',
+            };
+
+            const paymentColors: Record<string, string> = {
+              Paid: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
+              COD: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
+              Pending: 'bg-rose-500/10 text-rose-400 border-rose-500/30',
+              Refund: 'bg-purple-500/10 text-purple-400 border-purple-500/30',
             };
 
             const formattedDate = order.createdAt
@@ -426,9 +445,9 @@ export const AdminOrderList: React.FC<AdminOrderListProps> = ({
                       <span>{formattedDate}</span>
                     </span>
                     
-                    {/* Order Status Selector */}
+                    {/* 7-Stage Order Status Selector */}
                     <select
-                      value={order.orderStatus || 'Received'}
+                      value={order.orderStatus || 'New'}
                       onChange={(e) =>
                         onUpdateOrderStatus(
                           order.id,
@@ -438,13 +457,34 @@ export const AdminOrderList: React.FC<AdminOrderListProps> = ({
                         )
                       }
                       className={`px-3 py-1 rounded-full text-xs font-bold border cursor-pointer ${
-                        statusColors[order.orderStatus || 'Received'] || statusColors.Received
+                        statusColors[order.orderStatus || 'New'] || statusColors.New
                       }`}
                     >
-                      <option value="Received" className="bg-[#121829] text-amber-400">Status: Received</option>
-                      <option value="Printing" className="bg-[#121829] text-blue-400">Status: Printing</option>
-                      <option value="Shipped" className="bg-[#121829] text-purple-400">Status: Shipped</option>
+                      <option value="New" className="bg-[#121829] text-blue-400">Status: New</option>
+                      <option value="Design" className="bg-[#121829] text-purple-400">Status: Design</option>
+                      <option value="Printing" className="bg-[#121829] text-amber-400">Status: Printing</option>
+                      <option value="QC" className="bg-[#121829] text-cyan-400">Status: QC Inspection</option>
+                      <option value="Packing" className="bg-[#121829] text-indigo-400">Status: Packing</option>
+                      <option value="Shipped" className="bg-[#121829] text-sky-400">Status: Shipped</option>
                       <option value="Delivered" className="bg-[#121829] text-emerald-400">Status: Delivered</option>
+                      <option value="Cancelled" className="bg-[#121829] text-rose-400">Status: Cancelled</option>
+                    </select>
+
+                    {/* Color-Coded Payment Status Selector */}
+                    <select
+                      value={order.paymentStatus || 'Paid'}
+                      onChange={(e) =>
+                        onUpdatePaymentStatus &&
+                        onUpdatePaymentStatus(order.id, e.target.value as Order['paymentStatus'], currentAdminUser?.name)
+                      }
+                      className={`px-3 py-1 rounded-full text-xs font-bold border cursor-pointer ${
+                        paymentColors[order.paymentStatus || 'Paid'] || paymentColors.Paid
+                      }`}
+                    >
+                      <option value="Paid" className="bg-[#121829] text-emerald-400">🟢 Payment: Paid</option>
+                      <option value="COD" className="bg-[#121829] text-amber-400">🟠 Payment: COD</option>
+                      <option value="Pending" className="bg-[#121829] text-rose-400">🔴 Payment: Pending</option>
+                      <option value="Refund" className="bg-[#121829] text-purple-400">↩️ Payment: Refunded</option>
                     </select>
 
                     {/* Employee Profile Processing Badge */}
@@ -461,13 +501,48 @@ export const AdminOrderList: React.FC<AdminOrderListProps> = ({
                   </div>
 
                   <a
-                    href={`https://wa.me/91${order.customer?.phone || ''}?text=Hello%20${encodeURIComponent(order.customer?.fullName || 'Customer')},%20your%20A1print%20order%20${order.id}%20has%20been%20received!`}
+                    href={`https://wa.me/91${order.customer?.phone || ''}?text=Hello%20${encodeURIComponent(order.customer?.fullName || 'Customer')},%20your%20A1print%20order%20${order.id}%20status%20is%20now%20${encodeURIComponent(order.orderStatus || 'New')}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
                   >
-                    💬 WhatsApp Proof
+                    💬 WhatsApp Update
                   </a>
+                </div>
+
+                {/* Admin Remark Live Communication Box */}
+                <div className="p-3 rounded-xl dark:bg-zinc-950 bg-slate-50 border dark:border-zinc-800 border-slate-200 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold dark:text-zinc-300 text-slate-700 flex items-center gap-1.5">
+                      💬 Admin Remark / Live Customer Update Note
+                    </span>
+                    {order.adminRemarkTimestamp && (
+                      <span className="text-[10px] text-zinc-500 font-mono">
+                        Last saved: {new Date(order.adminRemarkTimestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      placeholder="Type custom status note for customer (e.g. Sent to print lab / Out for delivery)..."
+                      value={remarkInputs[order.id] !== undefined ? remarkInputs[order.id] : order.adminRemark || ''}
+                      onChange={(e) => setRemarkInputs({ ...remarkInputs, [order.id]: e.target.value })}
+                      className="flex-1 px-3 py-1.5 rounded-lg text-xs dark:bg-zinc-900 bg-white border dark:border-zinc-800 border-slate-300 dark:text-zinc-100 text-slate-900 focus:outline-none"
+                    />
+                    <button
+                      onClick={() => {
+                        const note = remarkInputs[order.id] !== undefined ? remarkInputs[order.id] : order.adminRemark;
+                        if (note && onUpdateAdminRemark) {
+                          onUpdateAdminRemark(order.id, note, currentAdminUser?.name);
+                        }
+                      }}
+                      className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer shrink-0"
+                    >
+                      Save Remark
+                    </button>
+                  </div>
                 </div>
 
                 {/* Order Details Body Grid */}

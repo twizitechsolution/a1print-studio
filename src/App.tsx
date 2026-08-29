@@ -18,6 +18,7 @@ import { CustomerOrdersDashboard } from './pages/CustomerOrdersDashboard';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { AboutPage } from './pages/AboutPage';
 import { ContactPage } from './pages/ContactPage';
+import { OrderTrackingPage } from './pages/OrderTrackingPage';
 
 import { CartDrawer } from './components/cart/CartDrawer';
 import { ProductGrid } from './components/catalog/ProductGrid';
@@ -238,6 +239,8 @@ export const App: React.FC = () => {
             onNavigate={handleNavigate}
           />
         )}
+
+        {currentPage === 'order-tracking' && <OrderTrackingPage />}
 
         {currentPage === 'about' && <AboutPage />}
         {currentPage === 'contact' && <ContactPage />}
