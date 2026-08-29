@@ -7,12 +7,20 @@ import {
   Clock,
   Printer,
   Truck,
-  CheckCircle,
+  CheckCircle2,
   XCircle,
   TrendingUp,
   Calendar,
   Layers,
-  ArrowUpRight,
+  AlertTriangle,
+  PackageCheck,
+  CreditCard,
+  RotateCcw,
+  Navigation,
+  CheckCircle,
+  HelpCircle,
+  FileSpreadsheet,
+  PackageX,
 } from 'lucide-react';
 
 interface AdminDarkStatsCardsProps {
@@ -24,24 +32,40 @@ export const AdminDarkStatsCards: React.FC<AdminDarkStatsCardsProps> = ({
   orders,
   onSelectStatusFilter,
 }) => {
-  // Calculations
+  // Real-time Date Calculations
   const todayStr = new Date().toISOString().split('T')[0];
   const currentMonthStr = new Date().toISOString().slice(0, 7); // e.g. "2026-08"
 
+  // Real-time Order Counts
   const totalOrders = orders.length;
   const todayOrders = orders.filter((o) => (o.createdAt || '').startsWith(todayStr)).length;
   const pendingOrders = orders.filter((o) => !o.orderStatus || o.orderStatus === 'Received').length;
   const processingOrders = orders.filter((o) => o.orderStatus === 'Printing').length;
-  const printedOrders = orders.filter((o) => o.orderStatus === 'Printing').length;
+  const printedOrders = orders.filter((o) => o.orderStatus === 'Printing' || o.orderStatus === 'Packed').length;
   const shippedOrders = orders.filter((o) => o.orderStatus === 'Shipped').length;
   const deliveredOrders = orders.filter((o) => o.orderStatus === 'Delivered').length;
   const cancelledOrders = orders.filter((o) => o.orderStatus === 'Cancelled').length;
 
-  // Unique customers
-  const uniquePhones = new Set(orders.map((o) => o.customer?.phone || o.customer?.fullName));
-  const totalCustomers = uniquePhones.size;
+  // Real-time Section 1: Operational Action Desk Counts
+  const printingPendingCount = orders.filter((o) => !o.orderStatus || o.orderStatus === 'Received').length;
+  const designPendingCount = orders.filter((o) => o.items?.some((i) => !i.compiledFrameDataUrl && (!i.customPhotoValues || Object.keys(i.customPhotoValues).length === 0))).length;
+  const packingPendingCount = orders.filter((o) => o.orderStatus === 'Printing').length;
+  const shippingPendingCount = orders.filter((o) => o.orderStatus === 'Printing' || o.orderStatus === 'Packed').length;
+  const paymentPendingCount = orders.filter((o) => o.paymentMethod === 'COD' && o.orderStatus !== 'Delivered').length;
+  const reprintRequiredCount = orders.filter((o) => o.orderStatus === 'Reprint' || (o.notes || '').toLowerCase().includes('reprint')).length;
 
-  // Sales totals
+  // Real-time Section 2: Shipping Overview Logistics Velocity Counts
+  const readyToShipCount = orders.filter((o) => o.orderStatus === 'Printing' || o.orderStatus === 'Packed').length;
+  const shippedCount = orders.filter((o) => o.orderStatus === 'Shipped').length;
+  const inTransitCount = orders.filter((o) => o.orderStatus === 'Shipped' && (o.trackingNumber || '').length > 0).length;
+  const deliveredCount = orders.filter((o) => o.orderStatus === 'Delivered').length;
+  const rtoCount = orders.filter((o) => o.orderStatus === 'RTO' || (o.notes || '').toLowerCase().includes('rto')).length;
+
+  // Unique customers count
+  const uniquePhones = new Set(orders.map((o) => o.customer?.phone || o.customer?.fullName).filter(Boolean));
+  const totalCustomers = uniquePhones.size || 1;
+
+  // Real-time Financial Sales Totals (excluding Cancelled orders)
   const validOrders = orders.filter((o) => o.orderStatus !== 'Cancelled');
   const totalSales = validOrders.reduce((acc, o) => acc + (o.total || 0), 0);
   const todaySales = validOrders
@@ -51,157 +75,321 @@ export const AdminDarkStatsCards: React.FC<AdminDarkStatsCardsProps> = ({
     .filter((o) => (o.createdAt || '').startsWith(currentMonthStr))
     .reduce((acc, o) => acc + (o.total || 0), 0);
 
-  const cardItems = [
+  // Section 1: Operational Action Items (6 Cards)
+  const operationalDeskItems = [
+    {
+      label: 'Printing Pending',
+      value: printingPendingCount,
+      subtext: 'Awaiting print file run',
+      icon: Printer,
+      color: 'from-amber-500 to-orange-600',
+      badgeBg: 'dark:bg-amber-950/40 bg-amber-50 dark:text-amber-300 text-amber-800 dark:border-amber-800/40 border-amber-200',
+      statusFilter: 'Received',
+    },
+    {
+      label: 'Design Pending',
+      value: designPendingCount,
+      subtext: 'Photo/Text check needed',
+      icon: FileSpreadsheet,
+      color: 'from-purple-500 to-indigo-600',
+      badgeBg: 'dark:bg-purple-950/40 bg-purple-50 dark:text-purple-300 text-purple-800 dark:border-purple-800/40 border-purple-200',
+      statusFilter: 'Received',
+    },
+    {
+      label: 'Packing Pending',
+      value: packingPendingCount,
+      subtext: 'Ready for 5-layer wrap',
+      icon: PackageCheck,
+      color: 'from-blue-500 to-cyan-600',
+      badgeBg: 'dark:bg-blue-950/40 bg-blue-50 dark:text-blue-300 text-blue-800 dark:border-blue-800/40 border-blue-200',
+      statusFilter: 'Printing',
+    },
+    {
+      label: 'Shipping Pending',
+      value: shippingPendingCount,
+      subtext: 'Awaiting courier pickup',
+      icon: Truck,
+      color: 'from-sky-500 to-blue-600',
+      badgeBg: 'dark:bg-sky-950/40 bg-sky-50 dark:text-sky-300 text-sky-800 dark:border-sky-800/40 border-sky-200',
+      statusFilter: 'Printing',
+    },
+    {
+      label: 'Payment Pending',
+      value: paymentPendingCount,
+      subtext: 'COD / Unpaid Verification',
+      icon: CreditCard,
+      color: 'from-pink-500 to-rose-600',
+      badgeBg: 'dark:bg-pink-950/40 bg-pink-50 dark:text-pink-300 text-pink-800 dark:border-pink-800/40 border-pink-200',
+      statusFilter: 'Received',
+    },
+    {
+      label: 'Reprint Required',
+      value: reprintRequiredCount,
+      subtext: 'Damage / Quality re-run',
+      icon: RotateCcw,
+      color: 'from-red-500 to-rose-700',
+      badgeBg: 'dark:bg-rose-950/40 bg-rose-50 dark:text-rose-300 text-rose-800 dark:border-rose-800/40 border-rose-200',
+      statusFilter: 'Reprint',
+    },
+  ];
+
+  // Section 2: Shipping Overview Items (5 Cards)
+  const shippingOverviewItems = [
+    {
+      label: 'Ready to Ship',
+      value: readyToShipCount,
+      icon: PackageCheck,
+      color: 'text-blue-500',
+      bgColor: 'dark:bg-blue-950/30 bg-blue-50 dark:border-blue-800/30 border-blue-200',
+      statusFilter: 'Printing',
+    },
+    {
+      label: 'Shipped',
+      value: shippedCount,
+      icon: Truck,
+      color: 'text-purple-500',
+      bgColor: 'dark:bg-purple-950/30 bg-purple-50 dark:border-purple-800/30 border-purple-200',
+      statusFilter: 'Shipped',
+    },
+    {
+      label: 'In Transit',
+      value: inTransitCount,
+      icon: Navigation,
+      color: 'text-sky-500',
+      bgColor: 'dark:bg-sky-950/30 bg-sky-50 dark:border-sky-800/30 border-sky-200',
+      statusFilter: 'Shipped',
+    },
+    {
+      label: 'Delivered',
+      value: deliveredCount,
+      icon: CheckCircle,
+      color: 'text-emerald-500',
+      bgColor: 'dark:bg-emerald-950/30 bg-emerald-50 dark:border-emerald-800/30 border-emerald-200',
+      statusFilter: 'Delivered',
+    },
+    {
+      label: 'RTO (Return)',
+      value: rtoCount,
+      icon: PackageX,
+      color: 'text-rose-500',
+      bgColor: 'dark:bg-rose-950/30 bg-rose-50 dark:border-rose-800/30 border-rose-200',
+      statusFilter: 'RTO',
+    },
+  ];
+
+  // Section 3: 12 Top Core Business Metrics Cards
+  const core12Metrics = [
     {
       label: 'Total Orders',
       value: totalOrders.toLocaleString(),
-      subtext: '+18% vs last month',
+      subtext: 'All-time orders',
       icon: ShoppingCart,
-      color: 'from-blue-600 to-indigo-600',
-      badgeBg: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-      onClick: () => onSelectStatusFilter && onSelectStatusFilter('All'),
+      color: 'text-blue-500',
+      statusFilter: 'All',
     },
     {
-      label: 'Today Orders',
+      label: 'Today’s Orders',
       value: todayOrders.toLocaleString(),
-      subtext: 'Placed today',
+      subtext: 'Received today',
       icon: Calendar,
-      color: 'from-indigo-600 to-purple-600',
-      badgeBg: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
-      onClick: () => onSelectStatusFilter && onSelectStatusFilter('Today'),
+      color: 'text-indigo-500',
+      statusFilter: 'Today',
     },
     {
       label: 'Pending Orders',
       value: pendingOrders.toLocaleString(),
       subtext: 'Needs processing',
       icon: Clock,
-      color: 'from-amber-500 to-orange-500',
-      badgeBg: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-      onClick: () => onSelectStatusFilter && onSelectStatusFilter('Received'),
+      color: 'text-amber-500',
+      statusFilter: 'Received',
     },
     {
       label: 'Processing Orders',
       value: processingOrders.toLocaleString(),
       subtext: 'In production queue',
       icon: Layers,
-      color: 'from-sky-500 to-blue-500',
-      badgeBg: 'bg-sky-500/10 text-sky-400 border-sky-500/20',
-      onClick: () => onSelectStatusFilter && onSelectStatusFilter('Printing'),
+      color: 'text-sky-500',
+      statusFilter: 'Printing',
     },
     {
       label: 'Printed Orders',
       value: printedOrders.toLocaleString(),
       subtext: 'Ready for packing',
       icon: Printer,
-      color: 'from-purple-500 to-pink-500',
-      badgeBg: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
-      onClick: () => onSelectStatusFilter && onSelectStatusFilter('Printing'),
+      color: 'text-purple-500',
+      statusFilter: 'Printing',
     },
     {
       label: 'Shipped Orders',
       value: shippedOrders.toLocaleString(),
-      subtext: 'In transit',
+      subtext: 'In courier transit',
       icon: Truck,
-      color: 'from-cyan-500 to-blue-600',
-      badgeBg: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
-      onClick: () => onSelectStatusFilter && onSelectStatusFilter('Shipped'),
+      color: 'text-cyan-500',
+      statusFilter: 'Shipped',
     },
     {
       label: 'Delivered Orders',
       value: deliveredOrders.toLocaleString(),
       subtext: 'Successfully fulfilled',
-      icon: CheckCircle,
-      color: 'from-emerald-500 to-teal-600',
-      badgeBg: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-      onClick: () => onSelectStatusFilter && onSelectStatusFilter('Delivered'),
+      icon: CheckCircle2,
+      color: 'text-emerald-500',
+      statusFilter: 'Delivered',
     },
     {
       label: 'Cancelled Orders',
       value: cancelledOrders.toLocaleString(),
-      subtext: 'Refunded / Void',
+      subtext: 'Cancelled or refunded',
       icon: XCircle,
-      color: 'from-rose-500 to-red-600',
-      badgeBg: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
-      onClick: () => onSelectStatusFilter && onSelectStatusFilter('Cancelled'),
+      color: 'text-rose-500',
+      statusFilter: 'Cancelled',
     },
     {
       label: 'Total Customers',
       value: totalCustomers.toLocaleString(),
-      subtext: '+15% New leads',
+      subtext: 'Registered database',
       icon: Users,
-      color: 'from-fuchsia-500 to-pink-600',
-      badgeBg: 'bg-fuchsia-500/10 text-fuchsia-400 border-fuchsia-500/20',
+      color: 'text-pink-500',
+      statusFilter: 'customers',
     },
     {
       label: 'Total Revenue',
       value: `₹${totalSales.toLocaleString()}`,
-      subtext: '+22% Overall growth',
+      subtext: 'Gross revenue',
       icon: DollarSign,
-      color: 'from-emerald-600 to-green-600',
-      badgeBg: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+      color: 'text-emerald-500',
+      statusFilter: 'reports',
     },
     {
-      label: "Today's Sales",
+      label: 'Today’s Sales',
       value: `₹${todaySales.toLocaleString()}`,
-      subtext: 'Revenue recorded today',
+      subtext: 'Gross sales today',
       icon: TrendingUp,
-      color: 'from-amber-600 to-yellow-500',
-      badgeBg: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+      color: 'text-emerald-500',
+      statusFilter: 'reports',
     },
     {
-      label: "This Month's Sales",
+      label: 'This Month’s Sales',
       value: `₹${monthSales.toLocaleString()}`,
-      subtext: 'Current month total',
-      icon: DollarSign,
-      color: 'from-indigo-600 to-blue-600',
-      badgeBg: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
+      subtext: 'Monthly sales total',
+      icon: Calendar,
+      color: 'text-emerald-500',
+      statusFilter: 'reports',
     },
   ];
 
   return (
-    <div className="space-y-4 font-sans">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-bold tracking-tight dark:text-zinc-100 text-slate-900">
-          Dashboard Overview
-        </h3>
-        <span className="text-xs dark:text-zinc-400 text-slate-500 font-medium dark:bg-zinc-900 bg-white px-2.5 py-1 rounded-md border dark:border-zinc-800 border-slate-200 shadow-xs">
-          12 Core Metrics
-        </span>
-      </div>
+    <div className="space-y-8 font-sans">
+      
+      {/* SECTION 1: 🚨 Operational Action Desk (Dashboard khulte hi sabse important pending kaam) */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5 text-amber-500" />
+            <h3 className="text-base font-bold dark:text-zinc-100 text-slate-900 tracking-tight">
+              Operational Action Desk (Immediate Attention Required)
+            </h3>
+          </div>
+          <span className="text-xs dark:text-zinc-400 text-slate-500 font-medium font-mono">Real-time Live Sync</span>
+        </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {cardItems.map((card, idx) => {
-          const IconComp = card.icon;
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+          {operationalDeskItems.map((item, idx) => {
+            const Icon = item.icon;
+            return (
+              <div
+                key={idx}
+                onClick={() => onSelectStatusFilter && onSelectStatusFilter(item.statusFilter)}
+                className={`p-4 rounded-xl border transition-all cursor-pointer shadow-xs hover:shadow-md space-y-3 ${item.badgeBg}`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold font-mono tracking-wide">{item.label}</span>
+                  <div className="p-2 rounded-lg bg-white/40 dark:bg-black/20 text-current">
+                    <Icon className="w-4 h-4" />
+                  </div>
+                </div>
 
-          return (
-            <div
-              key={idx}
-              onClick={card.onClick}
-              className={`p-5 dark:bg-zinc-900/50 bg-white rounded-xl border dark:border-zinc-800 border-slate-200 shadow-xs dark:hover:border-zinc-700 hover:border-slate-300 transition-colors cursor-pointer group flex flex-col justify-between space-y-3 ${
-                card.onClick ? 'dark:hover:bg-zinc-900/80 hover:bg-slate-50' : ''
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium dark:text-zinc-400 text-slate-500">
-                  {card.label}
-                </span>
-                <IconComp className="w-4 h-4 dark:text-zinc-500 text-slate-400 dark:group-hover:text-zinc-300 group-hover:text-slate-700 transition-colors" />
-              </div>
-
-              <div className="space-y-1">
-                <h4 className="font-mono text-2xl font-bold tracking-tight dark:text-zinc-100 text-slate-900">
-                  {card.value}
-                </h4>
-                <div className="flex items-center gap-1.5 text-[11px]">
-                  <span className="px-2 py-0.5 rounded-md border dark:border-zinc-800 border-slate-200 dark:bg-zinc-950 bg-slate-100 dark:text-zinc-400 text-slate-600 font-medium">
-                    {card.subtext}
-                  </span>
+                <div className="space-y-0.5">
+                  <div className="text-2xl font-black font-mono tracking-tight">{item.value}</div>
+                  <p className="text-[10px] opacity-80 font-medium">{item.subtext}</p>
                 </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
+
+      {/* SECTION 2: 🚚 Shipping & Logistics Velocity Overview */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Truck className="w-5 h-5 text-purple-500" />
+            <h3 className="text-base font-bold dark:text-zinc-100 text-slate-900 tracking-tight">
+              Shipping & Logistics Velocity Overview
+            </h3>
+          </div>
+          <span className="text-xs dark:text-zinc-400 text-slate-500 font-medium">Pan-India Dispatch Trajectory</span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          {shippingOverviewItems.map((item, idx) => {
+            const Icon = item.icon;
+            return (
+              <div
+                key={idx}
+                onClick={() => onSelectStatusFilter && onSelectStatusFilter(item.statusFilter)}
+                className={`p-4 rounded-xl border transition-all cursor-pointer shadow-xs hover:shadow-md space-y-2 ${item.bgColor}`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold dark:text-zinc-300 text-slate-700">{item.label}</span>
+                  <Icon className={`w-4 h-4 ${item.color}`} />
+                </div>
+                <div className="text-2xl font-bold font-mono dark:text-zinc-100 text-slate-900">{item.value}</div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* SECTION 3: 📊 Top Core Metrics — 12 KPI Cards */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="w-5 h-5 text-emerald-500" />
+            <h3 className="text-base font-bold dark:text-zinc-100 text-slate-900 tracking-tight">
+              Top Core Business Metrics (12 Real-Time KPI Cards)
+            </h3>
+          </div>
+          <span className="text-xs dark:text-zinc-400 text-slate-500 font-medium">Updated Live</span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {core12Metrics.map((item, idx) => {
+            const Icon = item.icon;
+            return (
+              <div
+                key={idx}
+                onClick={() => onSelectStatusFilter && onSelectStatusFilter(item.statusFilter)}
+                className="p-4 rounded-xl dark:bg-zinc-900/50 bg-white border dark:border-zinc-800 border-slate-200 shadow-xs hover:shadow-md transition-all cursor-pointer space-y-3 dark:hover:border-zinc-700 hover:border-slate-300"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs dark:text-zinc-400 text-slate-500 font-medium">{item.label}</span>
+                  <div className="p-2 rounded-lg dark:bg-zinc-950 bg-slate-100 border dark:border-zinc-800 border-slate-200">
+                    <Icon className={`w-4 h-4 ${item.color}`} />
+                  </div>
+                </div>
+
+                <div className="space-y-0.5">
+                  <div className="text-2xl font-bold font-mono tracking-tight dark:text-zinc-100 text-slate-900">
+                    {item.value}
+                  </div>
+                  <p className="text-[11px] dark:text-zinc-500 text-slate-400 font-medium">{item.subtext}</p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
     </div>
   );
 };

@@ -394,8 +394,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
           {/* Module 1: Dashboard Overview */}
           {activeTab === 'dashboard' && (
             <div className="space-y-6">
-              <AdminDarkStatsCards orders={orders} />
-              <AdminCharts orders={orders} />
+              <AdminDarkStatsCards
+                orders={orders}
+                onSelectStatusFilter={(statusFilter) => {
+                  if (statusFilter === 'reports' || statusFilter === 'customers') {
+                    setActiveTab(statusFilter as any);
+                  } else {
+                    setActiveTab('orders');
+                  }
+                }}
+              />
+              <AdminCharts
+                orders={orders}
+                onNavigateOrders={(filterStatus) => {
+                  setActiveTab('orders');
+                }}
+              />
             </div>
           )}
 
