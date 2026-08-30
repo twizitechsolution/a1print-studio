@@ -139,7 +139,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onSelectProduct, onNavigate 
           <div className="lg:col-span-6 relative flex items-center justify-center pt-4 lg:pt-0">
             <div className="relative w-full max-w-md group cursor-pointer" onClick={() => products[0] && onSelectProduct(products[0])}>
               <img
-                src="/hero_model_holding_frame.jpg"
+                src="/hero_model_holding_frame.png"
                 alt="A1print Studio Custom Photo Frame Model"
                 className="w-full h-auto max-h-[580px] object-contain rounded-3xl drop-shadow-2xl hover:scale-102 transition-transform duration-300"
               />
