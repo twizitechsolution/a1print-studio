@@ -25,7 +25,14 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   private handleReload = () => {
-    window.location.reload();
+    try {
+      if ('caches' in window) {
+        caches.keys().then((names) => {
+          names.forEach((name) => caches.delete(name));
+        });
+      }
+    } catch (e) {}
+    window.location.href = window.location.origin + window.location.pathname + '?v=' + Date.now();
   };
 
   public render() {
