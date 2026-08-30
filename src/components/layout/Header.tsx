@@ -25,7 +25,6 @@ export const Header: React.FC<HeaderProps> = ({
     { id: 'about', label: 'About Us' },
     { id: 'catalog', label: 'Shop' },
     { id: 'contact', label: 'Contact Us' },
-    { id: 'order-tracking', label: 'Track Order 🚚' },
     { id: 'my-order', label: 'My Order 📦' },
   ];
 

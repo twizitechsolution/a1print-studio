@@ -101,6 +101,7 @@ export const AdminOrderList: React.FC<AdminOrderListProps> = ({
 
   // Admin Remarks State
   const [remarkInputs, setRemarkInputs] = useState<Record<string, string>>({});
+  const [savedRemarkOrderIds, setSavedRemarkOrderIds] = useState<Record<string, boolean>>({});
 
   // Filter Orders by Date Range & Specific Date
   const filteredOrders = orders.filter((order) => {
@@ -533,14 +534,22 @@ export const AdminOrderList: React.FC<AdminOrderListProps> = ({
                     />
                     <button
                       onClick={() => {
-                        const note = remarkInputs[order.id] !== undefined ? remarkInputs[order.id] : order.adminRemark;
-                        if (note && onUpdateAdminRemark) {
+                        const note = remarkInputs[order.id] !== undefined ? remarkInputs[order.id] : (order.adminRemark || '');
+                        if (onUpdateAdminRemark) {
                           onUpdateAdminRemark(order.id, note, currentAdminUser?.name);
+                          setSavedRemarkOrderIds((prev) => ({ ...prev, [order.id]: true }));
+                          setTimeout(() => {
+                            setSavedRemarkOrderIds((prev) => ({ ...prev, [order.id]: false }));
+                          }, 3000);
                         }
                       }}
-                      className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer shrink-0"
+                      className={`px-3 py-1.5 font-bold text-xs rounded-lg transition-all cursor-pointer shrink-0 ${
+                        savedRemarkOrderIds[order.id]
+                          ? 'bg-emerald-600 text-white'
+                          : 'bg-purple-600 hover:bg-purple-700 text-white'
+                      }`}
                     >
-                      Save Remark
+                      {savedRemarkOrderIds[order.id] ? 'Saved ✓' : 'Save Remark'}
                     </button>
                   </div>
                 </div>

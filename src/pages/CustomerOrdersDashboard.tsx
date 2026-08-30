@@ -305,6 +305,23 @@ export const CustomerOrdersDashboard: React.FC<CustomerOrdersDashboardProps> = (
                   })}
                 </div>
 
+                {/* Live Admin Remark Alert Box (Only displayed if admin wrote a remark for this order) */}
+                {order.adminRemark && (
+                  <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 space-y-1">
+                    <div className="flex items-center justify-between font-bold text-xs">
+                      <span className="flex items-center gap-1.5 text-[#160E4B]">
+                        💬 Admin Status Update Remark:
+                      </span>
+                      {order.adminRemarkTimestamp && (
+                        <span className="text-[10px] text-amber-700 font-mono">
+                          Saved: {new Date(order.adminRemarkTimestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs font-semibold text-amber-950 pl-5">{order.adminRemark}</p>
+                  </div>
+                )}
+
                 {/* Delivery Address & Actions */}
                 <div className="p-4 bg-gray-50 rounded-2xl border border-gray-200 text-xs text-gray-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                   <div>
@@ -314,14 +331,12 @@ export const CustomerOrdersDashboard: React.FC<CustomerOrdersDashboardProps> = (
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0">
-                    <a
-                      href={`https://wa.me/919583626786?text=Hi%20A1print%20Studio,%20I%20need%20help%20with%20my%20Order%20${order.id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5"
+                    <button
+                      onClick={() => onNavigate('order-tracking')}
+                      className="px-5 py-3 rounded-2xl bg-gradient-to-r from-[#F82BA9] via-purple-600 to-[#160E4B] hover:opacity-95 text-white font-extrabold text-xs flex items-center gap-2 shadow-md hover:shadow-lg transition-all cursor-pointer"
                     >
-                      <MessageCircle className="w-3.5 h-3.5" /> Track on WhatsApp
-                    </a>
+                      <Truck className="w-4 h-4 text-white" /> Track Order 🚚
+                    </button>
                   </div>
                 </div>
 
