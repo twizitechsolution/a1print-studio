@@ -284,6 +284,62 @@ export const AdminProductListingModal: React.FC<AdminProductListingModalProps> =
               </div>
             </div>
 
+            {/* Admin Frame Payment Method CMS Settings */}
+            <div className="p-4 bg-zinc-900 rounded-xl border border-zinc-800 space-y-2">
+              <label className="text-xs font-bold text-zinc-200 block">
+                💳 Allowed Payment Methods for this Frame Product :
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs font-medium">
+                <label className="flex items-center gap-2 p-2.5 bg-zinc-950 border border-zinc-800 rounded-lg cursor-pointer hover:border-zinc-700 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={allowedPaymentModes.includes('Prepaid')}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setAllowedPaymentModes([...allowedPaymentModes, 'Prepaid']);
+                      } else {
+                        setAllowedPaymentModes(allowedPaymentModes.filter((m) => m !== 'Prepaid'));
+                      }
+                    }}
+                    className="accent-pink-500 w-4 h-4 cursor-pointer"
+                  />
+                  <span className="text-zinc-200 font-bold">Online Prepaid</span>
+                </label>
+
+                <label className="flex items-center gap-2 p-2.5 bg-zinc-950 border border-zinc-800 rounded-lg cursor-pointer hover:border-zinc-700 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={allowedPaymentModes.includes('COD')}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setAllowedPaymentModes([...allowedPaymentModes, 'COD']);
+                      } else {
+                        setAllowedPaymentModes(allowedPaymentModes.filter((m) => m !== 'COD'));
+                      }
+                    }}
+                    className="accent-pink-500 w-4 h-4 cursor-pointer"
+                  />
+                  <span className="text-zinc-200 font-bold">Cash on Delivery (COD)</span>
+                </label>
+
+                <label className="flex items-center gap-2 p-2.5 bg-zinc-950 border border-zinc-800 rounded-lg cursor-pointer hover:border-zinc-700 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={allowedPaymentModes.includes('GoQuick50')}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setAllowedPaymentModes([...allowedPaymentModes, 'GoQuick50']);
+                      } else {
+                        setAllowedPaymentModes(allowedPaymentModes.filter((m) => m !== 'GoQuick50'));
+                      }
+                    }}
+                    className="accent-pink-500 w-4 h-4 cursor-pointer"
+                  />
+                  <span className="text-purple-400 font-bold">GoQuick ⚡ ₹50 Advance</span>
+                </label>
+              </div>
+            </div>
+
             {/* Multi-Image Upload & Angle Thumbnails Section */}
             <div className="space-y-2 pt-2 border-t border-[#262E4A]">
               <div className="flex items-center justify-between">

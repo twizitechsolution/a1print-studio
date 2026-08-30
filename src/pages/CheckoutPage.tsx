@@ -358,70 +358,76 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
             <div className="space-y-2">
               
               {/* Option 1: Prepaid (Razorpay / UPI) */}
-              <label className={`p-4 rounded-2xl border-2 flex items-center justify-between cursor-pointer transition-all ${
-                paymentMethod === 'Razorpay' || paymentMethod === 'PhonePe' ? 'border-[#F82BA9] bg-pink-50/40' : 'border-gray-200'
-              }`}>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="radio"
-                    name="payment"
-                    checked={paymentMethod === 'Razorpay' || paymentMethod === 'PhonePe'}
-                    onChange={() => setPaymentMethod('Razorpay')}
-                    className="accent-[#F82BA9]"
-                  />
-                  <div>
-                    <span className="font-bold text-xs text-gray-900 block flex items-center gap-1.5">
-                      Full Online Payment <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-                      <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 font-extrabold text-[10px] rounded-full">Instant 9% OFF</span>
-                    </span>
-                    <span className="text-[11px] text-gray-500 block">UPI, GPay, PhonePe, Cards, NetBanking & Wallets</span>
+              {(activeItem?.product?.allowedPaymentModes ? activeItem.product.allowedPaymentModes.includes('Prepaid') : true) && (
+                <label className={`p-4 rounded-2xl border-2 flex items-center justify-between cursor-pointer transition-all ${
+                  paymentMethod === 'Razorpay' || paymentMethod === 'PhonePe' ? 'border-[#F82BA9] bg-pink-50/40' : 'border-gray-200'
+                }`}>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="radio"
+                      name="payment"
+                      checked={paymentMethod === 'Razorpay' || paymentMethod === 'PhonePe'}
+                      onChange={() => setPaymentMethod('Razorpay')}
+                      className="accent-[#F82BA9]"
+                    />
+                    <div>
+                      <span className="font-bold text-xs text-gray-900 block flex items-center gap-1.5">
+                        Full Online Payment <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                        <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 font-extrabold text-[10px] rounded-full">Instant 9% OFF</span>
+                      </span>
+                      <span className="text-[11px] text-gray-500 block">UPI, GPay, PhonePe, Cards, NetBanking & Wallets</span>
+                    </div>
                   </div>
-                </div>
-                <CreditCard className="w-5 h-5 text-purple-600" />
-              </label>
+                  <CreditCard className="w-5 h-5 text-purple-600" />
+                </label>
+              )}
 
               {/* Option 2: GoQuick ₹50 Advance Deposit */}
-              <label className={`p-4 rounded-2xl border-2 flex items-center justify-between cursor-pointer transition-all ${
-                (paymentMethod as string) === 'GoQuick50' ? 'border-[#F82BA9] bg-pink-50/40' : 'border-gray-200'
-              }`}>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="radio"
-                    name="payment"
-                    checked={(paymentMethod as string) === 'GoQuick50'}
-                    onChange={() => setPaymentMethod('GoQuick50' as any)}
-                    className="accent-[#F82BA9]"
-                  />
-                  <div>
-                    <span className="font-bold text-xs text-gray-900 block flex items-center gap-1.5">
-                      GoQuick ⚡ ₹50 Partial Advance Deposit
-                      <span className="px-2 py-0.5 bg-purple-100 text-purple-700 font-extrabold text-[10px] rounded-full">Popular Choice</span>
-                    </span>
-                    <span className="text-[11px] text-gray-500 block">Pay ₹50 advance online via UPI + Pay remaining ₹{Math.max(0, subtotal - 50)} cash on doorstep delivery</span>
+              {(activeItem?.product?.allowedPaymentModes ? activeItem.product.allowedPaymentModes.includes('GoQuick50') : true) && (
+                <label className={`p-4 rounded-2xl border-2 flex items-center justify-between cursor-pointer transition-all ${
+                  (paymentMethod as string) === 'GoQuick50' ? 'border-[#F82BA9] bg-pink-50/40' : 'border-gray-200'
+                }`}>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="radio"
+                      name="payment"
+                      checked={(paymentMethod as string) === 'GoQuick50'}
+                      onChange={() => setPaymentMethod('GoQuick50' as any)}
+                      className="accent-[#F82BA9]"
+                    />
+                    <div>
+                      <span className="font-bold text-xs text-gray-900 block flex items-center gap-1.5">
+                        GoQuick ⚡ ₹50 Partial Advance Deposit
+                        <span className="px-2 py-0.5 bg-purple-100 text-purple-700 font-extrabold text-[10px] rounded-full">Popular Choice</span>
+                      </span>
+                      <span className="text-[11px] text-gray-500 block">Pay ₹50 advance online via UPI + Pay remaining ₹{Math.max(0, subtotal - 50)} cash on doorstep delivery</span>
+                    </div>
                   </div>
-                </div>
-                <QrCode className="w-5 h-5 text-pink-600" />
-              </label>
+                  <QrCode className="w-5 h-5 text-pink-600" />
+                </label>
+              )}
 
               {/* Option 3: Full COD */}
-              <label className={`p-4 rounded-2xl border-2 flex items-center justify-between cursor-pointer transition-all ${
-                paymentMethod === 'COD' ? 'border-[#F82BA9] bg-pink-50/40' : 'border-gray-200'
-              }`}>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="radio"
-                    name="payment"
-                    checked={paymentMethod === 'COD'}
-                    onChange={() => setPaymentMethod('COD')}
-                    className="accent-[#F82BA9]"
-                  />
-                  <div>
-                    <span className="font-bold text-xs text-gray-900 block">Cash on Delivery (COD)</span>
-                    <span className="text-[11px] text-gray-500 block">Pay ₹{subtotal} in cash when order is delivered to your address</span>
+              {(activeItem?.product?.allowedPaymentModes ? activeItem.product.allowedPaymentModes.includes('COD') : true) && (
+                <label className={`p-4 rounded-2xl border-2 flex items-center justify-between cursor-pointer transition-all ${
+                  paymentMethod === 'COD' ? 'border-[#F82BA9] bg-pink-50/40' : 'border-gray-200'
+                }`}>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="radio"
+                      name="payment"
+                      checked={paymentMethod === 'COD'}
+                      onChange={() => setPaymentMethod('COD')}
+                      className="accent-[#F82BA9]"
+                    />
+                    <div>
+                      <span className="font-bold text-xs text-gray-900 block">Cash on Delivery (COD)</span>
+                      <span className="text-[11px] text-gray-500 block">Pay ₹{subtotal} in cash when order is delivered to your address</span>
+                    </div>
                   </div>
-                </div>
-                <Truck className="w-5 h-5 text-emerald-600" />
-              </label>
+                  <Truck className="w-5 h-5 text-emerald-600" />
+                </label>
+              )}
 
             </div>
           </div>

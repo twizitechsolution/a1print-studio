@@ -23,6 +23,7 @@ export const SUPER_ADMIN_USER: AdminUser = {
     'coupons',
     'shipping',
     'payments',
+    'support',
     'design_preview',
     'reports',
     'notifications',

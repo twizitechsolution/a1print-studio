@@ -149,6 +149,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
           'coupons',
           'shipping',
           'payments',
+          'support',
           'design_preview',
           'reports',
           'notifications',

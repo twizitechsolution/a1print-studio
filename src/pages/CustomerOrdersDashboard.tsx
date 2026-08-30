@@ -27,6 +27,7 @@ export const CustomerOrdersDashboard: React.FC<CustomerOrdersDashboardProps> = (
   const [ticketDescription, setTicketDescription] = useState('');
   const [ticketImages, setTicketImages] = useState<string[]>([]);
   const [ticketSuccessMsg, setTicketSuccessMsg] = useState('');
+  const [quickPhoneInput, setQuickPhoneInput] = useState('');
 
   // Address Form state
   const [showAddressForm, setShowAddressForm] = useState(false);
@@ -137,7 +138,7 @@ export const CustomerOrdersDashboard: React.FC<CustomerOrdersDashboardProps> = (
           </div>
           <h1 className="font-playfair text-3xl sm:text-4xl font-extrabold">Welcome back, {user.fullName}! 👋</h1>
           <p className="text-xs text-purple-200 pt-1">
-            📱 Phone: {user.phone} • ✉️ Email: {user.email}
+            📱 Phone: {user.phone || 'Not set'} • ✉️ Email: {user.email}
           </p>
         </div>
 
@@ -157,6 +158,40 @@ export const CustomerOrdersDashboard: React.FC<CustomerOrdersDashboardProps> = (
           </button>
         </div>
       </div>
+
+      {/* Mobile Number Update Banner for Google Auth Users */}
+      {(!user.phone || user.phone === '9876543210' || user.phone === '') && (
+        <div className="p-4 bg-amber-50 border border-amber-300 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-xs shadow-xs">
+          <div className="space-y-0.5">
+            <span className="font-extrabold text-amber-900 flex items-center gap-1.5 text-sm">
+              📱 Complete Your Customer Profile
+            </span>
+            <p className="text-amber-800 font-medium">Please enter your 10-digit mobile number to receive live WhatsApp order tracking and delivery status updates.</p>
+          </div>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <input
+              type="tel"
+              placeholder="Enter 10-digit mobile..."
+              value={quickPhoneInput}
+              onChange={(e) => setQuickPhoneInput(e.target.value)}
+              className="px-3 py-2 bg-white border border-amber-300 rounded-xl font-bold text-gray-900 focus:outline-none flex-1 sm:w-48"
+            />
+            <button
+              onClick={() => {
+                if (!quickPhoneInput || quickPhoneInput.trim().length < 10) {
+                  alert('Please enter a valid 10-digit mobile number!');
+                  return;
+                }
+                updateProfile({ phone: quickPhoneInput.trim() });
+                alert('Mobile number updated successfully!');
+              }}
+              className="px-4 py-2 bg-[#160E4B] hover:bg-[#251877] text-white font-extrabold rounded-xl shrink-0 cursor-pointer"
+            >
+              Update Phone
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Multi-Tab Navigation Bar */}
       <div className="flex items-center gap-2 border-b border-gray-200 pb-1 overflow-x-auto text-xs sm:text-sm font-extrabold">
