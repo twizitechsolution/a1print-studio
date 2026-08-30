@@ -93,6 +93,8 @@ export const ProductPage: React.FC<ProductPageProps> = ({
       'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80',
     photoSlots: product.photoSlots || [],
     textZones: product.textZones || [],
+    images: (product as any).angleImages || product.images || [],
+    product: product,
     createdAt: new Date().toISOString(),
   };
 
