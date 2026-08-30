@@ -505,22 +505,6 @@ export const AdminOrderList: React.FC<AdminOrderListProps> = ({
                       <option value="Cancelled" className="bg-[#121829] text-rose-400">Status: Cancelled</option>
                     </select>
 
-                    {/* Color-Coded Payment Status Selector */}
-                    <select
-                      value={order.paymentStatus || 'Paid'}
-                      onChange={(e) =>
-                        onUpdatePaymentStatus &&
-                        onUpdatePaymentStatus(order.id, e.target.value as Order['paymentStatus'], currentAdminUser?.name)
-                      }
-                      className={`px-3 py-1 rounded-full text-xs font-bold border cursor-pointer ${
-                        paymentColors[order.paymentStatus || 'Paid'] || paymentColors.Paid
-                      }`}
-                    >
-                      <option value="Paid" className="bg-[#121829] text-emerald-400">🟢 Payment: Paid</option>
-                      <option value="COD" className="bg-[#121829] text-amber-400">🟠 Payment: COD</option>
-                      <option value="Pending" className="bg-[#121829] text-rose-400">🔴 Payment: Pending</option>
-                      <option value="Refund" className="bg-[#121829] text-purple-400">↩️ Payment: Refunded</option>
-                    </select>
 
                     {/* Employee Profile Processing Badge */}
                     {order.processedBy && (

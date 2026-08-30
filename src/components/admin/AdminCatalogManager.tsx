@@ -260,7 +260,7 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
                           }`}
                           title="Copy shareable link for Instagram & Facebook Ads"
                         >
-                          {copiedAdLinkId === product.id ? 'Ad Link Copied ✓' : 'Copy Ad Link 🔗'}
+                          {copiedAdLinkId === product.id ? 'Copied ✓' : 'Copy 🔗'}
                         </button>
 
                         <button
