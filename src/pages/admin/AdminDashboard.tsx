@@ -44,6 +44,7 @@ import {
   Shield,
   ExternalLink,
   User as UserIcon,
+  Sparkles,
 } from 'lucide-react';
 
 interface AdminDashboardProps {
