@@ -351,6 +351,13 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
     }
   };
 
+  // Detect if customer has started customization (entered text or uploaded photo)
+  const hasStartedCustomization = useMemo(() => {
+    const hasTextValues = Object.values(textValues).some((v) => v && v.trim().length > 0);
+    const hasPhotoValues = Object.values(photoValues).some((v) => v && v.length > 0);
+    return hasTextValues || hasPhotoValues;
+  }, [textValues, photoValues]);
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start font-jost select-none">
       

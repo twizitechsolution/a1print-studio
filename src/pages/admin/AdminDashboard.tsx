@@ -20,7 +20,7 @@ import { AdminAdvancedReports } from '../../components/admin/AdminAdvancedReport
 import { AdminNotificationDesk } from '../../components/admin/AdminNotificationDesk';
 import { AdminCMSManager } from '../../components/admin/AdminCMSManager';
 import { AdminUserRoleManager } from '../../components/admin/AdminUserRoleManager';
-import { AdminThemeProvider } from '../../context/AdminThemeContext';
+import { AdminThemeProvider, useAdminTheme } from '../../context/AdminThemeContext';
 import { AdminThemeSwitch } from '../../components/admin/AdminThemeSwitch';
 import { AdminSupportDesk } from '../../components/admin/AdminSupportDesk';
 
