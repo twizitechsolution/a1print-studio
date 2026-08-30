@@ -56,8 +56,20 @@ export const App: React.FC = () => {
       }
     };
     window.addEventListener('popstate', handlePopState);
+
+    // Direct Product Share Link URL Handler (For Instagram & Facebook Ads)
+    const params = new URLSearchParams(window.location.search);
+    const prodIdParam = params.get('product');
+    if (prodIdParam && products && products.length > 0) {
+      const found = products.find((p) => p.id === prodIdParam || p.slug === prodIdParam);
+      if (found) {
+        setSelectedProduct(found);
+        setCurrentPage('product');
+      }
+    }
+
     return () => window.removeEventListener('popstate', handlePopState);
-  }, []);
+  }, [products]);
 
   const handleNavigate = (page: string, param?: string) => {
     if (page === 'admin') {
@@ -147,11 +159,11 @@ export const App: React.FC = () => {
       };
 
       addToCart(cartItemData);
-      setCurrentPage('checkout');
+      setCurrentPage('cart');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
       console.error('Proceed to checkout fallback error:', err);
-      setCurrentPage('checkout');
+      setCurrentPage('cart');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };

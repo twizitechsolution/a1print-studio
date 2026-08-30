@@ -175,7 +175,27 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
 }) => {
   const [photoValues, setPhotoValues] = useState<Record<string, string>>({});
   const [textValues, setTextValues] = useState<Record<string, string>>({});
+  const [fontValues, setFontValues] = useState<Record<string, string>>({});
+  const [validationError, setValidationError] = useState<string | null>(null);
   const [selectedSize, setSelectedSize] = useState<string>('A4 (8x12 in)');
+
+  const FONT_OPTIONS = [
+    'Playfair Display',
+    'Poppins',
+    'Dancing Script',
+    'Cinzel',
+    'Bebas Neue',
+    'Great Vibes',
+    'Pacifico',
+    'Lobster',
+    'Caveat',
+    'Montserrat',
+    'Raleway',
+    'Lora',
+    'Cormorant Garamond',
+    'Baloo 2',
+    'Jost',
+  ];
   const [activeSlotForCrop, setActiveSlotForCrop] = useState<any | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
@@ -296,8 +316,23 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
     setActiveSlotId(null);
   };
 
-  // Proceed with High-Res Export -> Checkout
+  // Proceed with High-Res Export -> Checkout (Strict Mandatory Field Validation!)
   const handleProceedWithExport = async () => {
+    // 1. Mandatory Text Fields Validation
+    const missingText = (template.textZones || []).filter((z) => !textValues[z.id] || textValues[z.id].trim() === '');
+    if (missingText.length > 0) {
+      setValidationError(`⚠️ All customization fields are required! Please complete: ${missingText.map(t => t.label).join(', ')}`);
+      return;
+    }
+
+    // 2. Mandatory Photo Slots Validation
+    const missingPhotos = (template.photoSlots || []).filter((s) => !photoValues[s.id]);
+    if (missingPhotos.length > 0) {
+      setValidationError(`⚠️ All photo slots are required! Please upload photos for: ${missingPhotos.map(p => p.label).join(', ')}`);
+      return;
+    }
+
+    setValidationError(null);
     setIsExportingCanvas(true);
     try {
       let compiled = compiledPreviewUrl;
@@ -573,12 +608,20 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                   <ImageIcon className="w-4 h-4 text-[#F82BA9]" /> Photo Uploads
                 </h4>
                 
-                <div className="grid grid-cols-1 gap-3">
+                {/* Validation Error Alert Banner */}
+                {validationError && (
+                  <div className="p-3.5 bg-rose-50 border border-rose-300 rounded-2xl text-rose-800 text-xs font-bold flex items-center justify-between shadow-xs">
+                    <span>{validationError}</span>
+                    <button onClick={() => setValidationError(null)} className="text-rose-600 hover:text-rose-900 font-extrabold text-sm ml-2 cursor-pointer">✕</button>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {photoSlots.map((slot) => (
                     <div key={slot.id} className="p-3 bg-white rounded-xl border border-purple-100 flex items-center justify-between gap-3 shadow-2xs">
                       <div className="space-y-0.5">
                         <span className="text-xs font-bold text-gray-900 block">{slot.label}</span>
-                        <span className="text-[10px] text-gray-400">Cutout shape: {slot.shape}</span>
+                        <span className="text-[10px] text-gray-400">Shape: {slot.shape}</span>
                       </div>
 
                       <div className="flex items-center gap-2">
@@ -591,9 +634,9 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                         <button
                           type="button"
                           onClick={() => handleOpenCropModal(slot.id)}
-                          className="px-3.5 py-2 bg-[#F82BA9] hover:bg-[#D61B90] text-white text-xs font-extrabold rounded-xl shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer shrink-0"
+                          className="px-2.5 py-1.5 bg-[#F82BA9] hover:bg-[#D61B90] text-white text-[11px] font-extrabold rounded-xl shadow-xs transition-colors flex items-center gap-1 cursor-pointer shrink-0"
                         >
-                          <ImageIcon className="w-3.5 h-3.5" /> {photoValues[slot.id] ? 'Change Photo' : 'Upload / Change Photo'}
+                          <ImageIcon className="w-3 h-3" /> {photoValues[slot.id] ? 'Change' : 'Upload'}
                         </button>
                       </div>
                     </div>
@@ -658,24 +701,36 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                         <div key={zone.id} className="space-y-1.5 sm:col-span-2">
                           <div className="flex items-center justify-between">
                             <label className="text-xs font-bold text-gray-800">{zone.label} :</label>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const newMsg = getRandomBirthdayMessage(textValues[zone.id] || zone.defaultValue);
-                                setTextValues({ ...textValues, [zone.id]: newMsg });
-                                setGeneratedZones((prev) => ({ ...prev, [zone.id]: true }));
-                              }}
-                              className="text-[11px] font-extrabold text-[#F82BA9] hover:text-pink-700 bg-pink-50 hover:bg-pink-100 px-3 py-1 rounded-xl border border-pink-200 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                              title="Click to generate or regenerate custom message"
-                            >
-                              {hasBeenGenerated ? '🔄 Regenerate Message' : '✨ Generate Message'}
-                            </button>
+                            <div className="flex items-center gap-2">
+                              <select
+                                value={fontValues[zone.id] || zone.fontFamily || 'Poppins'}
+                                onChange={(e) => setFontValues({ ...fontValues, [zone.id]: e.target.value })}
+                                className="text-[10px] bg-white border border-gray-300 rounded-lg px-2 py-0.5 font-bold text-pink-600 focus:outline-none cursor-pointer"
+                              >
+                                {FONT_OPTIONS.map((f) => (
+                                  <option key={f} value={f}>{f}</option>
+                                ))}
+                              </select>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const newMsg = getRandomBirthdayMessage(textValues[zone.id] || zone.defaultValue);
+                                  setTextValues({ ...textValues, [zone.id]: newMsg });
+                                  setGeneratedZones((prev) => ({ ...prev, [zone.id]: true }));
+                                }}
+                                className="text-[11px] font-extrabold text-[#F82BA9] hover:text-pink-700 bg-pink-50 hover:bg-pink-100 px-3 py-1 rounded-xl border border-pink-200 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                                title="Click to generate or regenerate custom message"
+                              >
+                                {hasBeenGenerated ? '🔄 Regenerate' : '✨ Generate'}
+                              </button>
+                            </div>
                           </div>
                           <textarea
                             rows={2}
                             value={textValues[zone.id] || ''}
                             onChange={(e) => setTextValues({ ...textValues, [zone.id]: e.target.value })}
                             className="w-full px-3 py-2 text-xs bg-white border border-gray-300 rounded-xl focus:outline-hidden focus:border-[#F82BA9] font-medium"
+                            style={{ fontFamily: fontValues[zone.id] || zone.fontFamily || 'Poppins' }}
                             placeholder="Type custom message or click Generate Message button..."
                           />
                         </div>
@@ -684,12 +739,24 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
 
                     return (
                       <div key={zone.id} className="space-y-1 sm:col-span-1">
-                        <label className="text-xs font-bold text-gray-800 block">{zone.label} :</label>
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-bold text-gray-800 block">{zone.label} :</label>
+                          <select
+                            value={fontValues[zone.id] || zone.fontFamily || 'Poppins'}
+                            onChange={(e) => setFontValues({ ...fontValues, [zone.id]: e.target.value })}
+                            className="text-[10px] bg-white border border-gray-300 rounded-lg px-1.5 py-0.5 font-bold text-pink-600 focus:outline-none cursor-pointer"
+                          >
+                            {FONT_OPTIONS.map((f) => (
+                              <option key={f} value={f}>{f}</option>
+                            ))}
+                          </select>
+                        </div>
                         <input
                           type="text"
                           value={textValues[zone.id] || ''}
                           onChange={(e) => setTextValues({ ...textValues, [zone.id]: e.target.value })}
                           className="w-full px-3 py-2 text-xs bg-white border border-gray-300 rounded-xl focus:outline-hidden focus:border-[#F82BA9] font-medium"
+                          style={{ fontFamily: fontValues[zone.id] || zone.fontFamily || 'Poppins' }}
                           placeholder={`Enter ${zone.label}...`}
                         />
                       </div>

@@ -4,6 +4,9 @@ import { useAuthStore } from '../store/useAuthStore';
 import { LiveCustomizedFrameThumbnail } from '../components/customizer/LiveCustomizedFrameThumbnail';
 import { Package, Truck, CheckCircle2, ShoppingBag, ArrowRight, Clock, MapPin, CreditCard, User, LogOut, Plus, Trash2, ShieldCheck, Download, MessageCircle, FileText, Settings } from 'lucide-react';
 
+import { useCartStore } from '../store/useCartStore';
+import { MessageSquare } from 'lucide-react';
+
 interface CustomerOrdersDashboardProps {
   orders: Order[];
   onNavigate: (page: string) => void;
@@ -14,7 +17,16 @@ export const CustomerOrdersDashboard: React.FC<CustomerOrdersDashboardProps> = (
   onNavigate,
 }) => {
   const { user, isAuthenticated, logoutUser, openAuthModal, addSavedAddress, deleteSavedAddress, setDefaultAddress, updateProfile } = useAuthStore();
-  const [activeTab, setActiveTab] = useState<'orders' | 'addresses' | 'payments' | 'profile'>('orders');
+  const { supportTickets, createSupportTicket } = useCartStore();
+  const [activeTab, setActiveTab] = useState<'orders' | 'addresses' | 'payments' | 'profile' | 'support'>('orders');
+
+  // Support Ticket Modal state
+  const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
+  const [ticketOrderId, setTicketOrderId] = useState('');
+  const [ticketIssueType, setTicketIssueType] = useState<'Frame Damaged in Transit' | 'Wrong Photo Printed' | 'Print Quality Issue' | 'Delivery Delayed' | 'Payment / Refund Query' | 'Other Issue'>('Frame Damaged in Transit');
+  const [ticketDescription, setTicketDescription] = useState('');
+  const [ticketImages, setTicketImages] = useState<string[]>([]);
+  const [ticketSuccessMsg, setTicketSuccessMsg] = useState('');
 
   // Address Form state
   const [showAddressForm, setShowAddressForm] = useState(false);
@@ -179,6 +191,17 @@ export const CustomerOrdersDashboard: React.FC<CustomerOrdersDashboardProps> = (
           }`}
         >
           <CreditCard className="w-4 h-4" /> Payment History
+        </button>
+
+        <button
+          onClick={() => setActiveTab('support')}
+          className={`px-5 py-3 rounded-t-2xl transition-all flex items-center gap-2 cursor-pointer ${
+            activeTab === 'support'
+              ? 'bg-white border-t-2 border-[#F82BA9] text-[#F82BA9] shadow-2xs font-black'
+              : 'text-gray-500 hover:text-gray-900'
+          }`}
+        >
+          <MessageSquare className="w-4 h-4" /> Help & Support 🆘
         </button>
 
         <button
@@ -597,11 +620,148 @@ export const CustomerOrdersDashboard: React.FC<CustomerOrdersDashboardProps> = (
 
           <button
             type="submit"
-            className="w-full py-3.5 bg-[#160E4B] hover:bg-[#251877] text-white font-extrabold text-xs rounded-xl shadow-md cursor-pointer transition-colors"
+            className="w-full py-3.5 bg-[#F82BA9] hover:bg-[#D61B90] text-white font-extrabold text-xs rounded-xl shadow-lg transition-all cursor-pointer"
           >
             Save Profile Changes
           </button>
         </form>
+      )}
+
+      {/* TAB: HELP & SUPPORT TICKETING SYSTEM */}
+      {activeTab === 'support' && (
+        <div className="bg-white p-6 sm:p-8 rounded-3xl border border-gray-200 shadow-xs space-y-6 font-jost text-xs">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-gray-100 pb-4">
+            <div>
+              <h3 className="font-playfair text-xl font-bold text-[#160E4B]">Help & Support Desk 🎧</h3>
+              <p className="text-gray-500 text-xs">Report order issues, transit damage, or print queries directly to our customer care desk.</p>
+            </div>
+
+            <button
+              onClick={() => setIsTicketModalOpen(true)}
+              className="px-5 py-3 bg-[#F82BA9] hover:bg-[#D61B90] text-white font-extrabold rounded-xl shadow-md transition-colors flex items-center gap-1.5 cursor-pointer shrink-0"
+            >
+              <Plus className="w-4 h-4" /> Raise Support Ticket / Complaint
+            </button>
+          </div>
+
+          {ticketSuccessMsg && (
+            <div className="p-3 bg-emerald-50 text-emerald-700 rounded-xl font-bold border border-emerald-200">
+              {ticketSuccessMsg}
+            </div>
+          )}
+
+          {/* Ticket Creation Modal */}
+          {isTicketModalOpen && (
+            <div className="p-6 bg-purple-50/60 border border-purple-100 rounded-2xl space-y-4">
+              <div className="flex justify-between items-center">
+                <h4 className="font-bold text-sm text-[#160E4B]">Create New Complaint Ticket</h4>
+                <button onClick={() => setIsTicketModalOpen(false)} className="text-gray-400 hover:text-black font-bold text-sm">✕</button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="font-bold text-gray-800">Select Order :</label>
+                  <select
+                    value={ticketOrderId}
+                    onChange={(e) => setTicketOrderId(e.target.value)}
+                    className="w-full p-2.5 bg-white border border-gray-300 rounded-xl font-bold"
+                  >
+                    <option value="">Select an order...</option>
+                    {customerOrders.map((o) => (
+                      <option key={o.id} value={o.id}>{o.id} ({new Date(o.createdAt).toLocaleDateString()})</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-bold text-gray-800">Issue Type :</label>
+                  <select
+                    value={ticketIssueType}
+                    onChange={(e) => setTicketIssueType(e.target.value as any)}
+                    className="w-full p-2.5 bg-white border border-gray-300 rounded-xl font-bold"
+                  >
+                    <option value="Frame Damaged in Transit">Frame Damaged in Transit</option>
+                    <option value="Wrong Photo Printed">Wrong Photo Printed</option>
+                    <option value="Print Quality Issue">Print Quality Issue</option>
+                    <option value="Delivery Delayed">Delivery Delayed</option>
+                    <option value="Payment / Refund Query">Payment / Refund Query</option>
+                    <option value="Other Issue">Other Issue</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-bold text-gray-800">Describe Your Issue in Detail :</label>
+                <textarea
+                  rows={3}
+                  value={ticketDescription}
+                  onChange={(e) => setTicketDescription(e.target.value)}
+                  placeholder="Please describe what happened..."
+                  className="w-full p-3 bg-white border border-gray-300 rounded-xl font-medium"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (!ticketOrderId || !ticketDescription) {
+                    alert('Please select an order and provide a description!');
+                    return;
+                  }
+                  createSupportTicket({
+                    orderId: ticketOrderId,
+                    customerName: user.fullName,
+                    customerPhone: user.phone,
+                    customerEmail: user.email,
+                    issueType: ticketIssueType,
+                    description: ticketDescription,
+                    images: ['https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=400&q=80'],
+                  });
+                  setIsTicketModalOpen(false);
+                  setTicketDescription('');
+                  setTicketSuccessMsg('Ticket raised successfully! Admin will respond shortly.');
+                  setTimeout(() => setTicketSuccessMsg(''), 4000);
+                }}
+                className="px-6 py-3 bg-[#160E4B] hover:bg-[#251877] text-white font-extrabold rounded-xl shadow-md transition-all cursor-pointer"
+              >
+                Submit Ticket to Support Desk
+              </button>
+            </div>
+          )}
+
+          {/* List of Submitted Tickets */}
+          <div className="space-y-4">
+            <h4 className="font-bold text-xs uppercase tracking-wider text-gray-500">Your Support Tickets</h4>
+            {supportTickets.length === 0 ? (
+              <p className="text-gray-400">No support tickets submitted yet.</p>
+            ) : (
+              supportTickets.map((t) => (
+                <div key={t.id} className="p-4 bg-gray-50 rounded-2xl border border-gray-200 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="font-extrabold text-purple-700 font-mono">{t.ticketNumber}</span>
+                      <span className="text-gray-500 ml-2">For Order: <strong>{t.orderId}</strong></span>
+                    </div>
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-800 border border-amber-300">
+                      {t.status}
+                    </span>
+                  </div>
+
+                  <p className="text-gray-700 font-medium bg-white p-3 rounded-xl border border-gray-200">
+                    "{t.description}"
+                  </p>
+
+                  {t.adminReply && (
+                    <div className="p-3 bg-purple-50 rounded-xl border border-purple-200 space-y-1">
+                      <span className="font-extrabold text-purple-900 block">💬 Admin Reply:</span>
+                      <p className="text-purple-800 font-bold">{t.adminReply}</p>
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
       )}
 
     </div>

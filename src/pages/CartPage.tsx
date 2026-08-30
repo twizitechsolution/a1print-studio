@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { CartItem } from '../types';
 import { LiveCustomizedFrameThumbnail } from '../components/customizer/LiveCustomizedFrameThumbnail';
 import { Trash2, ArrowRight, ShoppingBag } from 'lucide-react';
@@ -18,6 +18,33 @@ export const CartPage: React.FC<CartPageProps> = ({
   onUpdateQuantity,
   onNavigate,
 }) => {
+  const [couponInput, setCouponInput] = useState('');
+  const [couponError, setCouponError] = useState<string | null>(null);
+  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discountPercent: number } | null>(null);
+
+  const handleApplyCoupon = () => {
+    if (!couponInput.trim()) {
+      setCouponError('Please enter a coupon code.');
+      return;
+    }
+
+    const code = couponInput.trim().toUpperCase();
+    if (code === 'SAVE10' || code === 'FIRST10' || code === 'WELCOME10') {
+      setAppliedCoupon({ code, discountPercent: 10 });
+      setCouponError(null);
+    } else if (code === 'FESTIVE20' || code === 'RAKHI20' || code === 'SPECIAL20') {
+      setAppliedCoupon({ code, discountPercent: 20 });
+      setCouponError(null);
+    } else if (code === 'A1PRINT5') {
+      setAppliedCoupon({ code, discountPercent: 5 });
+      setCouponError(null);
+    } else {
+      setCouponError('Invalid coupon code. Try "SAVE10" or "FESTIVE20"!');
+    }
+  };
+
+  const discountAmount = appliedCoupon ? Math.round((subtotal * appliedCoupon.discountPercent) / 100) : 0;
+  const finalTotal = Math.max(0, subtotal - discountAmount);
   if (items.length === 0) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-20 text-center font-jost space-y-6 select-none">
@@ -102,22 +129,60 @@ export const CartPage: React.FC<CartPageProps> = ({
           ))}
         </div>
 
-        {/* Right Column: Order Summary */}
+        {/* Right Column: Order Summary with Coupon Code Input */}
         <div className="lg:col-span-4 bg-white p-6 rounded-3xl border border-gray-200 shadow-xs space-y-6">
           <h3 className="font-bold text-base text-[#160E4B]">Order Summary</h3>
+
+          {/* Coupon Code Input & Apply Box */}
+          <div className="p-4 bg-pink-50/60 rounded-2xl border border-pink-100 space-y-2">
+            <label className="text-xs font-extrabold text-[#160E4B] flex items-center gap-1.5">
+              🏷️ Have a Coupon Code?
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                placeholder="Enter code (e.g. SAVE10)..."
+                value={couponInput}
+                onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                className="flex-1 px-3 py-2 text-xs bg-white border border-gray-300 rounded-xl focus:outline-none focus:border-[#F82BA9] font-mono font-bold uppercase"
+              />
+              <button
+                type="button"
+                onClick={handleApplyCoupon}
+                className="px-4 py-2 bg-[#F82BA9] hover:bg-[#D61B90] text-white text-xs font-extrabold rounded-xl transition-all cursor-pointer shrink-0 shadow-xs"
+              >
+                Apply
+              </button>
+            </div>
+            {couponError && <p className="text-[11px] text-rose-600 font-bold">{couponError}</p>}
+            {appliedCoupon && (
+              <div className="flex items-center justify-between text-xs font-bold text-emerald-700 bg-emerald-50 p-2 rounded-xl border border-emerald-200">
+                <span>✓ Code &apos;{appliedCoupon.code}&apos; Applied ({appliedCoupon.discountPercent}% OFF)</span>
+                <button onClick={() => setAppliedCoupon(null)} className="text-rose-500 hover:text-rose-700">✕</button>
+              </div>
+            )}
+          </div>
 
           <div className="space-y-3 text-xs text-gray-600">
             <div className="flex justify-between font-bold">
               <span>Cart Subtotal</span>
               <span className="text-gray-900 font-extrabold">₹{subtotal}</span>
             </div>
+
+            {discountAmount > 0 && (
+              <div className="flex justify-between font-bold text-emerald-600">
+                <span>Coupon Discount ({appliedCoupon?.code})</span>
+                <span>-₹{discountAmount}</span>
+              </div>
+            )}
+
             <div className="flex justify-between font-bold text-emerald-600">
               <span>Express Shipping</span>
               <span>FREE</span>
             </div>
             <div className="pt-3 border-t border-gray-200 flex justify-between font-extrabold text-base text-[#160E4B]">
               <span>Grand Total</span>
-              <span className="text-[#F82BA9]">₹{subtotal}</span>
+              <span className="text-[#F82BA9]">₹{finalTotal}</span>
             </div>
           </div>
 

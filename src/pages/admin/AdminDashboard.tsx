@@ -22,6 +22,7 @@ import { AdminCMSManager } from '../../components/admin/AdminCMSManager';
 import { AdminUserRoleManager } from '../../components/admin/AdminUserRoleManager';
 import { AdminThemeProvider } from '../../context/AdminThemeContext';
 import { AdminThemeSwitch } from '../../components/admin/AdminThemeSwitch';
+import { AdminSupportDesk } from '../../components/admin/AdminSupportDesk';
 
 import {
   LayoutDashboard,
@@ -60,6 +61,7 @@ export type AdminTab =
   | 'coupons'
   | 'shipping'
   | 'payments'
+  | 'support'
   | 'design_preview'
   | 'reports'
   | 'notifications'
@@ -178,6 +180,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
       items: [
         { id: 'orders' as AdminTab, label: 'Orders & Print Queue', icon: Package, badge: orders.length },
         { id: 'customers' as AdminTab, label: 'Customers Directory', icon: Users },
+        { id: 'support' as AdminTab, label: 'Help Desk & Support', icon: MessageSquare },
         { id: 'shipping' as AdminTab, label: 'Shipping Rules', icon: Truck },
         { id: 'payments' as AdminTab, label: 'Payments & COD', icon: CreditCard },
       ],
@@ -437,6 +440,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
               currentAdminUser={currentAdminUser}
             />
           )}
+
+          {/* Module: Help Desk & Customer Support Tickets */}
+          {activeTab === 'support' && <AdminSupportDesk />}
 
           {/* Module 5: Registered Customers Directory */}
           {activeTab === 'customers' && (

@@ -141,13 +141,6 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess }) => {
               />
             </div>
 
-            <div className="p-3 bg-zinc-950/80 rounded-lg text-[11px] text-zinc-400 border border-zinc-800/60 flex items-center justify-between">
-              <span className="flex items-center gap-1.5 font-medium">
-                <Sparkles className="w-3.5 h-3.5 text-zinc-300" /> Default Passcode:
-              </span>
-              <code className="text-zinc-200 font-mono font-bold bg-zinc-900 px-2 py-0.5 rounded border border-zinc-800">123456</code>
-            </div>
-
             <button
               type="submit"
               className="w-full py-2.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-950 font-semibold text-xs rounded-lg transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-sm"

@@ -64,6 +64,7 @@ export interface Product {
   isDeleted?: boolean;
   deletedAt?: string;
   stockLogs?: StockLogItem[];
+  allowedPaymentModes?: ('Prepaid' | 'COD' | 'GoQuick50')[];
 }
 
 export interface CartItem {
@@ -74,6 +75,7 @@ export interface CartItem {
   uploadedPhotoUrl: string;
   customizedFramePreviewUrl?: string; // Full composite customized frame artwork URL
   customTextValues: Record<string, string>;
+  selectedFontFamily?: string;
   quantity: number;
   photoScale?: number;
   photoPosition?: { x: number; y: number };
@@ -98,6 +100,23 @@ export interface ProcessingHistoryItem {
   action: string;
   timestamp: string;
   notes?: string;
+}
+
+export interface SupportTicket {
+  id: string;
+  ticketNumber: string;
+  orderId: string;
+  customerName: string;
+  customerPhone: string;
+  customerEmail: string;
+  issueType: 'Frame Damaged in Transit' | 'Wrong Photo Printed' | 'Print Quality Issue' | 'Delivery Delayed' | 'Payment / Refund Query' | 'Other Issue';
+  description: string;
+  images: string[];
+  status: 'Pending' | 'In Review' | 'Resolved' | 'Closed';
+  createdAt: string;
+  adminReply?: string;
+  adminReplyTimestamp?: string;
+  repliedBy?: string;
 }
 
 export interface Order {

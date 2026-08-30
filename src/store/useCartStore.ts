@@ -744,6 +744,69 @@ export function useCartStore() {
     notifyListeners();
   };
 
+  // Support Tickets State & Management Engine
+  const [supportTickets, setSupportTickets] = useState<SupportTicket[]>(() => {
+    try {
+      const raw = localStorage.getItem('a1print_support_tickets_v1');
+      if (raw) return JSON.parse(raw);
+    } catch (e) {}
+    return [
+      {
+        id: 'tkt-1',
+        ticketNumber: 'TKT-948201',
+        orderId: 'ORD-849201',
+        customerName: 'Neha Saxena',
+        customerPhone: '9876543210',
+        customerEmail: 'neha.saxena@example.com',
+        issueType: 'Frame Damaged in Transit',
+        description: 'The outer corner of the acrylic glass frame has a small hairline crack received during delivery.',
+        images: ['https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=400&q=80'],
+        status: 'In Review',
+        createdAt: new Date().toISOString(),
+        adminReply: 'Free replacement frame has been approved by Quality Desk. New AWB dispatch update will be sent shortly!',
+        adminReplyTimestamp: new Date().toISOString(),
+      },
+    ];
+  });
+
+  const createSupportTicket = (data: Omit<SupportTicket, 'id' | 'ticketNumber' | 'createdAt' | 'status'>) => {
+    const newTkt: SupportTicket = {
+      ...data,
+      id: `tkt-${Date.now()}`,
+      ticketNumber: `TKT-${Math.floor(100000 + Math.random() * 900000)}`,
+      status: 'Pending',
+      createdAt: new Date().toISOString(),
+    };
+    const updated = [newTkt, ...supportTickets];
+    setSupportTickets(updated);
+    try {
+      localStorage.setItem('a1print_support_tickets_v1', JSON.stringify(updated));
+    } catch (e) {}
+    firebaseCloudDb.setDocument('support_tickets', newTkt.id, newTkt);
+    return newTkt;
+  };
+
+  const updateSupportTicketStatus = (ticketId: string, status: SupportTicket['status'], adminReply?: string) => {
+    const now = new Date().toISOString();
+    const updated = supportTickets.map((t) => {
+      if (t.id === ticketId) {
+        const item: SupportTicket = {
+          ...t,
+          status,
+          adminReply: adminReply !== undefined ? adminReply : t.adminReply,
+          adminReplyTimestamp: adminReply !== undefined ? now : t.adminReplyTimestamp,
+        };
+        firebaseCloudDb.setDocument('support_tickets', item.id, item);
+        return item;
+      }
+      return t;
+    });
+    setSupportTickets(updated);
+    try {
+      localStorage.setItem('a1print_support_tickets_v1', JSON.stringify(updated));
+    } catch (e) {}
+  };
+
   const subtotal = store.items.reduce((sum, item) => sum + item.itemTotalPrice, 0);
   const totalItems = store.items.reduce((sum, item) => sum + item.quantity, 0);
 
@@ -752,6 +815,9 @@ export function useCartStore() {
     items: store.items,
     orders: store.orders,
     categories: store.categories || DEFAULT_CATEGORIES,
+    supportTickets,
+    createSupportTicket,
+    updateSupportTicketStatus,
     addCategory,
     deleteCategory,
     addProduct,

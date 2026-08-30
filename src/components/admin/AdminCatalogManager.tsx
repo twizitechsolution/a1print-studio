@@ -37,6 +37,7 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
   const [isRecycleBinOpen, setIsRecycleBinOpen] = useState(false);
   const [selectedStockProduct, setSelectedStockProduct] = useState<Product | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [copiedAdLinkId, setCopiedAdLinkId] = useState<string | null>(null);
 
   // Defensive array guards to eliminate any runtime TypeError
   const safeProducts = Array.isArray(products) ? products.filter(Boolean) : [];
@@ -246,8 +247,25 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
                     <td className="p-4 text-right">
                       <div className="flex items-center justify-end gap-2">
                         <button
+                          onClick={() => {
+                            const url = `${window.location.origin}/?product=${product.id}`;
+                            navigator.clipboard.writeText(url);
+                            setCopiedAdLinkId(product.id);
+                            setTimeout(() => setCopiedAdLinkId(null), 3000);
+                          }}
+                          className={`px-3 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 shadow-xs ${
+                            copiedAdLinkId === product.id
+                              ? 'bg-emerald-600 text-white'
+                              : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                          }`}
+                          title="Copy shareable link for Instagram & Facebook Ads"
+                        >
+                          {copiedAdLinkId === product.id ? 'Ad Link Copied ✓' : 'Copy Ad Link 🔗'}
+                        </button>
+
+                        <button
                           onClick={() => handleVisualWorkspaceClick(product)}
-                          className="px-3.5 py-2 bg-[#9333EA] hover:bg-purple-700 text-white font-extrabold text-xs rounded-xl shadow-md transition-colors flex items-center gap-1.5 cursor-pointer"
+                          className="px-3.5 py-2 bg-[#9333EA] hover:bg-purple-700 text-white font-extrabold text-xs rounded-xl shadow-md transition-colors flex items-center gap-1.5 cursor-pointer shrink-0"
                         >
                           <Sliders className="w-3.5 h-3.5" /> Visual Workspace
                         </button>

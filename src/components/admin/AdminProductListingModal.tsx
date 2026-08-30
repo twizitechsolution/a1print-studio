@@ -31,6 +31,7 @@ export const AdminProductListingModal: React.FC<AdminProductListingModalProps> =
 
   const [detectedPhotoSlots, setDetectedPhotoSlots] = useState<PhotoSlotConfig[]>([]);
   const [detectedTextZones, setDetectedTextZones] = useState<TextZoneConfig[]>([]);
+  const [allowedPaymentModes, setAllowedPaymentModes] = useState<('Prepaid' | 'COD' | 'GoQuick50')[]>(['Prepaid', 'COD', 'GoQuick50']);
 
   useEffect(() => {
     if (editingProduct) {
@@ -43,6 +44,7 @@ export const AdminProductListingModal: React.FC<AdminProductListingModalProps> =
       setAngleImages(editingProduct.images && editingProduct.images.length > 0 ? editingProduct.images : (editingProduct.thumbnail ? [editingProduct.thumbnail] : []));
       setDetectedPhotoSlots(editingProduct.photoSlots || []);
       setDetectedTextZones(editingProduct.textZones || []);
+      setAllowedPaymentModes(editingProduct.allowedPaymentModes || ['Prepaid', 'COD', 'GoQuick50']);
     } else {
       setTitle('');
       setCategory(categories[0]?.slug || 'baby-kids');
@@ -53,6 +55,7 @@ export const AdminProductListingModal: React.FC<AdminProductListingModalProps> =
       setAngleImages([]);
       setDetectedPhotoSlots([]);
       setDetectedTextZones([]);
+      setAllowedPaymentModes(['Prepaid', 'COD', 'GoQuick50']);
     }
   }, [editingProduct, isOpen, categories]);
 
@@ -189,6 +192,7 @@ export const AdminProductListingModal: React.FC<AdminProductListingModalProps> =
       ],
       photoSlots: detectedPhotoSlots,
       textZones: detectedTextZones,
+      allowedPaymentModes,
     };
 
     onSaveProduct(newProd);
