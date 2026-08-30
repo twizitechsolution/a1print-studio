@@ -283,6 +283,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
           <div className="hidden md:flex items-center gap-2 px-2.5 py-1 rounded-full dark:bg-emerald-950/30 bg-emerald-50 border dark:border-emerald-800/40 border-emerald-200 dark:text-emerald-400 text-emerald-700 text-[11px] font-medium">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
             <span>Cloud Sync: Live</span>
+            <span className="text-[10px] font-bold px-1.5 py-0.5 bg-emerald-600 text-white rounded-full">v2.5.0 (2-Col Remark Active)</span>
           </div>
 
           <a
