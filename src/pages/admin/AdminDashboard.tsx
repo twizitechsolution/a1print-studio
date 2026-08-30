@@ -42,6 +42,8 @@ import {
   Palette,
   FileText,
   Shield,
+  ShieldCheck,
+  Database,
   ExternalLink,
   User as UserIcon,
   Sparkles,
