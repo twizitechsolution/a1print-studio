@@ -68,7 +68,8 @@ export type AdminTab =
   | 'settings'
   | 'users';
 
-export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialOrders }) => {
+const AdminDashboardInner: React.FC<AdminDashboardProps> = ({ orders: initialOrders }) => {
+  const { resolvedTheme } = useAdminTheme();
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     return localStorage.getItem(ADMIN_AUTH_KEY) === 'true';
   });
@@ -188,15 +189,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
       group: 'Marketing & Comms',
       items: [
         { id: 'coupons' as AdminTab, label: 'Coupons & Discounts', icon: Tag },
-        { id: 'notifications' as AdminTab, label: 'WhatsApp Desk', icon: MessageSquare },
-        { id: 'cms' as AdminTab, label: 'Store CMS Banners', icon: Gift },
+        { id: 'notifications' as AdminTab, label: 'WhatsApp Desk', icon: Bell },
+        { id: 'cms' as AdminTab, label: 'Store CMS Banners', icon: Sparkles },
       ],
     },
     {
       group: 'Settings & Security',
       items: [
-        { id: 'users' as AdminTab, label: 'User & Access Control', icon: Shield },
-        { id: 'settings' as AdminTab, label: 'Store Configuration', icon: Settings },
+        { id: 'settings' as AdminTab, label: 'Store Configuration', icon: Database },
+        { id: 'users' as AdminTab, label: 'Admin Users & Access', icon: ShieldCheck },
       ],
     },
   ];
@@ -251,8 +252,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
   const customerList = mergedCustomerDirectory();
 
   return (
-    <AdminThemeProvider>
-      <div className="min-h-screen dark:bg-zinc-950 bg-slate-50 dark:text-zinc-100 text-slate-900 font-sans flex flex-col select-none transition-colors">
+    <div className={`min-h-screen ${resolvedTheme === 'dark' ? 'bg-[#0B0F19] text-zinc-100 dark' : 'bg-slate-50 text-slate-900 light'} font-sans flex flex-col select-none transition-colors`}>
         
         {/* Top Admin Navigation Header (shadcn-admin style) */}
         <header className="sticky top-0 z-30 dark:bg-zinc-950/80 bg-white/80 border-b dark:border-zinc-800/80 border-slate-200 px-4 sm:px-6 py-3 flex items-center justify-between backdrop-blur-md">
@@ -521,6 +521,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
         </main>
       </div>
     </div>
-  </AdminThemeProvider>
+  );
+};
+
+export const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
+  return (
+    <AdminThemeProvider>
+      <AdminDashboardInner {...props} />
+    </AdminThemeProvider>
   );
 };

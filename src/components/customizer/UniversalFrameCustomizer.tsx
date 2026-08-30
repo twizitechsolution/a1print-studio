@@ -469,7 +469,7 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
         </div>
 
         {/* Dedicated Standalone Multi-Angle Photo Selection Carousel (Matching giftingstudio.in OUTSIDE showcase box) */}
-        {availableAngleImages.length > 1 && (
+        {!hasStartedCustomization && availableAngleImages.length > 1 && (
           <div className="w-full bg-white p-4 rounded-3xl border border-gray-200 shadow-xs text-center space-y-2">
             <span className="text-xs font-extrabold text-gray-800 block">Select Frame Angle View:</span>
             <div className="flex items-center justify-center gap-3 overflow-x-auto py-1 px-2">

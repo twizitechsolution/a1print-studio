@@ -32,15 +32,26 @@ export const AdminThemeProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   useEffect(() => {
     const root = document.documentElement;
+    const body = document.body;
     root.classList.remove('light', 'dark');
-    root.classList.add(resolvedTheme);
+    body.classList.remove('light', 'dark');
+
+    if (resolvedTheme === 'dark') {
+      root.classList.add('dark');
+      body.classList.add('dark');
+    } else {
+      root.classList.add('light');
+      body.classList.add('light');
+    }
 
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const handleChange = () => {
       if (theme === 'system') {
         const sysTheme = mediaQuery.matches ? 'dark' : 'light';
         root.classList.remove('light', 'dark');
+        body.classList.remove('light', 'dark');
         root.classList.add(sysTheme);
+        body.classList.add(sysTheme);
       }
     };
 
