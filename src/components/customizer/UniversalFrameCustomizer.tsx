@@ -465,15 +465,6 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
               );
             })}
 
-            {/* Anti-Piracy Protection Watermark Overlay */}
-            {watermarkSettings.enabled && (
-              <div className="absolute inset-0 pointer-events-none flex items-center justify-center overflow-hidden z-20">
-                <div className="text-pink-500/35 font-extrabold text-xl sm:text-2xl uppercase tracking-widest -rotate-45 select-none text-center px-4 py-2 border-2 border-pink-500/35 rounded-xl backdrop-blur-[0.5px]">
-                  {watermarkSettings.text || 'A1PRINT STUDIO SAMPLE'}
-                </div>
-              </div>
-            )}
-
           </div>
         </div>
 
@@ -701,36 +692,24 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                         <div key={zone.id} className="space-y-1.5 sm:col-span-2">
                           <div className="flex items-center justify-between">
                             <label className="text-xs font-bold text-gray-800">{zone.label} :</label>
-                            <div className="flex items-center gap-2">
-                              <select
-                                value={fontValues[zone.id] || zone.fontFamily || 'Poppins'}
-                                onChange={(e) => setFontValues({ ...fontValues, [zone.id]: e.target.value })}
-                                className="text-[10px] bg-white border border-gray-300 rounded-lg px-2 py-0.5 font-bold text-pink-600 focus:outline-none cursor-pointer"
-                              >
-                                {FONT_OPTIONS.map((f) => (
-                                  <option key={f} value={f}>{f}</option>
-                                ))}
-                              </select>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const newMsg = getRandomBirthdayMessage(textValues[zone.id] || zone.defaultValue);
-                                  setTextValues({ ...textValues, [zone.id]: newMsg });
-                                  setGeneratedZones((prev) => ({ ...prev, [zone.id]: true }));
-                                }}
-                                className="text-[11px] font-extrabold text-[#F82BA9] hover:text-pink-700 bg-pink-50 hover:bg-pink-100 px-3 py-1 rounded-xl border border-pink-200 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                                title="Click to generate or regenerate custom message"
-                              >
-                                {hasBeenGenerated ? '🔄 Regenerate' : '✨ Generate'}
-                              </button>
-                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newMsg = getRandomBirthdayMessage(textValues[zone.id] || zone.defaultValue);
+                                setTextValues({ ...textValues, [zone.id]: newMsg });
+                                setGeneratedZones((prev) => ({ ...prev, [zone.id]: true }));
+                              }}
+                              className="text-[11px] font-extrabold text-[#F82BA9] hover:text-pink-700 bg-pink-50 hover:bg-pink-100 px-3 py-1 rounded-xl border border-pink-200 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                              title="Click to generate or regenerate custom message"
+                            >
+                              {hasBeenGenerated ? '🔄 Regenerate' : '✨ Generate'}
+                            </button>
                           </div>
                           <textarea
                             rows={2}
                             value={textValues[zone.id] || ''}
                             onChange={(e) => setTextValues({ ...textValues, [zone.id]: e.target.value })}
                             className="w-full px-3 py-2 text-xs bg-white border border-gray-300 rounded-xl focus:outline-hidden focus:border-[#F82BA9] font-medium"
-                            style={{ fontFamily: fontValues[zone.id] || zone.fontFamily || 'Poppins' }}
                             placeholder="Type custom message or click Generate Message button..."
                           />
                         </div>
@@ -739,24 +718,12 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
 
                     return (
                       <div key={zone.id} className="space-y-1 sm:col-span-1">
-                        <div className="flex items-center justify-between">
-                          <label className="text-xs font-bold text-gray-800 block">{zone.label} :</label>
-                          <select
-                            value={fontValues[zone.id] || zone.fontFamily || 'Poppins'}
-                            onChange={(e) => setFontValues({ ...fontValues, [zone.id]: e.target.value })}
-                            className="text-[10px] bg-white border border-gray-300 rounded-lg px-1.5 py-0.5 font-bold text-pink-600 focus:outline-none cursor-pointer"
-                          >
-                            {FONT_OPTIONS.map((f) => (
-                              <option key={f} value={f}>{f}</option>
-                            ))}
-                          </select>
-                        </div>
+                        <label className="text-xs font-bold text-gray-800 block">{zone.label} :</label>
                         <input
                           type="text"
                           value={textValues[zone.id] || ''}
                           onChange={(e) => setTextValues({ ...textValues, [zone.id]: e.target.value })}
                           className="w-full px-3 py-2 text-xs bg-white border border-gray-300 rounded-xl focus:outline-hidden focus:border-[#F82BA9] font-medium"
-                          style={{ fontFamily: fontValues[zone.id] || zone.fontFamily || 'Poppins' }}
                           placeholder={`Enter ${zone.label}...`}
                         />
                       </div>

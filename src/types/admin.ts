@@ -8,6 +8,8 @@ export interface Coupon {
   minOrderValue: number;
   maxDiscountAmount?: number;
   usageLimit: number;
+  usageLimitPerUser?: 1 | 2 | 3 | 4 | 5 | 'Unlimited';
+  usedPerUser?: Record<string, number>;
   timesUsed: number;
   validFrom: string;
   validUntil: string;

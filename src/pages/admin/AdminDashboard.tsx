@@ -62,7 +62,6 @@ export type AdminTab =
   | 'shipping'
   | 'payments'
   | 'support'
-  | 'design_preview'
   | 'reports'
   | 'notifications'
   | 'cms'
@@ -173,7 +172,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ orders: initialO
       items: [
         { id: 'catalog' as AdminTab, label: 'Frame Catalog', icon: Layers },
         { id: 'custom_fields' as AdminTab, label: 'Customization Fields', icon: Settings },
-        { id: 'design_preview' as AdminTab, label: 'Live Preview Settings', icon: Palette },
       ],
     },
     {

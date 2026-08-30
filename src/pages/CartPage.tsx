@@ -29,13 +29,29 @@ export const CartPage: React.FC<CartPageProps> = ({
     }
 
     const code = couponInput.trim().toUpperCase();
+
+    // Validate per-customer usage limit (1-5 times or Unlimited)
+    const storedUserRaw = localStorage.getItem('a1print_customer_user');
+    const userEmail = storedUserRaw ? (JSON.parse(storedUserRaw).email || 'customer') : 'guest';
+    const redemptionsRaw = localStorage.getItem('a1print_coupon_redemptions_v1');
+    const redemptionsMap = redemptionsRaw ? JSON.parse(redemptionsRaw) : {};
+    const userUsedCount = redemptionsMap[userEmail]?.[code] || 0;
+
+    // Default 1-time limit per customer for standard codes
+    const perUserLimit = (code === 'UNLIMITED20' || code === 'REPEAT5') ? 5 : 1;
+
+    if (userUsedCount >= perUserLimit) {
+      setCouponError(`⚠️ You have already reached your maximum allowed usage limit (${perUserLimit} time) for promo code '${code}'!`);
+      return;
+    }
+
     if (code === 'SAVE10' || code === 'FIRST10' || code === 'WELCOME10') {
       setAppliedCoupon({ code, discountPercent: 10 });
       setCouponError(null);
-    } else if (code === 'FESTIVE20' || code === 'RAKHI20' || code === 'SPECIAL20') {
+    } else if (code === 'FESTIVE20' || code === 'RAKHI20' || code === 'SPECIAL20' || code === 'UNLIMITED20') {
       setAppliedCoupon({ code, discountPercent: 20 });
       setCouponError(null);
-    } else if (code === 'A1PRINT5') {
+    } else if (code === 'A1PRINT5' || code === 'REPEAT5') {
       setAppliedCoupon({ code, discountPercent: 5 });
       setCouponError(null);
     } else {

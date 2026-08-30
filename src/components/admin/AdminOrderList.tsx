@@ -97,6 +97,9 @@ export const AdminOrderList: React.FC<AdminOrderListProps> = ({
   const [endDate, setEndDate] = useState<string>('');
   const [specificDate, setSpecificDate] = useState<string>('');
 
+  // Top Toolbar Payment Filter State
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState<'All' | 'Paid' | 'COD' | 'Pending' | 'Refund'>('All');
+
   // 10-Item Pagination State
   const [currentPage, setCurrentPage] = useState<number>(1);
   const pageSize = 10;
@@ -105,8 +108,16 @@ export const AdminOrderList: React.FC<AdminOrderListProps> = ({
   const [remarkInputs, setRemarkInputs] = useState<Record<string, string>>({});
   const [savedRemarkOrderIds, setSavedRemarkOrderIds] = useState<Record<string, boolean>>({});
 
-  // Filter Orders by Date Range & Specific Date
+  // Filter Orders by Date Range & Payment Status
   const filteredOrders = orders.filter((order) => {
+    // 1. Payment Status Filter Check
+    if (paymentStatusFilter !== 'All') {
+      if (paymentStatusFilter === 'Paid' && order.paymentStatus !== 'Paid') return false;
+      if (paymentStatusFilter === 'COD' && order.paymentStatus !== 'COD') return false;
+      if (paymentStatusFilter === 'Pending' && order.paymentStatus !== 'Pending') return false;
+      if (paymentStatusFilter === 'Refund' && order.paymentStatus !== 'Refund') return false;
+    }
+
     if (!order.createdAt) return true;
     const orderDate = new Date(order.createdAt);
     const orderDateStr = orderDate.toISOString().split('T')[0];
@@ -311,31 +322,52 @@ export const AdminOrderList: React.FC<AdminOrderListProps> = ({
             </span>
           </div>
 
-          {/* Quick Preset Buttons */}
-          <div className="flex flex-wrap items-center gap-1.5">
-            {[
-              { id: 'all', label: 'All Time' },
-              { id: 'today', label: 'Today' },
-              { id: 'yesterday', label: 'Yesterday' },
-              { id: '7days', label: 'Last 7 Days' },
-              { id: 'month', label: 'This Month' },
-              { id: 'custom', label: 'Custom Calendar Range / Specific Date' },
-            ].map((p) => (
-              <button
-                key={p.id}
-                onClick={() => {
-                  setDateFilterMode(p.id as any);
+          {/* Quick Preset Buttons & Payment Filter Dropdown */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-1.5">
+              {[
+                { id: 'all', label: 'All Time' },
+                { id: 'today', label: 'Today' },
+                { id: 'yesterday', label: 'Yesterday' },
+                { id: '7days', label: 'Last 7 Days' },
+                { id: 'month', label: 'This Month' },
+                { id: 'custom', label: 'Custom Date Range' },
+              ].map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => {
+                    setDateFilterMode(p.id as any);
+                    setCurrentPage(1);
+                  }}
+                  className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${
+                    dateFilterMode === p.id
+                      ? 'bg-[#3B82F6] text-white shadow-md'
+                      : 'bg-[#1A2035] text-gray-400 hover:text-white border border-[#262E4A]'
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Top Toolbar Payment Status Filter Dropdown */}
+            <div className="flex items-center gap-2 shrink-0">
+              <label className="text-gray-400 font-extrabold text-xs">Payment Filter :</label>
+              <select
+                value={paymentStatusFilter}
+                onChange={(e) => {
+                  setPaymentStatusFilter(e.target.value as any);
                   setCurrentPage(1);
                 }}
-                className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${
-                  dateFilterMode === p.id
-                    ? 'bg-[#3B82F6] text-white shadow-md'
-                    : 'bg-[#1A2035] text-gray-400 hover:text-white border border-[#262E4A]'
-                }`}
+                className="px-3.5 py-1.5 bg-[#1A2035] border border-pink-500/40 rounded-xl text-xs font-extrabold text-pink-400 focus:outline-none cursor-pointer"
               >
-                {p.label}
-              </button>
-            ))}
+                <option value="All">All Payments (Paid, COD, Pending, Refund)</option>
+                <option value="Paid">🟢 Paid Only</option>
+                <option value="COD">🟠 COD Only</option>
+                <option value="Pending">🔴 Pending Only</option>
+                <option value="Refund">↩️ Refund Only</option>
+              </select>
+            </div>
           </div>
         </div>
 

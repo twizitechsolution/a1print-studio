@@ -47,6 +47,7 @@ export const AdminCouponManager: React.FC = () => {
   const [type, setType] = useState<Coupon['type']>('percentage');
   const [discountValue, setDiscountValue] = useState<number>(10);
   const [minOrder, setMinOrder] = useState<number>(499);
+  const [limitPerUser, setLimitPerUser] = useState<any>(1);
 
   const handleAddCoupon = () => {
     if (!code.trim()) return;
@@ -57,6 +58,8 @@ export const AdminCouponManager: React.FC = () => {
       discountValue,
       minOrderValue: minOrder,
       usageLimit: 500,
+      usageLimitPerUser: limitPerUser,
+      usedPerUser: {},
       timesUsed: 0,
       validFrom: new Date().toISOString().split('T')[0],
       validUntil: '2026-12-31',
@@ -83,7 +86,7 @@ export const AdminCouponManager: React.FC = () => {
           <h3 className="font-playfair text-xl font-bold text-white flex items-center gap-2">
             <Gift className="w-5 h-5 text-pink-400" /> Coupons & Discount Manager
           </h3>
-          <p className="text-xs text-gray-400">Create promotional discount codes, flat discounts, and free shipping rules.</p>
+          <p className="text-xs text-gray-400">Create promotional discount codes, flat discounts, and set per-user usage limits.</p>
         </div>
       </div>
 
@@ -102,41 +105,47 @@ export const AdminCouponManager: React.FC = () => {
               className="w-full bg-[#1A2035] border border-[#262E4A] px-3.5 py-2 rounded-xl text-xs text-white uppercase font-mono placeholder-gray-500 focus:outline-hidden"
             />
           </div>
-          <div className="sm:col-span-3">
+          <div className="sm:col-span-2">
             <select
               value={type}
               onChange={(e) => setType(e.target.value as any)}
-              className="w-full bg-[#1A2035] border border-[#262E4A] px-3 py-2 rounded-xl text-xs text-white focus:outline-hidden"
+              className="w-full bg-[#1A2035] border border-[#262E4A] px-3 py-2 rounded-xl text-xs text-white focus:outline-hidden font-bold"
             >
-              <option value="percentage">Percentage Discount (%)</option>
-              <option value="flat">Flat Amount Discount (₹)</option>
+              <option value="percentage">Discount (%)</option>
+              <option value="flat">Flat Off (₹)</option>
               <option value="free_shipping">Free Shipping</option>
             </select>
           </div>
           <div className="sm:col-span-2">
             <input
               type="number"
-              placeholder="Discount Value"
+              placeholder="Value"
               value={discountValue}
               onChange={(e) => setDiscountValue(Number(e.target.value))}
               className="w-full bg-[#1A2035] border border-[#262E4A] px-3 py-2 rounded-xl text-xs text-white focus:outline-hidden"
             />
           </div>
           <div className="sm:col-span-2">
-            <input
-              type="number"
-              placeholder="Min Order (₹)"
-              value={minOrder}
-              onChange={(e) => setMinOrder(Number(e.target.value))}
-              className="w-full bg-[#1A2035] border border-[#262E4A] px-3 py-2 rounded-xl text-xs text-white focus:outline-hidden"
-            />
+            <select
+              value={limitPerUser}
+              onChange={(e) => setLimitPerUser(e.target.value === 'Unlimited' ? 'Unlimited' : Number(e.target.value))}
+              className="w-full bg-[#1A2035] border border-pink-500/40 px-3 py-2 rounded-xl text-xs text-pink-400 font-extrabold focus:outline-hidden cursor-pointer"
+              title="Per User Usage Limit"
+            >
+              <option value={1}>Limit: 1 Time</option>
+              <option value={2}>Limit: 2 Times</option>
+              <option value={3}>Limit: 3 Times</option>
+              <option value={4}>Limit: 4 Times</option>
+              <option value={5}>Limit: 5 Times</option>
+              <option value="Unlimited">Limit: Unlimited</option>
+            </select>
           </div>
-          <div className="sm:col-span-2">
+          <div className="sm:col-span-3">
             <button
               onClick={handleAddCoupon}
               className="w-full py-2 bg-[#F82BA9] hover:bg-pink-600 text-white font-bold text-xs rounded-xl shadow-md transition-colors cursor-pointer"
             >
-              Save Coupon
+              Save Coupon Code
             </button>
           </div>
         </div>

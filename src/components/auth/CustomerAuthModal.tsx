@@ -156,10 +156,17 @@ export const CustomerAuthModal: React.FC = () => {
               <button
                 type="button"
                 onClick={() => {
-                  const success = registerUser('Google User', 'google.user@gmail.com', '9876543210', 'google-auth');
-                  if (success) {
-                    setSuccessMsg('Signed in with Google Account!');
-                    setTimeout(() => setSuccessMsg(''), 2500);
+                  const inputEmail = prompt('Please enter your Google / Gmail address to sign in:', 'customer@gmail.com');
+                  if (inputEmail && inputEmail.includes('@')) {
+                    const extractedName = inputEmail.split('@')[0].replace(/[^a-zA-Z0-9]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()).trim() || 'Google User';
+                    const success = registerUser(extractedName, inputEmail.trim(), '', 'google-oauth');
+                    if (success) {
+                      setSuccessMsg(`✓ Successfully signed in with ${inputEmail}!`);
+                      setTimeout(() => {
+                        setSuccessMsg('');
+                        closeAuthModal();
+                      }, 1500);
+                    }
                   }
                 }}
                 className="w-full py-3 bg-white hover:bg-gray-50 border border-gray-300 text-gray-800 font-extrabold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
