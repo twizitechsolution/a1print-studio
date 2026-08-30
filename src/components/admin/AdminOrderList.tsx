@@ -511,47 +511,72 @@ export const AdminOrderList: React.FC<AdminOrderListProps> = ({
                   </a>
                 </div>
 
-                {/* Admin Remark Live Communication Box */}
-                <div className="p-3 rounded-xl dark:bg-zinc-950 bg-slate-50 border dark:border-zinc-800 border-slate-200 space-y-2">
-                  <div className="flex items-center justify-between">
+                {/* Admin Remark 2-Column Split Container */}
+                <div className="p-3.5 rounded-xl dark:bg-zinc-950 bg-slate-50 border dark:border-zinc-800 border-slate-200 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  
+                  {/* Left Column (50%): Write / Edit Admin Remark Input Form */}
+                  <div className="space-y-2">
                     <span className="text-[11px] font-bold dark:text-zinc-300 text-slate-700 flex items-center gap-1.5">
-                      💬 Admin Remark / Live Customer Update Note
+                      ✏️ Write Admin Remark / Customer Note:
                     </span>
-                    {order.adminRemarkTimestamp && (
-                      <span className="text-[10px] text-zinc-500 font-mono">
-                        Last saved: {new Date(order.adminRemarkTimestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        placeholder="Type status note (e.g. Photo checked / Sent to print lab)..."
+                        value={remarkInputs[order.id] !== undefined ? remarkInputs[order.id] : order.adminRemark || ''}
+                        onChange={(e) => setRemarkInputs({ ...remarkInputs, [order.id]: e.target.value })}
+                        className="flex-1 px-3 py-1.5 rounded-lg text-xs dark:bg-zinc-900 bg-white border dark:border-zinc-800 border-slate-300 dark:text-zinc-100 text-slate-900 focus:outline-none"
+                      />
+                      <button
+                        onClick={() => {
+                          const note = remarkInputs[order.id] !== undefined ? remarkInputs[order.id] : (order.adminRemark || '');
+                          if (onUpdateAdminRemark) {
+                            onUpdateAdminRemark(order.id, note, currentAdminUser?.name);
+                            setRemarkInputs((prev) => {
+                              const next = { ...prev };
+                              delete next[order.id];
+                              return next;
+                            });
+                            setSavedRemarkOrderIds((prev) => ({ ...prev, [order.id]: true }));
+                            setTimeout(() => {
+                              setSavedRemarkOrderIds((prev) => ({ ...prev, [order.id]: false }));
+                            }, 3000);
+                          }
+                        }}
+                        className={`px-3.5 py-1.5 font-bold text-xs rounded-lg transition-all cursor-pointer shrink-0 ${
+                          savedRemarkOrderIds[order.id]
+                            ? 'bg-emerald-600 text-white'
+                            : 'bg-purple-600 hover:bg-purple-700 text-white'
+                        }`}
+                      >
+                        {savedRemarkOrderIds[order.id] ? 'Saved ✓' : 'Save Remark'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Right Column (50%): Active Saved Remark Display Card */}
+                  <div className="space-y-1.5 border-t md:border-t-0 md:border-l dark:border-zinc-800 border-slate-200 pt-2 md:pt-0 md:pl-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-purple-600 dark:text-purple-400 flex items-center gap-1.5">
+                        📌 Current Active Saved Remark:
                       </span>
+                      {order.adminRemarkTimestamp && (
+                        <span className="text-[10px] text-zinc-500 font-mono">
+                          {new Date(order.adminRemarkTimestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      )}
+                    </div>
+                    {order.adminRemark ? (
+                      <div className="p-2 bg-amber-50 dark:bg-amber-950/40 rounded-lg border border-amber-200 dark:border-amber-800/40 text-amber-900 dark:text-amber-300 text-xs font-semibold">
+                        "{order.adminRemark}"
+                      </div>
+                    ) : (
+                      <div className="p-2 text-xs italic dark:text-zinc-500 text-slate-400 font-medium">
+                        No active remark saved for this order yet.
+                      </div>
                     )}
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      placeholder="Type custom status note for customer (e.g. Sent to print lab / Out for delivery)..."
-                      value={remarkInputs[order.id] !== undefined ? remarkInputs[order.id] : order.adminRemark || ''}
-                      onChange={(e) => setRemarkInputs({ ...remarkInputs, [order.id]: e.target.value })}
-                      className="flex-1 px-3 py-1.5 rounded-lg text-xs dark:bg-zinc-900 bg-white border dark:border-zinc-800 border-slate-300 dark:text-zinc-100 text-slate-900 focus:outline-none"
-                    />
-                    <button
-                      onClick={() => {
-                        const note = remarkInputs[order.id] !== undefined ? remarkInputs[order.id] : (order.adminRemark || '');
-                        if (onUpdateAdminRemark) {
-                          onUpdateAdminRemark(order.id, note, currentAdminUser?.name);
-                          setSavedRemarkOrderIds((prev) => ({ ...prev, [order.id]: true }));
-                          setTimeout(() => {
-                            setSavedRemarkOrderIds((prev) => ({ ...prev, [order.id]: false }));
-                          }, 3000);
-                        }
-                      }}
-                      className={`px-3 py-1.5 font-bold text-xs rounded-lg transition-all cursor-pointer shrink-0 ${
-                        savedRemarkOrderIds[order.id]
-                          ? 'bg-emerald-600 text-white'
-                          : 'bg-purple-600 hover:bg-purple-700 text-white'
-                      }`}
-                    >
-                      {savedRemarkOrderIds[order.id] ? 'Saved ✓' : 'Save Remark'}
-                    </button>
-                  </div>
                 </div>
 
                 {/* Order Details Body Grid */}
