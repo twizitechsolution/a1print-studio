@@ -136,7 +136,9 @@ export const CustomerOrdersDashboard: React.FC<CustomerOrdersDashboardProps> = (
             </span>
             <span className="text-xs text-purple-200">Member since {new Date(user.createdAt).getFullYear()}</span>
           </div>
-          <h1 className="font-playfair text-3xl sm:text-4xl font-extrabold">Welcome back, {user.fullName}! 👋</h1>
+          <h1 className="font-playfair text-3xl sm:text-4xl font-extrabold">
+            Welcome back, {typeof user.fullName === 'string' && user.fullName.trim() ? user.fullName.trim() : (user.email ? user.email.split('@')[0] : 'Valued Customer')}! 👋
+          </h1>
           <p className="text-xs text-purple-200 pt-1">
             📱 Phone: {user.phone || 'Not set'} • ✉️ Email: {user.email}
           </p>

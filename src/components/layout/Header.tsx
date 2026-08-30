@@ -106,16 +106,26 @@ export const Header: React.FC<HeaderProps> = ({
           {/* User Account / Auth Dropdown */}
           <div className="relative">
             {isAuthenticated && user ? (
-              <button
-                onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-[#160E4B] rounded-full border border-purple-200 text-xs font-extrabold transition-colors cursor-pointer"
-              >
-                <div className="w-6 h-6 rounded-full bg-[#F82BA9] text-white flex items-center justify-center text-[10px] font-black">
-                  {user.fullName.charAt(0)}
-                </div>
-                <span className="max-w-[100px] truncate hidden sm:inline">{user.fullName.split(' ')[0]}</span>
-                <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
-              </button>
+              (() => {
+                const displayName = (typeof user.fullName === 'string' && user.fullName.trim()) 
+                  ? user.fullName.trim() 
+                  : (user.email ? user.email.split('@')[0] : 'Customer');
+                const initialChar = (displayName[0] || 'C').toUpperCase();
+                const firstName = displayName.split(' ')[0] || 'Customer';
+
+                return (
+                  <button
+                    onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-[#160E4B] rounded-full border border-purple-200 text-xs font-extrabold transition-colors cursor-pointer"
+                  >
+                    <div className="w-6 h-6 rounded-full bg-[#F82BA9] text-white flex items-center justify-center text-[10px] font-black">
+                      {initialChar}
+                    </div>
+                    <span className="max-w-[100px] truncate hidden sm:inline">{firstName}</span>
+                    <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
+                  </button>
+                );
+              })()
             ) : (
               <button
                 onClick={() => openAuthModal('login')}

@@ -135,33 +135,19 @@ export const HomePage: React.FC<HomePageProps> = ({ onSelectProduct, onNavigate 
 
           </div>
 
-          {/* Right Side Trio 3-Frame Showcase (LovecraftbySE Style) */}
+          {/* Right Side Model Image Showcase */}
           <div className="lg:col-span-6 relative flex items-center justify-center pt-4 lg:pt-0">
-            <div className="relative w-full max-w-lg flex items-center justify-center gap-2 sm:gap-4">
-              
-              {/* Left Secondary Frame */}
-              <div className="w-1/3 transform -rotate-3 hover:rotate-0 transition-transform duration-300">
-                {products[1] && <ProductFrameDisplay product={products[1]} fontScale={0.5} />}
+            <div className="relative w-full max-w-md group cursor-pointer" onClick={() => products[0] && onSelectProduct(products[0])}>
+              <img
+                src="/hero_model_holding_frame.jpg"
+                alt="A1print Studio Custom Photo Frame Model"
+                className="w-full h-auto max-h-[580px] object-contain rounded-3xl drop-shadow-2xl hover:scale-102 transition-transform duration-300"
+              />
+              <div className="absolute bottom-6 right-6 z-20">
+                <span className="px-5 py-2.5 bg-gradient-to-r from-[#3C187B] to-[#F82BA9] text-white font-extrabold text-xs rounded-2xl shadow-xl flex items-center gap-2">
+                  Customize Live Frame <ArrowRight className="w-4 h-4" />
+                </span>
               </div>
-
-              {/* Center Main Featured Frame (Elevated) */}
-              <div 
-                onClick={() => products[0] && onSelectProduct(products[0])}
-                className="w-1/2 relative transform hover:scale-105 transition-all duration-300 cursor-pointer group z-20"
-              >
-                {products[0] && <ProductFrameDisplay product={products[0]} fontScale={0.65} className="shadow-[0_25px_60px_rgba(0,0,0,0.5)] border-8 sm:border-[12px]" />}
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-4 rounded-xs">
-                  <span className="px-4 py-2 bg-[#F82BA9] text-white font-extrabold text-xs rounded-xl shadow-lg flex items-center gap-1.5">
-                    Customize Live <ArrowRight className="w-3.5 h-3.5" />
-                  </span>
-                </div>
-              </div>
-
-              {/* Right Secondary Frame */}
-              <div className="w-1/3 transform rotate-3 hover:rotate-0 transition-transform duration-300">
-                {products[2] && <ProductFrameDisplay product={products[2]} fontScale={0.5} />}
-              </div>
-
             </div>
           </div>
 

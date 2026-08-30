@@ -113,14 +113,18 @@ export function useAuthStore() {
   };
 
   const loginUser = (emailOrPhone: string, _password?: string) => {
+    const rawName = typeof emailOrPhone === 'string' && emailOrPhone.includes('@') ? emailOrPhone.split('@')[0] : 'Valued Customer';
     const existingUser = globalAuthState.user || {
       id: `cust-${Date.now()}`,
-      fullName: emailOrPhone.includes('@') ? emailOrPhone.split('@')[0] : 'Valued Customer',
+      fullName: (typeof globalAuthState.user?.fullName === 'string' && globalAuthState.user.fullName) ? globalAuthState.user.fullName : rawName,
       email: emailOrPhone.includes('@') ? emailOrPhone : `${emailOrPhone}@a1printstudio.com`,
       phone: emailOrPhone.includes('@') ? '9876543210' : emailOrPhone,
       createdAt: new Date().toISOString(),
       savedAddresses: [],
     };
+    if (typeof existingUser.fullName !== 'string') {
+      existingUser.fullName = String(existingUser.fullName || 'Valued Customer');
+    }
     globalAuthState.user = existingUser;
     globalAuthState.isAuthenticated = true;
     globalAuthState.isAuthModalOpen = false;
@@ -128,12 +132,13 @@ export function useAuthStore() {
     return true;
   };
 
-  const registerUser = (fullName: string, email: string, phone: string, _password?: string) => {
+  const registerUser = (fullName: string | any, email: string, phone: string, _password?: string) => {
+    const safeName = (typeof fullName === 'string' && fullName.trim()) ? fullName.trim() : (email ? email.split('@')[0] : 'Valued Customer');
     const newUser: CustomerUser = {
       id: `cust-${Date.now()}`,
-      fullName,
+      fullName: safeName,
       email: email || `${phone}@a1printstudio.com`,
-      phone,
+      phone: phone || '',
       createdAt: new Date().toISOString(),
       savedAddresses: [],
     };
@@ -175,10 +180,26 @@ export function useAuthStore() {
     notifyAuthListeners();
   };
 
-  const updateProfile = (fullName: string, phone: string) => {
+  const updateProfile = (fullNameOrUpdates: string | Partial<CustomerUser>, phoneArg?: string) => {
     if (!globalAuthState.user) return;
-    globalAuthState.user.fullName = fullName;
-    globalAuthState.user.phone = phone;
+    if (typeof fullNameOrUpdates === 'object' && fullNameOrUpdates !== null) {
+      if (typeof fullNameOrUpdates.fullName === 'string' && fullNameOrUpdates.fullName.trim()) {
+        globalAuthState.user.fullName = fullNameOrUpdates.fullName.trim();
+      }
+      if (typeof fullNameOrUpdates.phone === 'string') {
+        globalAuthState.user.phone = fullNameOrUpdates.phone.trim();
+      }
+      if (typeof fullNameOrUpdates.email === 'string') {
+        globalAuthState.user.email = fullNameOrUpdates.email.trim();
+      }
+    } else if (typeof fullNameOrUpdates === 'string') {
+      if (fullNameOrUpdates.trim()) {
+        globalAuthState.user.fullName = fullNameOrUpdates.trim();
+      }
+      if (phoneArg && typeof phoneArg === 'string') {
+        globalAuthState.user.phone = phoneArg.trim();
+      }
+    }
     notifyAuthListeners();
   };
 
