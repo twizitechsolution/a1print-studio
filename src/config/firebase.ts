@@ -1,5 +1,5 @@
-// A1print Studio Live Firebase Cloud Database Client
-// Connected to Official User Firebase Project: aoneprintstudio-4c1bd
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import { getAuth, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 
 export const FIREBASE_CONFIG = {
   apiKey: "AIzaSyBmyIAGv2y7UVqrIIOhQdllnrEOwJ8Purk",
@@ -10,6 +10,30 @@ export const FIREBASE_CONFIG = {
   appId: "1:551063939028:web:1ba31f8cccaa3d84419841",
   measurementId: "G-WGX8K53VN9"
 };
+
+const app = getApps().length === 0 ? initializeApp(FIREBASE_CONFIG) : getApp();
+export const firebaseAuth = getAuth(app);
+export const googleAuthProvider = new GoogleAuthProvider();
+
+export async function signInWithGooglePopup() {
+  try {
+    const result = await signInWithPopup(firebaseAuth, googleAuthProvider);
+    const user = result.user;
+    return {
+      success: true,
+      name: user.displayName || 'Google User',
+      email: user.email || '',
+      photoURL: user.photoURL || '',
+      uid: user.uid,
+    };
+  } catch (error: any) {
+    console.error('Firebase Google Sign-In Error:', error);
+    return {
+      success: false,
+      error: error.message || 'Google Sign-In failed',
+    };
+  }
+}
 
 const FIREBASE_PROJECT_ID = FIREBASE_CONFIG.projectId;
 const FIRESTORE_BASE_URL = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents`;

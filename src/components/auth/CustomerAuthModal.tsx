@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useAuthStore } from '../../store/useAuthStore';
 import { X, User, Mail, Lock, Phone, Sparkles, LogIn, UserPlus, CheckCircle2 } from 'lucide-react';
 
+import { signInWithGooglePopup } from '../../config/firebase';
+
 export const CustomerAuthModal: React.FC = () => {
   const { isAuthModalOpen, authModalMode, closeAuthModal, loginUser, registerUser, openAuthModal } = useAuthStore();
 
@@ -18,6 +20,27 @@ export const CustomerAuthModal: React.FC = () => {
   const [successMsg, setSuccessMsg] = useState('');
 
   if (!isAuthModalOpen) return null;
+
+  const handleGoogleLogin = async () => {
+    setErrorMsg('');
+    try {
+      const res = await signInWithGooglePopup();
+      if (res.success && res.email) {
+        const success = registerUser(res.name, res.email, '', 'google-oauth');
+        if (success) {
+          setSuccessMsg(`✓ Welcome, ${res.name}!`);
+          setTimeout(() => {
+            setSuccessMsg('');
+            closeAuthModal();
+          }, 1500);
+        }
+      } else if (res.error) {
+        setErrorMsg(`Google Sign-In: ${res.error}`);
+      }
+    } catch (e: any) {
+      setErrorMsg('Google Sign-In popup cancelled or closed.');
+    }
+  };
 
   const handleLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -155,20 +178,7 @@ export const CustomerAuthModal: React.FC = () => {
               <span className="text-[11px] text-gray-400 font-medium">Or continue instantly with</span>
               <button
                 type="button"
-                onClick={() => {
-                  const inputEmail = prompt('Please enter your Google / Gmail address to sign in:', 'customer@gmail.com');
-                  if (inputEmail && inputEmail.includes('@')) {
-                    const extractedName = inputEmail.split('@')[0].replace(/[^a-zA-Z0-9]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()).trim() || 'Google User';
-                    const success = registerUser(extractedName, inputEmail.trim(), '', 'google-oauth');
-                    if (success) {
-                      setSuccessMsg(`✓ Successfully signed in with ${inputEmail}!`);
-                      setTimeout(() => {
-                        setSuccessMsg('');
-                        closeAuthModal();
-                      }, 1500);
-                    }
-                  }
-                }}
+                onClick={handleGoogleLogin}
                 className="w-full py-3 bg-white hover:bg-gray-50 border border-gray-300 text-gray-800 font-extrabold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
                 <svg className="w-4 h-4" viewBox="0 0 24 24">
