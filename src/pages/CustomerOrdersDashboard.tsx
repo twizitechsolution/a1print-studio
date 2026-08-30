@@ -273,12 +273,12 @@ export const CustomerOrdersDashboard: React.FC<CustomerOrdersDashboardProps> = (
                     return (
                       <div key={idx} className="p-4 bg-gray-50 rounded-2xl border border-gray-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                         
-                        <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-4 flex-1 min-w-0">
                           <div className="w-20 h-24 shrink-0">
                             <LiveCustomizedFrameThumbnail item={item} fontScale={0.22} />
                           </div>
 
-                          <div className="space-y-1 text-xs">
+                          <div className="space-y-1 text-xs flex-1 min-w-0">
                             <h4 className="font-bold text-sm text-[#160E4B]">{item.product?.title || 'Custom Photo Frame'}</h4>
                             <p className="text-[#F82BA9] font-bold">Size: {item.selectedSize?.name || 'A4 (8x12 Inch)'}</p>
                             <p className="text-gray-500">Frame Style: {item.selectedFrame?.name || 'Classic Black Wood'}</p>
@@ -293,7 +293,24 @@ export const CustomerOrdersDashboard: React.FC<CustomerOrdersDashboardProps> = (
                           </div>
                         </div>
 
-                        <div className="text-xs text-right space-y-1">
+                        {/* Middle Column: Live Admin Status Update Remark Box */}
+                        {order.adminRemark && (
+                          <div className="w-full sm:w-64 p-3 bg-amber-50 rounded-xl border border-amber-200 text-amber-900 space-y-1 shrink-0">
+                            <div className="flex items-center justify-between font-bold text-[11px]">
+                              <span className="text-[#160E4B] flex items-center gap-1">
+                                💬 Remark:
+                              </span>
+                              {order.adminRemarkTimestamp && (
+                                <span className="text-[9px] text-amber-700 font-mono">
+                                  {new Date(order.adminRemarkTimestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs font-semibold text-amber-950 leading-snug">{order.adminRemark}</p>
+                          </div>
+                        )}
+
+                        <div className="text-xs text-right space-y-1 shrink-0">
                           <span className="font-extrabold text-sm text-[#160E4B]">₹{item.itemTotalPrice || (item.selectedSize?.price || 699) * (item.quantity || 1)}</span>
                           <span className="text-[10px] text-emerald-600 font-bold block bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
                             Payment: {order.paymentMethod || 'PhonePe'} ({order.paymentStatus || 'Paid'})
@@ -304,23 +321,6 @@ export const CustomerOrdersDashboard: React.FC<CustomerOrdersDashboardProps> = (
                     );
                   })}
                 </div>
-
-                {/* Live Admin Remark Alert Box (Only displayed if admin wrote a remark for this order) */}
-                {order.adminRemark && (
-                  <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 space-y-1">
-                    <div className="flex items-center justify-between font-bold text-xs">
-                      <span className="flex items-center gap-1.5 text-[#160E4B]">
-                        💬 Admin Status Update Remark:
-                      </span>
-                      {order.adminRemarkTimestamp && (
-                        <span className="text-[10px] text-amber-700 font-mono">
-                          Saved: {new Date(order.adminRemarkTimestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs font-semibold text-amber-950 pl-5">{order.adminRemark}</p>
-                  </div>
-                )}
 
                 {/* Delivery Address & Actions */}
                 <div className="p-4 bg-gray-50 rounded-2xl border border-gray-200 text-xs text-gray-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">

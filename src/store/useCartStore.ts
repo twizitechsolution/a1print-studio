@@ -100,8 +100,17 @@ function saveStoredCategories(categories: Category[]) {
   } catch (e) {}
 }
 
+function getStoredAdminRemarks(): Record<string, { remark: string; timestamp: string }> {
+  try {
+    const raw = localStorage.getItem('a1print_admin_remarks_v1');
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  return {};
+}
+
 function getStoredLocalData(): StoreData {
   const categories = getStoredCategories();
+  const savedRemarks = getStoredAdminRemarks();
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
@@ -112,10 +121,23 @@ function getStoredLocalData(): StoreData {
         stockLogs: p.stockLogs || [],
       }));
 
+      const rawOrders = parsed.orders && parsed.orders.length > 0 ? parsed.orders : [defaultOrder];
+      const ordersWithRemarks = rawOrders.map((o: Order) => {
+        const saved = savedRemarks[o.id];
+        if (saved && saved.remark) {
+          return {
+            ...o,
+            adminRemark: saved.remark,
+            adminRemarkTimestamp: saved.timestamp || o.adminRemarkTimestamp,
+          };
+        }
+        return o;
+      });
+
       return {
         products: prods,
         items: parsed.items || [],
-        orders: parsed.orders && parsed.orders.length > 0 ? parsed.orders : [defaultOrder],
+        orders: ordersWithRemarks,
         categories,
       };
     }
@@ -127,10 +149,22 @@ function getStoredLocalData(): StoreData {
     stockLogs: [],
   }));
 
+  const initialOrders = [defaultOrder].map((o: Order) => {
+    const saved = savedRemarks[o.id];
+    if (saved && saved.remark) {
+      return {
+        ...o,
+        adminRemark: saved.remark,
+        adminRemarkTimestamp: saved.timestamp || o.adminRemarkTimestamp,
+      };
+    }
+    return o;
+  });
+
   return {
     products: defaultProds,
     items: [],
-    orders: [defaultOrder],
+    orders: initialOrders,
     categories,
   };
 }
@@ -188,15 +222,29 @@ async function initCloudSync() {
       notifyListeners();
     }
 
-    // 2. NON-DESTRUCTIVE UNION MERGING FOR ORDERS
+    // 2. NON-DESTRUCTIVE UNION MERGING FOR ORDERS (PRESERVES ADMIN REMARKS)
     const cloudOrders = await firebaseCloudDb.getCollection('orders');
     if (cloudOrders && cloudOrders.length > 0) {
+      const savedRemarks = getStoredAdminRemarks();
       const orderMap = new Map<string, Order>();
       memoryData.orders.forEach((o) => {
         if (o && o.id) orderMap.set(o.id, o);
       });
+      
       cloudOrders.forEach((co) => {
-        if (co && co.id) orderMap.set(co.id, co);
+        if (co && co.id) {
+          const existing = orderMap.get(co.id);
+          const localRemark = savedRemarks[co.id]?.remark || existing?.adminRemark || '';
+          const localRemarkTime = savedRemarks[co.id]?.timestamp || existing?.adminRemarkTimestamp || '';
+
+          orderMap.set(co.id, {
+            ...co,
+            adminRemark: co.adminRemark || localRemark,
+            adminRemarkTimestamp: co.adminRemarkTimestamp || localRemarkTime,
+            orderStatus: co.orderStatus || existing?.orderStatus || 'Received',
+            paymentStatus: co.paymentStatus || existing?.paymentStatus || 'Paid',
+          });
+        }
       });
 
       const mergedOrders = Array.from(orderMap.values()).sort(
@@ -656,10 +704,20 @@ export function useCartStore() {
     remark: string,
     employeeName?: string
   ) => {
+    const now = new Date().toISOString();
+
+    // 1. Save to dedicated Remarks localStorage Map
+    try {
+      const existingMapRaw = localStorage.getItem('a1print_admin_remarks_v1');
+      const remarksMap = existingMapRaw ? JSON.parse(existingMapRaw) : {};
+      remarksMap[orderId] = { remark, timestamp: now, employeeName };
+      localStorage.setItem('a1print_admin_remarks_v1', JSON.stringify(remarksMap));
+    } catch (e) {}
+
+    // 2. Update memoryData.orders
     const updatedOrders = memoryData.orders.map((ord) => {
       if (ord.id === orderId) {
         const empName = employeeName || 'Nirod Kumar (Super Admin)';
-        const now = new Date().toISOString();
 
         const historyItem = {
           id: `hist-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
