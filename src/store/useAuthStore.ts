@@ -95,10 +95,55 @@ function notifyAuthListeners() {
   listeners.forEach((l) => l());
 }
 
+let isCustomerCloudSyncInit = false;
+
+async function initCustomerCloudSync() {
+  if (isCustomerCloudSyncInit) return;
+  isCustomerCloudSyncInit = true;
+
+  try {
+    const cloudCustomers = await firebaseCloudDb.getCollection('customer_users');
+    if (cloudCustomers && cloudCustomers.length > 0) {
+      const raw = localStorage.getItem(CUSTOMERS_DIRECTORY_KEY);
+      let list: CustomerUser[] = raw ? JSON.parse(raw) : [];
+
+      cloudCustomers.forEach((cc) => {
+        if (cc && cc.id) {
+          const idx = list.findIndex((c) => c.id === cc.id || c.phone === cc.phone || c.email === cc.email);
+          if (idx !== -1) {
+            list[idx] = { ...list[idx], ...cc };
+          } else {
+            list.push(cc);
+          }
+        }
+      });
+
+      localStorage.setItem(CUSTOMERS_DIRECTORY_KEY, JSON.stringify(list));
+
+      if (globalAuthState.user) {
+        const matchingCloudUser = cloudCustomers.find(
+          (c) => c.id === globalAuthState.user?.id || c.email === globalAuthState.user?.email || c.phone === globalAuthState.user?.phone
+        );
+        if (matchingCloudUser) {
+          globalAuthState.user = {
+            ...globalAuthState.user,
+            ...matchingCloudUser,
+            fullName: typeof matchingCloudUser.fullName === 'string' ? matchingCloudUser.fullName : globalAuthState.user.fullName,
+          };
+          notifyAuthListeners();
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('Customer cloud sync fallback:', e);
+  }
+}
+
 export function useAuthStore() {
   const [state, setState] = useState<AuthState>(globalAuthState);
 
   useEffect(() => {
+    initCustomerCloudSync();
     const handleChange = () => setState({ ...globalAuthState });
     listeners.add(handleChange);
     return () => {

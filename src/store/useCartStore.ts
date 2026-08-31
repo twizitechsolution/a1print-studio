@@ -111,17 +111,22 @@ function getStoredAdminRemarks(): Record<string, { remark: string; timestamp: st
 function getStoredLocalData(): StoreData {
   const categories = getStoredCategories();
   const savedRemarks = getStoredAdminRemarks();
+  const deletedIds = getDeletedProductIds();
+
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      const prods = (parsed.products && parsed.products.length > 0 ? parsed.products : INITIAL_PRODUCTS).map((p: Product) => ({
-        ...p,
-        stockQuantity: p.stockQuantity !== undefined ? p.stockQuantity : 50,
-        stockLogs: p.stockLogs || [],
-      }));
+      const rawProds = Array.isArray(parsed.products) ? parsed.products : INITIAL_PRODUCTS;
+      const prods = rawProds
+        .filter((p: Product) => p && p.id && !deletedIds.has(p.id) && !p.isDeleted)
+        .map((p: Product) => ({
+          ...p,
+          stockQuantity: p.stockQuantity !== undefined ? p.stockQuantity : 50,
+          stockLogs: p.stockLogs || [],
+        }));
 
-      const rawOrders = parsed.orders && parsed.orders.length > 0 ? parsed.orders : [defaultOrder];
+      const rawOrders = Array.isArray(parsed.orders) && parsed.orders.length > 0 ? parsed.orders : [defaultOrder];
       const ordersWithRemarks = rawOrders.map((o: Order) => {
         const saved = savedRemarks[o.id];
         if (saved && saved.remark) {
@@ -143,11 +148,13 @@ function getStoredLocalData(): StoreData {
     }
   } catch (e) {}
 
-  const defaultProds = INITIAL_PRODUCTS.map((p) => ({
-    ...p,
-    stockQuantity: 50,
-    stockLogs: [],
-  }));
+  const defaultProds = INITIAL_PRODUCTS
+    .filter((p) => p && p.id && !deletedIds.has(p.id))
+    .map((p) => ({
+      ...p,
+      stockQuantity: 50,
+      stockLogs: [],
+    }));
 
   const initialOrders = [defaultOrder].map((o: Order) => {
     const saved = savedRemarks[o.id];
@@ -191,38 +198,44 @@ async function initCloudSync() {
   isCloudSyncInitialized = true;
 
   try {
-    // 1. FETCH CLOUD FIRESTORE CATALOG
+    // 1. FETCH CLOUD FIRESTORE DELETED PRODUCT TOMBSTONES
+    const deletedDocs = await firebaseCloudDb.getCollection('deleted_products');
+    const cloudDeletedIds = getDeletedProductIds();
+    if (deletedDocs && deletedDocs.length > 0) {
+      deletedDocs.forEach((d) => {
+        if (d.ids && Array.isArray(d.ids)) {
+          d.ids.forEach((id: string) => cloudDeletedIds.add(id));
+        } else if (d.id && d.id !== 'global_tombstone') {
+          cloudDeletedIds.add(d.id);
+        }
+      });
+      saveDeletedProductIds(cloudDeletedIds);
+    }
+
+    // 2. FETCH CLOUD FIRESTORE CATALOG
     const cloudProds = await firebaseCloudDb.getCollection('products');
 
     if (cloudProds && cloudProds.length > 0) {
-      const merged = [...memoryData.products];
-      cloudProds.forEach((cp) => {
-        const idx = merged.findIndex((mp) => mp.id === cp.id);
-        if (idx !== -1) {
-          const local = merged[idx];
-          merged[idx] = {
-            ...local,
-            ...cp,
-            stockQuantity: cp.stockQuantity !== undefined ? cp.stockQuantity : (local.stockQuantity ?? 50),
-            stockLogs: (cp.stockLogs && cp.stockLogs.length > 0) ? cp.stockLogs : (local.stockLogs || []),
-            isDeleted: cp.isDeleted !== undefined ? cp.isDeleted : local.isDeleted,
-            deletedAt: cp.deletedAt || local.deletedAt,
-          };
-        } else {
-          merged.push({
-            ...cp,
-            stockQuantity: cp.stockQuantity !== undefined ? cp.stockQuantity : 50,
-            stockLogs: cp.stockLogs || [],
-          });
-        }
-      });
+      const validCloudProds = cloudProds
+        .filter((cp) => cp && cp.id && !cloudDeletedIds.has(cp.id) && !cp.isDeleted)
+        .map((cp) => ({
+          ...cp,
+          stockQuantity: cp.stockQuantity !== undefined ? cp.stockQuantity : 50,
+          stockLogs: cp.stockLogs || [],
+        }));
 
-      memoryData.products = merged;
+      memoryData.products = validCloudProds;
       saveStoredLocalData(memoryData);
       notifyListeners();
+    } else {
+      memoryData.products.forEach((p) => {
+        if (p && p.id && !cloudDeletedIds.has(p.id) && !p.isDeleted) {
+          firebaseCloudDb.setDocument('products', p.id, p);
+        }
+      });
     }
 
-    // 2. NON-DESTRUCTIVE UNION MERGING FOR ORDERS (PRESERVES ADMIN REMARKS)
+    // 3. NON-DESTRUCTIVE UNION MERGING FOR ORDERS (PRESERVES ALL CUSTOMER ORDERS & ADMIN REMARKS)
     const cloudOrders = await firebaseCloudDb.getCollection('orders');
     if (cloudOrders && cloudOrders.length > 0) {
       const savedRemarks = getStoredAdminRemarks();
@@ -252,6 +265,15 @@ async function initCloudSync() {
       );
 
       memoryData.orders = mergedOrders;
+      saveStoredLocalData(memoryData);
+      notifyListeners();
+    }
+
+    // 4. FETCH CLOUD FIRESTORE CATEGORIES
+    const cloudCats = await firebaseCloudDb.getCollection('categories');
+    if (cloudCats && cloudCats.length > 0) {
+      memoryData.categories = cloudCats;
+      saveStoredCategories(cloudCats);
       saveStoredLocalData(memoryData);
       notifyListeners();
     }
@@ -372,6 +394,13 @@ export function useCartStore() {
     const deletedIds = getDeletedProductIds();
     deletedIds.add(id);
     saveDeletedProductIds(deletedIds);
+
+    // Save tombstone to Cloud Firestore so server updates & other devices remember deletion forever!
+    firebaseCloudDb.setDocument('deleted_products', 'global_tombstone', {
+      id: 'global_tombstone',
+      ids: Array.from(deletedIds),
+      updatedAt: new Date().toISOString(),
+    });
 
     const updatedProducts = memoryData.products.filter((p) => p.id !== id);
     saveStoredLocalData({ ...memoryData, products: updatedProducts });
