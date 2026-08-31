@@ -31,6 +31,11 @@ export class ErrorBoundary extends Component<Props, State> {
           names.forEach((name) => caches.delete(name));
         });
       }
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then((registrations) => {
+          registrations.forEach((r) => r.unregister());
+        });
+      }
     } catch (e) {}
     window.location.href = window.location.origin + window.location.pathname + '?v=' + Date.now();
   };
