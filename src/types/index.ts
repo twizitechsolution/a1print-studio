@@ -42,6 +42,7 @@ export interface SizeOption {
 
 export interface Product {
   id: string;
+  productId?: string;
   slug: string;
   title: string;
   subtitle: string;

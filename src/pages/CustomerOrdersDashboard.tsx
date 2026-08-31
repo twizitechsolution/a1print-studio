@@ -340,7 +340,12 @@ export const CustomerOrdersDashboard: React.FC<CustomerOrdersDashboardProps> = (
                               <LiveCustomizedFrameThumbnail item={item} fontScale={0.22} />
                             </div>
                             <div className="space-y-0.5">
-                              <h4 className="font-bold text-sm text-[#160E4B]">{item.product?.title || 'Custom Photo Frame'}</h4>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <h4 className="font-bold text-sm text-[#160E4B]">{item.product?.title || 'Custom Photo Frame'}</h4>
+                                <span className="px-2 py-0.5 bg-purple-50 text-purple-700 font-mono font-bold text-[10px] rounded-md border border-purple-200">
+                                  Product ID: {item.product?.productId || (item.product?.id ? `PRD-${item.product.id.slice(-4)}` : 'PRD-1001')}
+                                </span>
+                              </div>
                               <p className="text-[#F82BA9] font-bold text-xs">Size: {item.selectedSize?.name || 'A4 (8x12 Inch)'} | Frame: {item.selectedFrame?.name || 'Classic Black Wood'}</p>
                             </div>
                           </div>

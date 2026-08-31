@@ -104,9 +104,90 @@ export const AdminOrderList: React.FC<AdminOrderListProps> = ({
   const [currentPage, setCurrentPage] = useState<number>(1);
   const pageSize = 10;
 
+  // Batch Order Selection State for Courier Logistics Export
+  const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
+
   // Admin Remarks State
   const [remarkInputs, setRemarkInputs] = useState<Record<string, string>>({});
   const [savedRemarkOrderIds, setSavedRemarkOrderIds] = useState<Record<string, boolean>>({});
+
+  // Export Orders to Courier CSV / Excel File
+  const exportSelectedOrdersToCSV = (targetOrders: Order[]) => {
+    if (!targetOrders || targetOrders.length === 0) {
+      alert('Please select at least one order to export!');
+      return;
+    }
+
+    const headers = [
+      'Order ID',
+      'Order Date',
+      'Customer Name',
+      'Mobile Number',
+      'Email Address',
+      'Delivery Address',
+      'City',
+      'State',
+      'Pincode',
+      'Ordered Product(s)',
+      'Product ID(s)',
+      'Selected Size(s)',
+      'Selected Frame(s)',
+      'Payment Method',
+      'Payment Status',
+      'Order Status',
+      'Total Amount (INR)',
+      'Admin Remarks',
+    ];
+
+    const sanitizeCell = (text: any) => {
+      if (text === null || text === undefined) return '""';
+      const str = String(text).replace(/"/g, '""');
+      return `"${str}"`;
+    };
+
+    const rows = targetOrders.map((ord) => {
+      const cust = ord.customer || ({} as any);
+      const dateStr = ord.createdAt ? new Date(ord.createdAt).toLocaleString('en-IN') : 'N/A';
+
+      const productTitles = ord.items.map((i) => `${i.product?.title || 'Custom Frame'} (Qty: ${i.quantity || 1})`).join(' | ');
+      const productIds = ord.items.map((i) => i.product?.productId || (i.product?.id ? `PRD-${i.product.id.slice(-4)}` : 'PRD-1001')).join(' | ');
+      const sizes = ord.items.map((i) => i.selectedSize?.name || 'A4 Size').join(' | ');
+      const frames = ord.items.map((i) => i.selectedFrame?.name || 'Black Wood').join(' | ');
+      const fullAddress = `${cust.address || ''}${cust.address ? ', ' : ''}${cust.landmark || ''}`.trim();
+
+      return [
+        sanitizeCell(ord.id),
+        sanitizeCell(dateStr),
+        sanitizeCell(cust.fullName || 'Customer'),
+        sanitizeCell(cust.phone || 'N/A'),
+        sanitizeCell(cust.email || 'N/A'),
+        sanitizeCell(fullAddress),
+        sanitizeCell(cust.city || ''),
+        sanitizeCell(cust.state || ''),
+        sanitizeCell(cust.pincode || ''),
+        sanitizeCell(productTitles),
+        sanitizeCell(productIds),
+        sanitizeCell(sizes),
+        sanitizeCell(frames),
+        sanitizeCell(ord.paymentMethod || 'Prepaid'),
+        sanitizeCell(ord.paymentStatus || 'Paid'),
+        sanitizeCell(ord.orderStatus || 'Received'),
+        sanitizeCell(ord.total || ord.subtotal || 0),
+        sanitizeCell(ord.adminRemark || ''),
+      ].join(',');
+    });
+
+    const csvContent = '\uFEFF' + [headers.map(sanitizeCell).join(','), ...rows].join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const timestamp = new Date().toISOString().split('T')[0];
+    link.href = url;
+    link.setAttribute('download', `A1Print_Shipping_Orders_EXPORT_${timestamp}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   // Filter Orders by Date Range & Payment Status
   const filteredOrders = orders.filter((order) => {
@@ -426,6 +507,63 @@ export const AdminOrderList: React.FC<AdminOrderListProps> = ({
         )}
       </div>
 
+      {/* Batch Selection Action Bar for Courier Logistics Export */}
+      {filteredOrders.length > 0 && (
+        <div className="p-3 bg-purple-950/30 dark:bg-purple-950/40 border border-purple-800/40 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 font-sans">
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2 cursor-pointer font-bold text-xs text-purple-200">
+              <input
+                type="checkbox"
+                checked={paginatedOrders.length > 0 && paginatedOrders.every((o) => selectedOrderIds.has(o.id))}
+                onChange={() => {
+                  const isAllSelected = paginatedOrders.length > 0 && paginatedOrders.every((o) => selectedOrderIds.has(o.id));
+                  setSelectedOrderIds((prev) => {
+                    const next = new Set(prev);
+                    if (isAllSelected) {
+                      paginatedOrders.forEach((o) => next.delete(o.id));
+                    } else {
+                      paginatedOrders.forEach((o) => next.add(o.id));
+                    }
+                    return next;
+                  });
+                }}
+                className="w-4 h-4 rounded-xs border-purple-400 accent-[#F82BA9] cursor-pointer"
+              />
+              <span>Select All ({paginatedOrders.length} on Page)</span>
+            </label>
+
+            {selectedOrderIds.size > 0 && (
+              <span className="px-2.5 py-1 bg-pink-500/20 text-pink-300 font-extrabold text-xs rounded-full border border-pink-500/30">
+                📦 {selectedOrderIds.size} Orders Selected
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <button
+              onClick={() => {
+                const target = selectedOrderIds.size > 0
+                  ? filteredOrders.filter((o) => selectedOrderIds.has(o.id))
+                  : filteredOrders;
+                exportSelectedOrdersToCSV(target);
+              }}
+              className="flex-1 sm:flex-initial px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs rounded-lg shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <Download className="w-4 h-4" /> Export {selectedOrderIds.size > 0 ? `Selected (${selectedOrderIds.size})` : 'All'} Orders (Excel / CSV)
+            </button>
+
+            {selectedOrderIds.size > 0 && (
+              <button
+                onClick={() => setSelectedOrderIds(new Set())}
+                className="px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold text-xs rounded-lg transition-colors cursor-pointer"
+              >
+                Clear Selection
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {filteredOrders.length === 0 ? (
         <div className="p-8 bg-[#121829] rounded-2xl border border-[#262E4A] text-center space-y-2">
           <p className="text-gray-400 font-bold text-sm">No customer orders match the selected date filter.</p>
@@ -464,14 +602,36 @@ export const AdminOrderList: React.FC<AdminOrderListProps> = ({
                 })
               : '26 Aug 2026';
 
+            const isSelected = selectedOrderIds.has(order.id);
+
             return (
               <div
                 key={order.id}
-                className="p-5 dark:bg-zinc-900/50 bg-white rounded-xl border dark:border-zinc-800 border-slate-200 shadow-xs space-y-4 dark:text-zinc-300 text-slate-700 dark:hover:border-zinc-700 hover:border-slate-300 transition-colors"
+                className={`p-5 dark:bg-zinc-900/50 bg-white rounded-xl border transition-colors space-y-4 dark:text-zinc-300 text-slate-700 ${
+                  isSelected ? 'border-purple-500 dark:border-purple-500 bg-purple-950/10 dark:bg-purple-950/20' : 'dark:border-zinc-800 border-slate-200 shadow-xs'
+                }`}
               >
                 {/* Top Order Row Header */}
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b dark:border-zinc-800/80 border-slate-200 pb-3">
                   <div className="flex flex-wrap items-center gap-2.5">
+                    {/* Row Select Checkbox */}
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => {
+                        setSelectedOrderIds((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(order.id)) {
+                            next.delete(order.id);
+                          } else {
+                            next.add(order.id);
+                          }
+                          return next;
+                        });
+                      }}
+                      className="w-4 h-4 rounded-xs border-zinc-600 accent-[#F82BA9] cursor-pointer"
+                    />
+
                     <span className="font-mono font-bold dark:text-zinc-100 text-slate-900 text-sm tracking-tight">{order.id}</span>
 
                     {/* Order Date & Time Badge */}
@@ -627,7 +787,12 @@ export const AdminOrderList: React.FC<AdminOrderListProps> = ({
                             </div>
 
                             <div className="space-y-0.5 min-w-0 flex-1">
-                              <h5 className="font-bold dark:text-zinc-100 text-slate-900 text-xs truncate">{item.product?.title || 'Custom Photo Frame'}</h5>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <h5 className="font-bold dark:text-zinc-100 text-slate-900 text-xs truncate">{item.product?.title || 'Custom Photo Frame'}</h5>
+                                <span className="px-1.5 py-0.5 bg-purple-500/10 dark:bg-purple-500/20 text-purple-600 dark:text-purple-300 font-mono font-bold text-[10px] rounded-md border border-purple-500/30">
+                                  Product ID: {item.product?.productId || (item.product?.id ? `PRD-${item.product.id.slice(-4)}` : 'PRD-1001')}
+                                </span>
+                              </div>
                               <span className="text-blue-500 font-bold block text-[11px]">{item.selectedSize?.name || 'A4 (8x12 Inch)'}</span>
                               
                               {textEntries.length > 0 && (

@@ -21,6 +21,7 @@ export const AdminProductListingModal: React.FC<AdminProductListingModalProps> =
   const { categories } = useCartStore();
 
   const [title, setTitle] = useState<string>('');
+  const [productId, setProductId] = useState<string>('');
   const [category, setCategory] = useState<string>('baby-kids');
   const [price, setPrice] = useState<number>(699);
   const [originalPrice, setOriginalPrice] = useState<number>(999);
@@ -36,6 +37,7 @@ export const AdminProductListingModal: React.FC<AdminProductListingModalProps> =
   useEffect(() => {
     if (editingProduct) {
       setTitle(editingProduct.title || '');
+      setProductId(editingProduct.productId || `PRD-${Math.floor(1000 + Math.random() * 9000)}`);
       setCategory(editingProduct.category || 'baby-kids');
       setPrice(editingProduct.sizes?.[0]?.price || 699);
       setOriginalPrice(editingProduct.sizes?.[0]?.originalPrice || 999);
@@ -47,6 +49,7 @@ export const AdminProductListingModal: React.FC<AdminProductListingModalProps> =
       setAllowedPaymentModes(editingProduct.allowedPaymentModes || ['Prepaid', 'COD', 'GoQuick50']);
     } else {
       setTitle('');
+      setProductId(`PRD-${Math.floor(1000 + Math.random() * 9000)}`);
       setCategory(categories[0]?.slug || 'baby-kids');
       setPrice(699);
       setOriginalPrice(999);
@@ -145,6 +148,7 @@ export const AdminProductListingModal: React.FC<AdminProductListingModalProps> =
 
     const newProd: Product = {
       id: editingProduct?.id || `prod-${Date.now()}`,
+      productId: productId.trim() || `PRD-${Math.floor(1000 + Math.random() * 9000)}`,
       slug,
       title: title.trim(),
       subtitle: `${categoryLabel} Gift Frame`,
@@ -225,15 +229,28 @@ export const AdminProductListingModal: React.FC<AdminProductListingModalProps> =
           {/* Left Column: Form Inputs (6 Cols) */}
           <div className="lg:col-span-6 space-y-4 text-xs">
             
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-zinc-300 block">Product Title :</label>
-              <input
-                type="text"
-                placeholder="e.g. Personalized Dad Heartbeat Photo Collage Frame"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 text-xs focus:outline-none focus:border-zinc-500 font-medium transition-colors"
-              />
+            <div className="grid grid-cols-12 gap-3">
+              <div className="col-span-4 space-y-1.5">
+                <label className="text-xs font-semibold text-purple-300 block">Product ID / SKU :</label>
+                <input
+                  type="text"
+                  placeholder="e.g. PRD-1004"
+                  value={productId}
+                  onChange={(e) => setProductId(e.target.value)}
+                  className="w-full px-3 py-2 bg-zinc-900 border border-purple-500/40 rounded-lg text-purple-200 text-xs font-mono font-bold focus:outline-none focus:border-purple-400 transition-colors"
+                />
+              </div>
+
+              <div className="col-span-8 space-y-1.5">
+                <label className="text-xs font-medium text-zinc-300 block">Product Title :</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Personalized Dad Heartbeat Photo Frame"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 text-xs focus:outline-none focus:border-zinc-500 font-medium transition-colors"
+                />
+              </div>
             </div>
 
             <div className="space-y-1.5">

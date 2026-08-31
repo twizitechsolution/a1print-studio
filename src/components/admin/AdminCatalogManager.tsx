@@ -37,6 +37,7 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
   const [isRecycleBinOpen, setIsRecycleBinOpen] = useState(false);
   const [selectedStockProduct, setSelectedStockProduct] = useState<Product | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [searchQuery, setSearchQuery] = useState<string>('');
   const [copiedAdLinkId, setCopiedAdLinkId] = useState<string | null>(null);
 
   // Defensive array guards to eliminate any runtime TypeError
@@ -44,7 +45,19 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
   const safeCategories = Array.isArray(categories) ? categories.filter(Boolean) : [];
 
   // Active Live Products vs Soft-Deleted Recycle Bin Products
-  const activeProducts = safeProducts.filter((p) => p && !p.isDeleted);
+  const activeProducts = safeProducts.filter((p) => {
+    if (!p || p.isDeleted) return false;
+    if (!searchQuery.trim()) return true;
+
+    const q = searchQuery.toLowerCase().trim();
+    const titleMatch = (p.title || '').toLowerCase().includes(q);
+    const idMatch = (p.id || '').toLowerCase().includes(q);
+    const prodIdMatch = (p.productId || '').toLowerCase().includes(q);
+    const catMatch = (p.categoryLabel || p.category || '').toLowerCase().includes(q);
+
+    return titleMatch || idMatch || prodIdMatch || catMatch;
+  });
+
   const deletedProducts = safeProducts.filter((p) => p && p.isDeleted);
 
   // 10-Item Pagination State
@@ -105,6 +118,21 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {/* Product ID & Title Search Input */}
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Search by Product ID, Title..."
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="pl-8 pr-3 py-2 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg text-xs dark:text-zinc-100 text-slate-800 focus:outline-none focus:border-purple-500 font-medium w-60 shadow-2xs"
+            />
+            <span className="absolute left-2.5 top-2.5 text-zinc-400 text-xs">🔍</span>
+          </div>
+
           {/* Category Manager Button */}
           <button
             onClick={() => setIsCategoryModalOpen(true)}
@@ -154,6 +182,7 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
                 const origVal = product.sizes && product.sizes[0] ? product.sizes[0].originalPrice : null;
                 const catName = product.categoryLabel || product.category || 'Custom Frame';
                 const stockQty = product.stockQuantity !== undefined ? product.stockQuantity : 50;
+                const displayProductId = product.productId || `PRD-${product.id.slice(-4)}`;
 
                 return (
                   <tr key={product.id} className="dark:hover:bg-zinc-900/60 hover:bg-slate-50 transition-colors dark:text-zinc-200 text-slate-800">
@@ -171,9 +200,14 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
                     </td>
 
                     <td className="p-3.5">
-                      <div className="space-y-0.5">
+                      <div className="space-y-1">
                         <h4 className="font-semibold dark:text-zinc-100 text-slate-900 text-xs">{product.title}</h4>
-                        <span className="dark:text-zinc-500 text-slate-400 font-mono text-[10px] block">ID: {product.id}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="px-2 py-0.5 bg-purple-500/10 dark:bg-purple-500/20 text-purple-600 dark:text-purple-300 font-mono font-bold text-[10px] rounded-md border border-purple-500/30">
+                            {displayProductId}
+                          </span>
+                          <span className="dark:text-zinc-500 text-slate-400 font-mono text-[10px]">({product.id})</span>
+                        </div>
                         {product.images && product.images.length > 1 && (
                           <span className="text-[10px] dark:text-zinc-400 text-slate-500 block font-normal">📸 {product.images.length} Angle Photos</span>
                         )}
