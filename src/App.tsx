@@ -47,7 +47,7 @@ export const App: React.FC = () => {
   } = useCartStore();
 
   // Default initial product if selectedProduct is null
-  const activeProduct = selectedProduct || (products && products.length > 0 ? products[0] : INITIAL_PRODUCTS[0]);
+  const activeProduct = selectedProduct || (products && products.length > 0 ? products[0] : null);
 
   useEffect(() => {
     const handlePopState = () => {

@@ -37,18 +37,35 @@ const defaultOrder: Order = {
   items: [
     {
       id: 'cart-1',
-      product: INITIAL_PRODUCTS[0],
-      selectedSize: INITIAL_PRODUCTS[0].sizes[0],
-      selectedFrame: INITIAL_PRODUCTS[0].frames[0],
+      product: {
+        id: 'prod-sample-default',
+        slug: 'welcome-baby-customizable-birth-frame',
+        title: 'Welcome Little One – Personalized Baby Birth Details Frame',
+        subtitle: 'Preserve your newborn\'s birth details in a personalized keepsake frame',
+        category: 'baby',
+        categoryLabel: 'Photo Collages',
+        rating: 4.9,
+        reviewsCount: 11,
+        thumbnail: 'https://images.unsplash.com/photo-1519689680058-324335c77eba?auto=format&fit=crop&w=800&q=80',
+        baseImageUrl: 'https://images.unsplash.com/photo-1519689680058-324335c77eba?auto=format&fit=crop&w=800&q=80',
+        images: ['https://images.unsplash.com/photo-1519689680058-324335c77eba?auto=format&fit=crop&w=800&q=80'],
+        bestseller: true,
+        onSale: true,
+        description: 'Sample order item.',
+        features: ['300 GSM Archival Premium Matte Paper'],
+        photoSlots: [],
+        textZones: [],
+        sizes: [{ id: 'size-a4', name: 'A4 (8x12 Inch)', dimensions: '8 x 12 inches', price: 699, originalPrice: 999, discountPercentage: 30 }],
+        frames: [{ id: 'frame-black', name: 'Classic Black Wood', borderStyle: 'border-8 border-black shadow-2xl', frameColor: '#000000', borderColorClass: 'border-black' }],
+      },
+      selectedSize: { id: 'size-a4', name: 'A4 (8x12 Inch)', dimensions: '8 x 12 inches', price: 699, originalPrice: 999, discountPercentage: 30 },
+      selectedFrame: { id: 'frame-black', name: 'Classic Black Wood', borderStyle: 'border-8 border-black shadow-2xl', frameColor: '#000000', borderColorClass: 'border-black' },
       uploadedPhotoUrl: 'https://images.unsplash.com/photo-1519689680058-324335c77eba?auto=format&fit=crop&q=80&w=600',
       customTextValues: {
         babyName: 'Arya Sharma',
         birthDateDay: '31',
         hospitalName: 'Duya Hospital',
         parentsName: 'Nikhil & Nikita',
-        height: '49',
-        weight: '3.5',
-        bloodGroup: 'A+',
       },
       quantity: 1,
       photoScale: 1,
@@ -117,7 +134,7 @@ function getStoredLocalData(): StoreData {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      const rawProds = Array.isArray(parsed.products) ? parsed.products : INITIAL_PRODUCTS;
+      const rawProds = Array.isArray(parsed.products) ? parsed.products : [];
       const prods = rawProds
         .filter((p: Product) => p && p.id && !deletedIds.has(p.id) && !p.isDeleted)
         .map((p: Product) => ({
@@ -148,13 +165,7 @@ function getStoredLocalData(): StoreData {
     }
   } catch (e) {}
 
-  const defaultProds = INITIAL_PRODUCTS
-    .filter((p) => p && p.id && !deletedIds.has(p.id))
-    .map((p) => ({
-      ...p,
-      stockQuantity: 50,
-      stockLogs: [],
-    }));
+  const defaultProds: Product[] = [];
 
   const initialOrders = [defaultOrder].map((o: Order) => {
     const saved = savedRemarks[o.id];

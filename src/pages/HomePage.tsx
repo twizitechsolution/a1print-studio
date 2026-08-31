@@ -16,7 +16,7 @@ interface HomePageProps {
 
 export const HomePage: React.FC<HomePageProps> = ({ onSelectProduct, onNavigate }) => {
   const { products } = useCartStore();
-  const safeProducts = (products && products.length > 0) ? products : INITIAL_PRODUCTS;
+  const safeProducts = (products && products.length > 0) ? products : [];
   const featuredProducts = safeProducts.slice(0, 3);
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
 
@@ -27,7 +27,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onSelectProduct, onNavigate 
       price: 'Rs. 699',
       itemsCount: '85 items',
       icon: '👶',
-      product: safeProducts[0] || INITIAL_PRODUCTS[0],
+      product: safeProducts[0] || null,
       image: 'https://lovecraftbyse.com/wp-content/uploads/2025/02/welcome-baby-boy-scaled.webp',
     },
     {
@@ -36,7 +36,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onSelectProduct, onNavigate 
       price: 'Rs. 699',
       itemsCount: '59 items',
       icon: '🎂',
-      product: safeProducts[1] || INITIAL_PRODUCTS[1] || INITIAL_PRODUCTS[0],
+      product: safeProducts[1] || safeProducts[0] || null,
       image: 'https://lovecraftbyse.com/wp-content/uploads/2026/03/custom-birthday-collage-photo-frame-personalized-name-date-1.jpg',
     },
     {
@@ -45,7 +45,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onSelectProduct, onNavigate 
       price: 'Rs. 699',
       itemsCount: '24 items',
       icon: '👶',
-      product: safeProducts[1] || INITIAL_PRODUCTS[1] || INITIAL_PRODUCTS[0],
+      product: safeProducts[1] || safeProducts[0] || null,
       image: 'https://lovecraftbyse.com/wp-content/uploads/2026/03/custom-birthday-collage-photo-frame-personalized-name-date-1.jpg',
     },
     {
@@ -54,7 +54,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onSelectProduct, onNavigate 
       price: 'Rs. 699',
       itemsCount: '19 items',
       icon: '🎁',
-      product: safeProducts[2] || INITIAL_PRODUCTS[2] || INITIAL_PRODUCTS[0],
+      product: safeProducts[2] || safeProducts[0] || null,
       image: 'https://lovecraftbyse.com/wp-content/uploads/2026/02/personalized-dad-heartbeat-frame-multiple-photos.webp-scaled.webp',
     },
   ];
