@@ -227,12 +227,6 @@ async function initCloudSync() {
       memoryData.products = validCloudProds;
       saveStoredLocalData(memoryData);
       notifyListeners();
-    } else {
-      memoryData.products.forEach((p) => {
-        if (p && p.id && !cloudDeletedIds.has(p.id) && !p.isDeleted) {
-          firebaseCloudDb.setDocument('products', p.id, p);
-        }
-      });
     }
 
     // 3. NON-DESTRUCTIVE UNION MERGING FOR ORDERS (PRESERVES ALL CUSTOMER ORDERS & ADMIN REMARKS)
