@@ -6,6 +6,7 @@ import { Eye, ArrowRight, Image as ImageIcon, Sparkles, Loader2, X, ShieldCheck,
 import { InteractiveCalendarZone } from './InteractiveCalendarZone';
 import { getRandomBirthdayMessage } from '../../data/messageBank';
 import { DeliveryPincodeChecker } from '../cart/DeliveryPincodeChecker';
+import { getFrameShapeStyles } from '../../utils/shapeStyles';
 
 interface UniversalFrameCustomizerProps {
   template: UniversalFrameTemplate;
