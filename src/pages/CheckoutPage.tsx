@@ -23,8 +23,9 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
 }) => {
   const { user, isAuthenticated, registerUser } = useAuthStore();
 
-  const [firstName, setFirstName] = useState(user?.fullName ? user.fullName.split(' ')[0] : '');
-  const [lastName, setLastName] = useState(user?.fullName && user.fullName.split(' ').length > 1 ? user.fullName.split(' ').slice(1).join(' ') : '');
+  const safeUserFullName = typeof user?.fullName === 'string' ? user.fullName.trim() : '';
+  const [firstName, setFirstName] = useState(safeUserFullName ? safeUserFullName.split(' ')[0] : '');
+  const [lastName, setLastName] = useState(safeUserFullName && safeUserFullName.split(' ').length > 1 ? safeUserFullName.split(' ').slice(1).join(' ') : '');
   const [phone, setPhone] = useState(user?.phone || '');
   const [email, setEmail] = useState(user?.email || '');
   const [address, setAddress] = useState('');

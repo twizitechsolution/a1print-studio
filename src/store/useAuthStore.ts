@@ -62,6 +62,11 @@ try {
   const saved = localStorage.getItem(AUTH_STORAGE_KEY);
   if (saved) {
     const parsed = JSON.parse(saved);
+    if (parsed && parsed.user) {
+      if (typeof parsed.user.fullName !== 'string') {
+        parsed.user.fullName = String(parsed.user.email ? parsed.user.email.split('@')[0] : 'Valued Customer');
+      }
+    }
     globalAuthState = {
       ...globalAuthState,
       ...parsed,
