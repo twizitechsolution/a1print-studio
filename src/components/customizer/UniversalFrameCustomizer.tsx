@@ -228,7 +228,7 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
     if (saved) {
       try { return JSON.parse(saved); } catch (e) {}
     }
-    return { enabled: true, text: 'A1PRINT STUDIO SAMPLE' };
+    return { enabled: false, text: '' };
   });
 
   const handleOpenPreviewModal = async () => {

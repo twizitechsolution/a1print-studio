@@ -32,6 +32,29 @@ export const AdminDarkStatsCards: React.FC<AdminDarkStatsCardsProps> = ({
   orders,
   onSelectStatusFilter,
 }) => {
+  const [dbCustomerCount, setDbCustomerCount] = React.useState<number>(() => {
+    try {
+      const raw = localStorage.getItem('a1print_registered_customers_v2');
+      if (raw) {
+        const list = JSON.parse(raw);
+        if (Array.isArray(list)) return list.length;
+      }
+    } catch (e) {}
+    return 0;
+  });
+
+  React.useEffect(() => {
+    const fetchCustomers = async () => {
+      try {
+        const docs = await firebaseCloudDb.getCollection('customer_users');
+        if (docs && docs.length > 0) {
+          setDbCustomerCount(docs.length);
+        }
+      } catch (e) {}
+    };
+    fetchCustomers();
+  }, []);
+
   // Real-time Date Calculations
   const todayStr = new Date().toISOString().split('T')[0];
   const currentMonthStr = new Date().toISOString().slice(0, 7); // e.g. "2026-08"
@@ -61,9 +84,13 @@ export const AdminDarkStatsCards: React.FC<AdminDarkStatsCardsProps> = ({
   const deliveredCount = orders.filter((o) => o.orderStatus === 'Delivered').length;
   const rtoCount = orders.filter((o) => o.orderStatus === 'RTO' || (o.notes || '').toLowerCase().includes('rto')).length;
 
-  // Unique customers count
-  const uniquePhones = new Set(orders.map((o) => o.customer?.phone || o.customer?.fullName).filter(Boolean));
-  const totalCustomers = uniquePhones.size || 1;
+  // Real-time Unique customers count across orders & Cloud Firestore registered users directory!
+  const customerSet = new Set<string>();
+  orders.forEach((o) => {
+    if (o.customer?.phone) customerSet.add(o.customer.phone.trim());
+    if (o.customer?.email) customerSet.add(o.customer.email.trim().toLowerCase());
+  });
+  const totalCustomers = Math.max(customerSet.size, dbCustomerCount, 1);
 
   // Real-time Financial Sales Totals (excluding Cancelled orders)
   const validOrders = orders.filter((o) => o.orderStatus !== 'Cancelled');

@@ -724,23 +724,7 @@ export function useCartStore() {
       const raw = localStorage.getItem('a1print_support_tickets_v1');
       if (raw) return JSON.parse(raw);
     } catch (e) {}
-    return [
-      {
-        id: 'tkt-1',
-        ticketNumber: 'TKT-948201',
-        orderId: 'ORD-849201',
-        customerName: 'Neha Saxena',
-        customerPhone: '9876543210',
-        customerEmail: 'neha.saxena@example.com',
-        issueType: 'Frame Damaged in Transit',
-        description: 'The outer corner of the acrylic glass frame has a small hairline crack received during delivery.',
-        images: ['https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=400&q=80'],
-        status: 'In Review',
-        createdAt: new Date().toISOString(),
-        adminReply: 'Free replacement frame has been approved by Quality Desk. New AWB dispatch update will be sent shortly!',
-        adminReplyTimestamp: new Date().toISOString(),
-      },
-    ];
+    return [];
   });
 
   const createSupportTicket = (data: Omit<SupportTicket, 'id' | 'ticketNumber' | 'createdAt' | 'status'>) => {

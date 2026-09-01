@@ -124,6 +124,16 @@ export const CustomerOrdersDashboard: React.FC<CustomerOrdersDashboardProps> = (
     return false;
   });
 
+  // Filter support tickets specifically for the currently logged in customer profile!
+  const userSupportTickets = supportTickets.filter((t) => {
+    if (!user) return false;
+    const uPhone = (user.phone || '').trim();
+    const uEmail = (user.email || '').trim().toLowerCase();
+    const tPhone = (t.customerPhone || '').trim();
+    const tEmail = (t.customerEmail || '').trim().toLowerCase();
+    return (uPhone && tPhone && uPhone === tPhone) || (uEmail && tEmail && uEmail === tEmail);
+  });
+
   return (
     <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8 font-jost select-none">
       
@@ -595,11 +605,11 @@ export const CustomerOrdersDashboard: React.FC<CustomerOrdersDashboardProps> = (
         <div className="bg-white p-6 rounded-3xl border border-gray-200 shadow-xs space-y-4">
           <h3 className="font-playfair text-xl font-bold text-[#160E4B]">Payment History & Transactions</h3>
 
-          {orders.length === 0 ? (
-            <p className="text-xs text-gray-500">No payment transaction records found.</p>
+          {customerOrders.length === 0 ? (
+            <p className="text-xs text-gray-500">No payment transaction records found for your account.</p>
           ) : (
             <div className="space-y-3 text-xs">
-              {orders.map((ord) => (
+              {customerOrders.map((ord) => (
                 <div key={ord.id} className="p-4 bg-gray-50 rounded-2xl border border-gray-200 flex items-center justify-between gap-4">
                   <div className="space-y-1">
                     <span className="font-extrabold text-[#160E4B] font-mono">Order {ord.id}</span>
@@ -774,10 +784,10 @@ export const CustomerOrdersDashboard: React.FC<CustomerOrdersDashboardProps> = (
           {/* List of Submitted Tickets */}
           <div className="space-y-4">
             <h4 className="font-bold text-xs uppercase tracking-wider text-gray-500">Your Support Tickets</h4>
-            {supportTickets.length === 0 ? (
-              <p className="text-gray-400">No support tickets submitted yet.</p>
+            {userSupportTickets.length === 0 ? (
+              <p className="text-gray-400">No support tickets submitted yet for your account.</p>
             ) : (
-              supportTickets.map((t) => (
+              userSupportTickets.map((t) => (
                 <div key={t.id} className="p-4 bg-gray-50 rounded-2xl border border-gray-200 space-y-3">
                   <div className="flex items-center justify-between">
                     <div>

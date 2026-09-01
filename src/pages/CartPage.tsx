@@ -105,12 +105,35 @@ export const CartPage: React.FC<CartPageProps> = ({
                   <p className="text-[#F82BA9] font-bold">Size: {item.selectedSize?.name || 'A4 (8x12 Inch)'}</p>
                   <p className="text-gray-500">Frame Style: {item.selectedFrame?.name || 'Classic Black Wood'}</p>
                   
-                  {/* Dynamic Custom Text Details List */}
-                  <div className="p-2 bg-purple-50 rounded-lg text-[10px] space-y-0.5 mt-2 font-mono text-gray-700">
-                    {Object.entries(item.customTextValues).map(([k, v]) => (
-                      <div key={k}>{k}: <strong>{v}</strong></div>
-                    ))}
-                  </div>
+                  {/* Dynamic Customization Details List (Clean & Professional Display) */}
+                  {item.customTextValues && Object.keys(item.customTextValues).length > 0 && (
+                    <div className="p-2.5 bg-purple-50/70 rounded-xl text-[11px] space-y-1 mt-2 border border-purple-100 max-w-sm">
+                      {Object.entries(item.customTextValues).map(([k, v]) => {
+                        if (!v) return null;
+                        const isImage = typeof v === 'string' && (v.startsWith('data:image') || v.startsWith('http://') || v.startsWith('https://'));
+                        const cleanKey = k
+                          .replace(/([A-Z])/g, ' $1')
+                          .replace(/[-_]/g, ' ')
+                          .replace(/^./, (str) => str.toUpperCase())
+                          .trim();
+
+                        if (isImage) {
+                          return (
+                            <div key={k} className="flex items-center gap-1.5 text-[#160E4B]">
+                              <span className="font-bold">{cleanKey}:</span>
+                              <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 font-extrabold text-[10px] rounded-md">✓ Uploaded</span>
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <div key={k} className="text-[#160E4B]">
+                            <span className="font-bold">{cleanKey}:</span> <span className="font-semibold text-gray-800">{v}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
 
