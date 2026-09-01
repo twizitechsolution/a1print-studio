@@ -3,9 +3,9 @@ import { CartItem, Order, Product, Category, StockLogItem } from '../types';
 import { PRODUCTS as INITIAL_PRODUCTS } from '../data/products';
 import { firebaseCloudDb } from '../config/firebase';
 
-const STORAGE_KEY = 'a1print_store_data_v15';
-const DELETED_IDS_KEY = 'a1print_deleted_product_ids_v15';
-const CATEGORIES_KEY = 'a1print_categories_v15';
+const STORAGE_KEY = 'a1print_store_data_v20';
+const DELETED_IDS_KEY = 'a1print_deleted_product_ids_v20';
+const CATEGORIES_KEY = 'a1print_categories_v20';
 
 export const DEFAULT_CATEGORIES: Category[] = [
   { id: 'cat-1', name: 'Baby & Kids', slug: 'baby-kids', description: 'Customized newborn birth stats & baby milestone frames', icon: '👶', createdAt: new Date().toISOString() },
