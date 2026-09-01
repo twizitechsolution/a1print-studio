@@ -30,9 +30,9 @@ export const AdminPaymentManager: React.FC = () => {
     },
   ]);
 
-  const [codFee, setCodFee] = useState<number>(50);
-  const [keyId, setKeyId] = useState<string>('rzp_test_TUVA8GMaELbV0a');
-  const [keySecret, setKeySecret] = useState<string>('fjrS6b6Nn8AQMs1AbQ5OM1YQ');
+  const [codFee, setCodFee] = useState<number>(0);
+  const [keyId, setKeyId] = useState<string>('rzp_test_TWrhN46NzOrFA4');
+  const [keySecret, setKeySecret] = useState<string>('1OoKv4t5vKRYfYGRRqCpv9H0');
   const [savedStatus, setSavedStatus] = useState<string | null>(null);
 
   useEffect(() => {

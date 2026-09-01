@@ -4,7 +4,7 @@ import { LiveCustomizedFrameThumbnail } from '../components/customizer/LiveCusto
 import { useAuthStore } from '../store/useAuthStore';
 import { launchRazorpayCheckout } from '../services/razorpayService';
 import { InstantUPIGatewayModal } from '../components/cart/InstantUPIGatewayModal';
-import { ShieldCheck, Truck, CreditCard, Lock, Sparkles, Edit3, Loader2, UserPlus, LogIn, X, CheckCircle2, Zap, QrCode } from 'lucide-react';
+import { ShieldCheck, Truck, CreditCard, Lock, Sparkles, Edit3, Loader2, UserPlus, LogIn, X, CheckCircle2, Zap, QrCode, MapPin } from 'lucide-react';
 
 interface CheckoutPageProps {
   items: CartItem[];
@@ -21,7 +21,7 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
   onOrderSuccess,
   onNavigate,
 }) => {
-  const { user, isAuthenticated, registerUser } = useAuthStore();
+  const { user, isAuthenticated, registerUser, addSavedAddress } = useAuthStore();
 
   const safeUserFullName = typeof user?.fullName === 'string' ? user.fullName.trim() : '';
   const [firstName, setFirstName] = useState(safeUserFullName ? safeUserFullName.split(' ')[0] : '');
@@ -33,7 +33,10 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
   const [city, setCity] = useState('');
   const [state, setState] = useState('Odisha');
   const [pincode, setPincode] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'Razorpay' | 'PhonePe' | 'COD'>('Razorpay');
+  const [paymentMethod, setPaymentMethod] = useState<'Razorpay' | 'COD'>('Razorpay');
+
+  // Saved Address selection state
+  const [selectedAddressId, setSelectedAddressId] = useState<string>('new');
 
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -81,15 +84,34 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
 
   const handleCompletePrepaidOrder = (paymentId: string, gatewayName: 'Razorpay' | 'UPI Direct' = 'Razorpay') => {
     try {
+      const fullAddressStr = `${address}${landmark ? `, Near ${landmark}` : ''}`;
       const customerData = {
         fullName: `${firstName} ${lastName}`.trim(),
         phone,
         email: email || `${phone}@a1printstudio.com`,
-        address: `${address}${landmark ? `, Near ${landmark}` : ''}`,
+        address: fullAddressStr,
         city,
         state,
         pincode,
       };
+
+      // Auto-save address to logged-in user profile
+      if (isAuthenticated && addSavedAddress && address && pincode) {
+        const alreadyExists = user?.savedAddresses?.some(
+          (a) => a.address === fullAddressStr && a.pincode === pincode
+        );
+        if (!alreadyExists) {
+          addSavedAddress({
+            type: 'Home',
+            fullName: customerData.fullName,
+            phone,
+            address: fullAddressStr,
+            city,
+            state,
+            pincode,
+          });
+        }
+      }
 
       const order = onPlaceOrder({
         customer: customerData,
@@ -122,17 +144,36 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
     setIsSubmitting(true);
     setErrorMsg(null);
 
+    const fullAddressStr = `${address}${landmark ? `, Near ${landmark}` : ''}`;
     const customerData = {
       fullName: `${firstName} ${lastName}`.trim(),
       phone,
       email: email || `${phone}@a1printstudio.com`,
-      address: `${address}${landmark ? `, Near ${landmark}` : ''}`,
+      address: fullAddressStr,
       city,
       state,
       pincode,
     };
 
-    if (paymentMethod === 'Razorpay' || paymentMethod === 'PhonePe') {
+    // Auto-save address to logged-in user profile
+    if (isAuthenticated && addSavedAddress && address && pincode) {
+      const alreadyExists = user?.savedAddresses?.some(
+        (a) => a.address === fullAddressStr && a.pincode === pincode
+      );
+      if (!alreadyExists) {
+        addSavedAddress({
+          type: 'Home',
+          fullName: customerData.fullName,
+          phone,
+          address: fullAddressStr,
+          city,
+          state,
+          pincode,
+        });
+      }
+    }
+
+    if (paymentMethod === 'Razorpay') {
       // Launch Official Razorpay Standard Web Checkout Gateway
       launchRazorpayCheckout({
         amountInRupees: subtotal,
@@ -233,6 +274,72 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
               </span>
             )}
           </div>
+
+          {/* Saved Addresses Selector for Logged-In User */}
+          {isAuthenticated && user && user.savedAddresses && user.savedAddresses.length > 0 && (
+            <div className="space-y-3 p-4 bg-purple-50/70 border border-purple-200 rounded-2xl font-jost text-xs">
+              <div className="flex items-center justify-between">
+                <span className="font-extrabold text-xs text-[#160E4B] flex items-center gap-1.5">
+                  <MapPin className="w-4 h-4 text-[#F82BA9]" /> Select Saved Delivery Address
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedAddressId('new');
+                    setAddress('');
+                    setLandmark('');
+                    setCity('');
+                    setPincode('');
+                  }}
+                  className="text-[11px] font-extrabold text-[#F82BA9] hover:underline cursor-pointer"
+                >
+                  + Add New Address
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 gap-2.5">
+                {user.savedAddresses.map((sa) => (
+                  <label
+                    key={sa.id}
+                    className={`p-3.5 rounded-xl border-2 flex items-start gap-3 cursor-pointer transition-all ${
+                      selectedAddressId === sa.id ? 'border-[#F82BA9] bg-white shadow-xs' : 'border-gray-200 bg-white/70 hover:border-purple-300'
+                    }`}
+                    onClick={() => {
+                      setSelectedAddressId(sa.id);
+                      setAddress(sa.address || '');
+                      setCity(sa.city || '');
+                      setState(sa.state || 'Odisha');
+                      setPincode(sa.pincode || '');
+                      if (sa.fullName) {
+                        const parts = sa.fullName.trim().split(' ');
+                        setFirstName(parts[0] || '');
+                        setLastName(parts.slice(1).join(' ') || '');
+                      }
+                      if (sa.phone) setPhone(sa.phone);
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      name="saved_address_choice"
+                      checked={selectedAddressId === sa.id}
+                      onChange={() => {}}
+                      className="mt-0.5 accent-[#F82BA9]"
+                    />
+                    <div className="text-xs space-y-0.5 flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-extrabold text-gray-900">{sa.fullName || user.fullName}</span>
+                        <span className="px-2 py-0.5 bg-purple-100 text-purple-800 text-[10px] font-bold rounded-md uppercase">
+                          {sa.type || 'Saved Address'}
+                        </span>
+                      </div>
+                      <p className="text-gray-600 font-medium">{sa.address}, {sa.city}, {sa.state} - {sa.pincode}</p>
+                      <p className="text-gray-500 font-mono text-[11px]">📱 {sa.phone || user.phone}</p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 font-jost text-xs">
             <div className="space-y-1">
@@ -358,77 +465,50 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
             <label className="font-bold text-xs text-gray-900 block">Payment Method</label>
             <div className="space-y-2">
               
-              {/* Option 1: Prepaid (Razorpay / UPI) */}
-              {(activeItem?.product?.allowedPaymentModes ? activeItem.product.allowedPaymentModes.includes('Prepaid') : true) && (
-                <label className={`p-4 rounded-2xl border-2 flex items-center justify-between cursor-pointer transition-all ${
-                  paymentMethod === 'Razorpay' || paymentMethod === 'PhonePe' ? 'border-[#F82BA9] bg-pink-50/40' : 'border-gray-200'
-                }`}>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="radio"
-                      name="payment"
-                      checked={paymentMethod === 'Razorpay' || paymentMethod === 'PhonePe'}
-                      onChange={() => setPaymentMethod('Razorpay')}
-                      className="accent-[#F82BA9]"
-                    />
-                    <div>
-                      <span className="font-bold text-xs text-gray-900 block flex items-center gap-1.5">
-                        Full Online Payment <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-                        <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 font-extrabold text-[10px] rounded-full">Instant 9% OFF</span>
-                      </span>
-                      <span className="text-[11px] text-gray-500 block">UPI, GPay, PhonePe, Cards, NetBanking & Wallets</span>
-                    </div>
+              {/* Option 1: Prepaid (Razorpay Gateway) */}
+              <label className={`p-4 rounded-2xl border-2 flex items-center justify-between cursor-pointer transition-all ${
+                paymentMethod === 'Razorpay' ? 'border-[#F82BA9] bg-pink-50/40' : 'border-gray-200 hover:border-purple-200'
+              }`}>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="radio"
+                    name="payment"
+                    checked={paymentMethod === 'Razorpay'}
+                    onChange={() => setPaymentMethod('Razorpay')}
+                    className="accent-[#F82BA9]"
+                  />
+                  <div>
+                    <span className="font-bold text-xs text-gray-900 block flex items-center gap-1.5">
+                      Prepaid Online Payment (Razorpay) <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                      <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 font-extrabold text-[10px] rounded-full">Secure & Fast</span>
+                    </span>
+                    <span className="text-[11px] text-gray-500 block">UPI, Google Pay, PhonePe, Cards, NetBanking & Wallets</span>
                   </div>
-                  <CreditCard className="w-5 h-5 text-purple-600" />
-                </label>
-              )}
+                </div>
+                <CreditCard className="w-5 h-5 text-purple-600" />
+              </label>
 
-              {/* Option 2: GoQuick ₹50 Advance Deposit */}
-              {(activeItem?.product?.allowedPaymentModes ? activeItem.product.allowedPaymentModes.includes('GoQuick50') : true) && (
-                <label className={`p-4 rounded-2xl border-2 flex items-center justify-between cursor-pointer transition-all ${
-                  (paymentMethod as string) === 'GoQuick50' ? 'border-[#F82BA9] bg-pink-50/40' : 'border-gray-200'
-                }`}>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="radio"
-                      name="payment"
-                      checked={(paymentMethod as string) === 'GoQuick50'}
-                      onChange={() => setPaymentMethod('GoQuick50' as any)}
-                      className="accent-[#F82BA9]"
-                    />
-                    <div>
-                      <span className="font-bold text-xs text-gray-900 block flex items-center gap-1.5">
-                        GoQuick ⚡ ₹50 Partial Advance Deposit
-                        <span className="px-2 py-0.5 bg-purple-100 text-purple-700 font-extrabold text-[10px] rounded-full">Popular Choice</span>
-                      </span>
-                      <span className="text-[11px] text-gray-500 block">Pay ₹50 advance online via UPI + Pay remaining ₹{Math.max(0, subtotal - 50)} cash on doorstep delivery</span>
-                    </div>
+              {/* Option 2: Cash on Delivery (COD) */}
+              <label className={`p-4 rounded-2xl border-2 flex items-center justify-between cursor-pointer transition-all ${
+                paymentMethod === 'COD' ? 'border-[#F82BA9] bg-pink-50/40' : 'border-gray-200 hover:border-purple-200'
+              }`}>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="radio"
+                    name="payment"
+                    checked={paymentMethod === 'COD'}
+                    onChange={() => setPaymentMethod('COD')}
+                    className="accent-[#F82BA9]"
+                  />
+                  <div>
+                    <span className="font-bold text-xs text-gray-900 block flex items-center gap-1.5">
+                      Cash on Delivery (COD)
+                    </span>
+                    <span className="text-[11px] text-gray-500 block">Pay cash directly to delivery partner upon order delivery</span>
                   </div>
-                  <QrCode className="w-5 h-5 text-pink-600" />
-                </label>
-              )}
-
-              {/* Option 3: Full COD */}
-              {(activeItem?.product?.allowedPaymentModes ? activeItem.product.allowedPaymentModes.includes('COD') : true) && (
-                <label className={`p-4 rounded-2xl border-2 flex items-center justify-between cursor-pointer transition-all ${
-                  paymentMethod === 'COD' ? 'border-[#F82BA9] bg-pink-50/40' : 'border-gray-200'
-                }`}>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="radio"
-                      name="payment"
-                      checked={paymentMethod === 'COD'}
-                      onChange={() => setPaymentMethod('COD')}
-                      className="accent-[#F82BA9]"
-                    />
-                    <div>
-                      <span className="font-bold text-xs text-gray-900 block">Cash on Delivery (COD)</span>
-                      <span className="text-[11px] text-gray-500 block">Pay ₹{subtotal} in cash when order is delivered to your address</span>
-                    </div>
-                  </div>
-                  <Truck className="w-5 h-5 text-emerald-600" />
-                </label>
-              )}
+                </div>
+                <Truck className="w-5 h-5 text-emerald-600" />
+              </label>
 
             </div>
           </div>

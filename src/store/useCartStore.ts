@@ -117,11 +117,54 @@ function getStoredLocalData(): StoreData {
 
 let memoryData: StoreData = getStoredLocalData();
 
+function optimizeDataForLocalStorage(data: StoreData): StoreData {
+  const sanitizeValue = (val: any): any => {
+    if (typeof val === 'string' && val.startsWith('data:image') && val.length > 50000) {
+      return val.substring(0, 15000) + '...[COMPRESSED_PREVIEW]';
+    }
+    if (Array.isArray(val)) return val.map(sanitizeValue);
+    if (typeof val === 'object' && val !== null) {
+      const obj: Record<string, any> = {};
+      for (const [k, v] of Object.entries(val)) {
+        obj[k] = sanitizeValue(v);
+      }
+      return obj;
+    }
+    return val;
+  };
+
+  return {
+    ...data,
+    items: (data.items || []).map((item) => ({
+      ...item,
+      customizedFramePreviewUrl: item.customizedFramePreviewUrl && item.customizedFramePreviewUrl.length > 50000
+        ? item.customizedFramePreviewUrl.substring(0, 15000) + '...[COMPRESSED_PREVIEW]'
+        : item.customizedFramePreviewUrl,
+      customTextValues: sanitizeValue(item.customTextValues || {}),
+    })),
+  };
+}
+
 function saveStoredLocalData(data: StoreData) {
   memoryData = data;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  } catch (e) {}
+    const optimized = optimizeDataForLocalStorage(data);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(optimized));
+  } catch (e) {
+    try {
+      // Fallback if quota still exceeded: strip extra preview strings so cart items remain safe
+      const fallback = {
+        ...data,
+        items: (data.items || []).map((item) => ({
+          ...item,
+          customizedFramePreviewUrl: '',
+        })),
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(fallback));
+    } catch (err) {
+      console.warn('LocalStorage save error:', err);
+    }
+  }
 }
 
 const listeners = new Set<() => void>();
@@ -168,17 +211,22 @@ async function initCloudSync() {
       notifyListeners();
     }
 
-    // 3. NON-DESTRUCTIVE UNION MERGING FOR ORDERS (PRESERVES ALL CUSTOMER ORDERS & ADMIN REMARKS)
+    // 3. STRICT NON-DESTRUCTIVE UNION MERGING FOR ORDERS (PRESERVES ALL CUSTOMER ORDERS)
     const cloudOrders = await firebaseCloudDb.getCollection('orders');
+    const savedRemarks = getStoredAdminRemarks();
+    const orderMap = new Map<string, Order>();
+
+    // Step A: Load all local memory orders first (never drop un-synced orders!)
+    memoryData.orders.forEach((o) => {
+      if (o && o.id) orderMap.set(o.id, o);
+    });
+
+    // Step B: Merge Cloud Firestore orders
     if (cloudOrders && cloudOrders.length > 0) {
-      const savedRemarks = getStoredAdminRemarks();
-      const orderMap = new Map<string, Order>();
-      memoryData.orders.forEach((o) => {
-        if (o && o.id) orderMap.set(o.id, o);
-      });
-      
+      const cloudIds = new Set<string>();
       cloudOrders.forEach((co) => {
         if (co && co.id) {
+          cloudIds.add(co.id);
           const existing = orderMap.get(co.id);
           const localRemark = savedRemarks[co.id]?.remark || existing?.adminRemark || '';
           const localRemarkTime = savedRemarks[co.id]?.timestamp || existing?.adminRemarkTimestamp || '';
@@ -193,14 +241,21 @@ async function initCloudSync() {
         }
       });
 
-      const mergedOrders = Array.from(orderMap.values()).sort(
-        (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
-      );
-
-      memoryData.orders = mergedOrders;
-      saveStoredLocalData(memoryData);
-      notifyListeners();
+      // Background retry push for local orders missing in Cloud Firestore
+      orderMap.forEach((localOrder, id) => {
+        if (!cloudIds.has(id)) {
+          firebaseCloudDb.setDocument('orders', id, localOrder);
+        }
+      });
     }
+
+    const mergedOrders = Array.from(orderMap.values()).sort(
+      (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+    );
+
+    memoryData.orders = mergedOrders;
+    saveStoredLocalData(memoryData);
+    notifyListeners();
 
     // 4. FETCH CLOUD FIRESTORE CATEGORIES
     const cloudCats = await firebaseCloudDb.getCollection('categories');
@@ -544,7 +599,12 @@ export function useCartStore() {
     const syncToCloud = async () => {
       let success = await firebaseCloudDb.setDocument('orders', newOrder.id, newOrder);
       if (!success) {
-        setTimeout(() => firebaseCloudDb.setDocument('orders', newOrder.id, newOrder), 2000);
+        setTimeout(async () => {
+          let retry1 = await firebaseCloudDb.setDocument('orders', newOrder.id, newOrder);
+          if (!retry1) {
+            setTimeout(() => firebaseCloudDb.setDocument('orders', newOrder.id, newOrder), 4000);
+          }
+        }, 1500);
       }
     };
     syncToCloud();
