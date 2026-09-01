@@ -358,25 +358,37 @@ export function useCartStore() {
 
   // Soft Delete Product (Moved to Recycle Bin)
   const softDeleteProduct = (id: string) => {
-    const updatedProducts = memoryData.products.map((p) => {
-      if (p.id === id) {
-        const updated: Product = {
-          ...p,
-          isDeleted: true,
-          deletedAt: new Date().toISOString(),
-        };
-        firebaseCloudDb.setDocument('products', updated.id, updated);
-        return updated;
-      }
-      return p;
+    const deletedIds = getDeletedProductIds();
+    deletedIds.add(id);
+    saveDeletedProductIds(deletedIds);
+
+    // Save tombstone to Cloud Firestore so server updates & all devices remember deletion forever!
+    firebaseCloudDb.setDocument('deleted_products', 'global_tombstone', {
+      id: 'global_tombstone',
+      ids: Array.from(deletedIds),
+      updatedAt: new Date().toISOString(),
     });
 
+    // Delete document from Cloud Firestore products collection
+    firebaseCloudDb.deleteDocument('products', id);
+
+    const updatedProducts = memoryData.products.filter((p) => p.id !== id);
     saveStoredLocalData({ ...memoryData, products: updatedProducts });
     notifyListeners();
   };
 
   // Restore Soft-Deleted Product from Recycle Bin
   const restoreProduct = (id: string) => {
+    const deletedIds = getDeletedProductIds();
+    deletedIds.delete(id);
+    saveDeletedProductIds(deletedIds);
+
+    firebaseCloudDb.setDocument('deleted_products', 'global_tombstone', {
+      id: 'global_tombstone',
+      ids: Array.from(deletedIds),
+      updatedAt: new Date().toISOString(),
+    });
+
     const updatedProducts = memoryData.products.map((p) => {
       if (p.id === id) {
         const updated: Product = {
