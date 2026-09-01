@@ -15,7 +15,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed. Use POST.' });
   }
 
-  const keySecret = process.env.RAZORPAY_KEY_SECRET || 'fjrS6b6Nn8AQMs1AbQ5OM1YQ';
+  const keySecret = process.env.RAZORPAY_KEY_SECRET || '1OoKv4t5vKRYfYGRRqCpv9H0';
 
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
@@ -28,7 +28,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // If order_id & signature are present, perform HMAC-SHA256 verification
+    // Perform HMAC-SHA256 verification
     if (razorpay_order_id && razorpay_signature) {
       const text = `${razorpay_order_id}|${razorpay_payment_id}`;
       const generated_signature = crypto
@@ -53,7 +53,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    // If payment_id is valid (Direct Checkout mode), accept payment verification
+    // Direct Payment fallback when payment_id is present
     return res.status(200).json({
       success: true,
       message: 'Razorpay Payment received and verified',

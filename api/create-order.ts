@@ -19,8 +19,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
     const { amount, currency = 'INR', receipt, customKeyId, customKeySecret } = body;
 
-    const keyId = customKeyId || process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_TUVA8GMaELbV0a';
-    const keySecret = customKeySecret || process.env.RAZORPAY_KEY_SECRET || 'fjrS6b6Nn8AQMs1AbQ5OM1YQ';
+    const keyId = customKeyId || process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_TWrhN46NzOrFA4';
+    const keySecret = customKeySecret || process.env.RAZORPAY_KEY_SECRET || '1OoKv4t5vKRYfYGRRqCpv9H0';
+
+    if (!keyId || !keySecret) {
+      return res.status(401).json({ error: 'Razorpay API credentials missing. Please check server environment variables.' });
+    }
 
     const amountInPaise = Number(amount);
     if (!amountInPaise || isNaN(amountInPaise) || amountInPaise < 100) {
@@ -48,8 +52,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (order && order.id) {
         orderId = order.id;
       }
-    } catch (sdkError) {
-      console.warn('Razorpay SDK order creation failed, executing direct REST API fallback:', sdkError);
+    } catch (sdkError: any) {
+      console.warn('Razorpay SDK order creation failed, executing direct REST API fallback:', sdkError?.message || sdkError);
+      if (sdkError?.statusCode === 401 || sdkError?.error?.code === 'BAD_REQUEST_ERROR') {
+        // Continue to REST fallback
+      }
     }
 
     // Approach 2: Direct REST API Fallback with Basic Auth if SDK failed
@@ -73,7 +80,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         orderId = apiData.id;
       } else {
         console.error('Razorpay Direct REST API Error response:', apiData);
-        return res.status(apiRes.status || 500).json({
+        const statusCode = apiRes.status === 401 ? 401 : 500;
+        return res.status(statusCode).json({
           error: apiData?.error?.description || 'Failed to create order on Razorpay API.',
           details: apiData,
         });
