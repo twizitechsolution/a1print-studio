@@ -280,6 +280,115 @@ export const AdminDarkStatsCards: React.FC<AdminDarkStatsCardsProps> = ({
   return (
     <div className="space-y-8 font-sans">
       
+      {/* Quick Action Shipping & Product ID Toolbar Banner */}
+      <div className="p-4 bg-gradient-to-r from-purple-900/60 via-indigo-900/60 to-slate-900/80 border border-purple-500/30 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-lg">
+        <div>
+          <h3 className="text-sm font-bold text-white flex items-center gap-2">
+            <span>📦 Order Bulk Selection & Shipping Export Hub</span>
+            <span className="px-2 py-0.5 bg-purple-500/30 text-purple-200 font-mono text-[10px] rounded-full border border-purple-400/40">NEW</span>
+          </h3>
+          <p className="text-xs text-zinc-300 mt-0.5">
+            Export all order details for logistics couriers in 1-click or select specific orders with checkboxes in the Orders desk.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+          <button
+            onClick={() => {
+              if (!orders || orders.length === 0) {
+                alert('No orders available to export!');
+                return;
+              }
+              const headers = [
+                'Order ID',
+                'Order Date',
+                'Customer Name',
+                'Mobile Number',
+                'Email Address',
+                'Delivery Address',
+                'City',
+                'State',
+                'Pincode',
+                'Ordered Product(s)',
+                'Product ID(s)',
+                'Selected Size(s)',
+                'Selected Frame(s)',
+                'Payment Method',
+                'Payment Status',
+                'Order Status',
+                'Total Amount (INR)',
+                'Admin Remarks',
+              ];
+
+              const sanitizeCell = (text: any) => {
+                if (text === null || text === undefined) return '""';
+                const str = String(text).replace(/"/g, '""');
+                return `"${str}"`;
+              };
+
+              const rows = orders.map((ord) => {
+                const cust = ord.customer || ({} as any);
+                const dateStr = ord.createdAt ? new Date(ord.createdAt).toLocaleString('en-IN') : 'N/A';
+                const productTitles = ord.items.map((i) => `${i.product?.title || 'Custom Frame'} (Qty: ${i.quantity || 1})`).join(' | ');
+                const productIds = ord.items.map((i) => i.product?.productId || (i.product?.id ? `PRD-${i.product.id.slice(-4)}` : 'PRD-1001')).join(' | ');
+                const sizes = ord.items.map((i) => i.selectedSize?.name || 'A4 Size').join(' | ');
+                const frames = ord.items.map((i) => i.selectedFrame?.name || 'Black Wood').join(' | ');
+                const fullAddress = `${cust.address || ''}${cust.address ? ', ' : ''}${cust.landmark || ''}`.trim();
+
+                return [
+                  sanitizeCell(ord.id),
+                  sanitizeCell(dateStr),
+                  sanitizeCell(cust.fullName || 'Customer'),
+                  sanitizeCell(cust.phone || 'N/A'),
+                  sanitizeCell(cust.email || 'N/A'),
+                  sanitizeCell(fullAddress),
+                  sanitizeCell(cust.city || ''),
+                  sanitizeCell(cust.state || ''),
+                  sanitizeCell(cust.pincode || ''),
+                  sanitizeCell(productTitles),
+                  sanitizeCell(productIds),
+                  sanitizeCell(sizes),
+                  sanitizeCell(frames),
+                  sanitizeCell(ord.paymentMethod || 'Prepaid'),
+                  sanitizeCell(ord.paymentStatus || 'Paid'),
+                  sanitizeCell(ord.orderStatus || 'Received'),
+                  sanitizeCell(ord.total || ord.subtotal || 0),
+                  sanitizeCell(ord.adminRemark || ''),
+                ].join(',');
+              });
+
+              const csvContent = '\uFEFF' + [headers.map(sanitizeCell).join(','), ...rows].join('\r\n');
+              const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+              const url = URL.createObjectURL(blob);
+              const link = document.createElement('a');
+              const timestamp = new Date().toISOString().split('T')[0];
+              link.href = url;
+              link.setAttribute('download', `A1Print_Shipping_Orders_EXPORT_${timestamp}.csv`);
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+            }}
+            className="px-3.5 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
+          >
+            <FileSpreadsheet className="w-4 h-4" /> 📥 Export All Orders (Excel / CSV)
+          </button>
+
+          <button
+            onClick={() => onSelectStatusFilter && onSelectStatusFilter('orders')}
+            className="px-3.5 py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
+          >
+            <ShoppingCart className="w-3.5 h-3.5" /> Select Orders & Checkboxes
+          </button>
+
+          <button
+            onClick={() => onSelectStatusFilter && onSelectStatusFilter('catalog')}
+            className="px-3.5 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-bold text-xs rounded-xl border border-zinc-700 transition-all flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
+          >
+            <Layers className="w-3.5 h-3.5 text-purple-400" /> Frame Product IDs
+          </button>
+        </div>
+      </div>
+
       {/* SECTION 1: 🚨 Operational Action Desk (Dashboard khulte hi sabse important pending kaam) */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
