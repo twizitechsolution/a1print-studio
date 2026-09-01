@@ -23,67 +23,6 @@ interface StoreData {
   categories: Category[];
 }
 
-const defaultOrder: Order = {
-  id: 'ORD-849201',
-  customer: {
-    fullName: 'Neha Saxena',
-    phone: '9876543210',
-    email: 'neha.saxena@example.com',
-    address: 'Flat 402, Gomti Nagar',
-    city: 'Lucknow',
-    state: 'Uttar Pradesh',
-    pincode: '226010',
-  },
-  items: [
-    {
-      id: 'cart-1',
-      product: {
-        id: 'prod-sample-default',
-        slug: 'welcome-baby-customizable-birth-frame',
-        title: 'Welcome Little One – Personalized Baby Birth Details Frame',
-        subtitle: 'Preserve your newborn\'s birth details in a personalized keepsake frame',
-        category: 'baby',
-        categoryLabel: 'Photo Collages',
-        rating: 4.9,
-        reviewsCount: 11,
-        thumbnail: 'https://images.unsplash.com/photo-1519689680058-324335c77eba?auto=format&fit=crop&w=800&q=80',
-        baseImageUrl: 'https://images.unsplash.com/photo-1519689680058-324335c77eba?auto=format&fit=crop&w=800&q=80',
-        images: ['https://images.unsplash.com/photo-1519689680058-324335c77eba?auto=format&fit=crop&w=800&q=80'],
-        bestseller: true,
-        onSale: true,
-        description: 'Sample order item.',
-        features: ['300 GSM Archival Premium Matte Paper'],
-        photoSlots: [],
-        textZones: [],
-        sizes: [{ id: 'size-a4', name: 'A4 (8x12 Inch)', dimensions: '8 x 12 inches', price: 699, originalPrice: 999, discountPercentage: 30 }],
-        frames: [{ id: 'frame-black', name: 'Classic Black Wood', borderStyle: 'border-8 border-black shadow-2xl', frameColor: '#000000', borderColorClass: 'border-black' }],
-      },
-      selectedSize: { id: 'size-a4', name: 'A4 (8x12 Inch)', dimensions: '8 x 12 inches', price: 699, originalPrice: 999, discountPercentage: 30 },
-      selectedFrame: { id: 'frame-black', name: 'Classic Black Wood', borderStyle: 'border-8 border-black shadow-2xl', frameColor: '#000000', borderColorClass: 'border-black' },
-      uploadedPhotoUrl: 'https://images.unsplash.com/photo-1519689680058-324335c77eba?auto=format&fit=crop&q=80&w=600',
-      customTextValues: {
-        babyName: 'Arya Sharma',
-        birthDateDay: '31',
-        hospitalName: 'Duya Hospital',
-        parentsName: 'Nikhil & Nikita',
-      },
-      quantity: 1,
-      photoScale: 1,
-      photoPosition: { x: 0, y: 0 },
-      photoRotation: 0,
-      itemTotalPrice: 699,
-    },
-  ],
-  subtotal: 699,
-  discount: 0,
-  shipping: 0,
-  total: 699,
-  paymentMethod: 'PhonePe',
-  paymentStatus: 'Paid',
-  orderStatus: 'Received',
-  createdAt: new Date().toISOString(),
-};
-
 function getDeletedProductIds(): Set<string> {
   try {
     const raw = localStorage.getItem(DELETED_IDS_KEY);
@@ -143,7 +82,7 @@ function getStoredLocalData(): StoreData {
           stockLogs: p.stockLogs || [],
         }));
 
-      const rawOrders = Array.isArray(parsed.orders) && parsed.orders.length > 0 ? parsed.orders : [defaultOrder];
+      const rawOrders = Array.isArray(parsed.orders) ? parsed.orders : [];
       const ordersWithRemarks = rawOrders.map((o: Order) => {
         const saved = savedRemarks[o.id];
         if (saved && saved.remark) {
@@ -166,18 +105,7 @@ function getStoredLocalData(): StoreData {
   } catch (e) {}
 
   const defaultProds: Product[] = [];
-
-  const initialOrders = [defaultOrder].map((o: Order) => {
-    const saved = savedRemarks[o.id];
-    if (saved && saved.remark) {
-      return {
-        ...o,
-        adminRemark: saved.remark,
-        adminRemarkTimestamp: saved.timestamp || o.adminRemarkTimestamp,
-      };
-    }
-    return o;
-  });
+  const initialOrders: Order[] = [];
 
   return {
     products: defaultProds,

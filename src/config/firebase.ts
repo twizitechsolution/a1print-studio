@@ -38,7 +38,7 @@ export async function signInWithGooglePopup() {
 const FIREBASE_PROJECT_ID = FIREBASE_CONFIG.projectId;
 const FIRESTORE_BASE_URL = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents`;
 
-// Helper: Sanitize payload to guarantee JSON string size is < 500 KB (Well below Firestore 1MB limit!)
+// Helper: Sanitize payload to guarantee JSON string size is < 300 KB (Well below Firestore 1MB limit!)
 function sanitizePayloadForFirestore(obj: any): any {
   if (!obj || typeof obj !== 'object') return obj;
   if (Array.isArray(obj)) {
@@ -48,9 +48,7 @@ function sanitizePayloadForFirestore(obj: any): any {
   const sanitized: Record<string, any> = {};
   for (const [key, val] of Object.entries(obj)) {
     if (typeof val === 'string') {
-      // Preserve customer photo slot keys & URLs intact up to 250,000 chars (~250 KB)
-      const isPhotoKey = key.startsWith('photo') || key.includes('Photo') || key === 'baseImageUrl' || key === 'thumbnail' || key === 'image';
-      if (val.startsWith('data:image') && val.length > 250000 && !isPhotoKey) {
+      if (val.startsWith('data:image') && val.length > 100000) {
         sanitized[key] = val.substring(0, 15000) + '...[COMPRESSED_FIRESTORE_PREVIEW]';
       } else {
         sanitized[key] = val;
