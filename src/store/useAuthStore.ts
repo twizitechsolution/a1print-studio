@@ -97,10 +97,7 @@ function notifyAuthListeners() {
 
 let isCustomerCloudSyncInit = false;
 
-async function initCustomerCloudSync() {
-  if (isCustomerCloudSyncInit) return;
-  isCustomerCloudSyncInit = true;
-
+async function syncCustomerFromCloud() {
   try {
     const cloudCustomers = await firebaseCloudDb.getCollection('customer_users');
     if (cloudCustomers && cloudCustomers.length > 0) {
@@ -125,18 +122,33 @@ async function initCustomerCloudSync() {
           (c) => c.id === globalAuthState.user?.id || c.email === globalAuthState.user?.email || c.phone === globalAuthState.user?.phone
         );
         if (matchingCloudUser) {
-          globalAuthState.user = {
+          const updatedUser = {
             ...globalAuthState.user,
             ...matchingCloudUser,
             fullName: typeof matchingCloudUser.fullName === 'string' ? matchingCloudUser.fullName : globalAuthState.user.fullName,
           };
-          notifyAuthListeners();
+          if (JSON.stringify(updatedUser) !== JSON.stringify(globalAuthState.user)) {
+            globalAuthState.user = updatedUser;
+            notifyAuthListeners();
+          }
         }
       }
     }
   } catch (e) {
     console.warn('Customer cloud sync fallback:', e);
   }
+}
+
+async function initCustomerCloudSync() {
+  if (isCustomerCloudSyncInit) return;
+  isCustomerCloudSyncInit = true;
+
+  await syncCustomerFromCloud();
+
+  // Active 5-Second Real-Time Auto-Polling Loop
+  setInterval(() => {
+    syncCustomerFromCloud();
+  }, 5000);
 }
 
 export function useAuthStore() {

@@ -186,13 +186,10 @@ function notifyListeners() {
   listeners.forEach((l) => l());
 }
 
-// Real-Time Cloud Firestore Sync Engine
+// Real-Time Cloud Firestore Sync Engine (5-Second Active Polling & 0ms Instant Reactivity)
 let isCloudSyncInitialized = false;
 
-async function initCloudSync() {
-  if (isCloudSyncInitialized) return;
-  isCloudSyncInitialized = true;
-
+async function syncFromCloud() {
   try {
     // 1. FETCH CLOUD FIRESTORE DELETED PRODUCT TOMBSTONES
     const deletedDocs = await firebaseCloudDb.getCollection('deleted_products');
@@ -243,7 +240,7 @@ async function initCloudSync() {
     });
 
     const mergedProducts = Array.from(productMap.values());
-    if (mergedProducts.length > 0) {
+    if (mergedProducts.length > 0 && JSON.stringify(mergedProducts) !== JSON.stringify(memoryData.products)) {
       memoryData.products = mergedProducts;
       saveStoredLocalData(memoryData);
       notifyListeners();
@@ -291,9 +288,11 @@ async function initCloudSync() {
       (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
     );
 
-    memoryData.orders = mergedOrders;
-    saveStoredLocalData(memoryData);
-    notifyListeners();
+    if (JSON.stringify(mergedOrders) !== JSON.stringify(memoryData.orders)) {
+      memoryData.orders = mergedOrders;
+      saveStoredLocalData(memoryData);
+      notifyListeners();
+    }
 
     // 4. STRICT NON-DESTRUCTIVE UNION MERGING FOR CATEGORIES
     const cloudCats = await firebaseCloudDb.getCollection('categories');
@@ -323,13 +322,27 @@ async function initCloudSync() {
     });
 
     const mergedCats = Array.from(categoryMap.values());
-    memoryData.categories = mergedCats;
-    saveStoredCategories(mergedCats);
-    saveStoredLocalData(memoryData);
-    notifyListeners();
+    if (JSON.stringify(mergedCats) !== JSON.stringify(memoryData.categories)) {
+      memoryData.categories = mergedCats;
+      saveStoredCategories(mergedCats);
+      saveStoredLocalData(memoryData);
+      notifyListeners();
+    }
   } catch (e) {
-    console.warn('Cloud sync initialization fallback:', e);
+    console.warn('Cloud sync background polling error:', e);
   }
+}
+
+async function initCloudSync() {
+  if (isCloudSyncInitialized) return;
+  isCloudSyncInitialized = true;
+
+  await syncFromCloud();
+
+  // Active 5-Second Real-Time Auto-Polling Loop
+  setInterval(() => {
+    syncFromCloud();
+  }, 5000);
 }
 
 export function useCartStore() {
