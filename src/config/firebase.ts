@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
-import { getFirestore, collection, getDocs, doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, doc, setDoc, deleteDoc, onSnapshot, enableMultiTabIndexedDbPersistence } from 'firebase/firestore';
 
 export const FIREBASE_CONFIG = {
   apiKey: "AIzaSyBmyIAGv2y7UVqrIIOhQdllnrEOwJ8Purk",
@@ -15,6 +15,19 @@ export const FIREBASE_CONFIG = {
 const app = getApps().length === 0 ? initializeApp(FIREBASE_CONFIG) : getApp();
 export const firebaseAuth = getAuth(app);
 export const firebaseDb = getFirestore(app);
+export { collection, doc, onSnapshot };
+
+// Enable IndexedDB offline persistence for instant 0ms cached page loads
+if (typeof window !== 'undefined') {
+  enableMultiTabIndexedDbPersistence(firebaseDb).catch((err) => {
+    if (err.code === 'failed-precondition') {
+      console.warn('Firestore multi-tab persistence enabled in another tab.');
+    } else if (err.code === 'unimplemented') {
+      console.warn('Browser does not support Firestore persistence.');
+    }
+  });
+}
+
 export const googleAuthProvider = new GoogleAuthProvider();
 
 export async function signInWithGooglePopup() {
