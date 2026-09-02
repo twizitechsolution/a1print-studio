@@ -58,6 +58,10 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
     const catMatch = (p.categoryLabel || p.category || '').toLowerCase().includes(q);
 
     return titleMatch || idMatch || prodIdMatch || catMatch;
+  }).sort((a, b) => {
+    const timeA = a.updatedAt ? new Date(a.updatedAt).getTime() : (a.createdAt ? new Date(a.createdAt).getTime() : (a.id ? parseInt(a.id.replace(/\D/g, '')) || 0 : 0));
+    const timeB = b.updatedAt ? new Date(b.updatedAt).getTime() : (b.createdAt ? new Date(b.createdAt).getTime() : (b.id ? parseInt(b.id.replace(/\D/g, '')) || 0 : 0));
+    return timeB - timeA;
   });
 
   const deletedProducts = safeProducts.filter((p) => p && p.isDeleted);

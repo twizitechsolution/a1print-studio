@@ -40,9 +40,13 @@ export const AdminTemplateEditor: React.FC<AdminTemplateEditorProps> = ({
   if (!product) return null;
   const { updateProduct } = useCartStore();
 
-  const [baseFrameUrl, setBaseFrameUrl] = useState<string>(
-    product.baseImageUrl || product.thumbnail || (product.images && product.images[0]) || 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80'
-  );
+  const resolvedBaseUrl = 
+    (product.baseImageUrl && !product.baseImageUrl.includes('[COMPRESSED_FIRESTORE_PREVIEW]') && product.baseImageUrl.length > 50 ? product.baseImageUrl : null) ||
+    (product.thumbnail && !product.thumbnail.includes('[COMPRESSED_FIRESTORE_PREVIEW]') && product.thumbnail.length > 50 ? product.thumbnail : null) ||
+    (product.images && product.images[0] && !product.images[0].includes('[COMPRESSED_FIRESTORE_PREVIEW]') && product.images[0].length > 50 ? product.images[0] : null) ||
+    'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80';
+
+  const [baseFrameUrl, setBaseFrameUrl] = useState<string>(resolvedBaseUrl);
 
   const [workspaceZoom, setWorkspaceZoom] = useState<number>(100);
   const [lockRatio, setLockRatio] = useState<boolean>(true);
@@ -430,6 +434,9 @@ export const AdminTemplateEditor: React.FC<AdminTemplateEditorProps> = ({
                 src={baseFrameUrl}
                 alt="Frame Mockup"
                 className="w-full h-full object-cover absolute inset-0 pointer-events-none"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80';
+                }}
               />
 
               {/* Rendered Photo Slots (Exclusively for this product!) */}

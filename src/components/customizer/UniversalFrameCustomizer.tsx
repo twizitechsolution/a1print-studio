@@ -250,6 +250,17 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
     }
   };
 
+  // ⚡ Auto-Snap Back to Uploader 1 Main Frame Image as soon as customer starts editing!
+  useEffect(() => {
+    if (activeAngleImage !== null) {
+      const hasPhotoEdit = Object.values(photoValues).some(Boolean);
+      const hasTextEdit = Object.values(textValues).some(Boolean);
+      if (hasPhotoEdit || hasTextEdit) {
+        setActiveAngleImage(null); // Instantly clears angle selection and snaps to Uploader 1 main frame!
+      }
+    }
+  }, [photoValues, textValues]);
+
   useEffect(() => {
     const loadWatermark = () => {
       const saved = localStorage.getItem('a1print_watermark_settings');
