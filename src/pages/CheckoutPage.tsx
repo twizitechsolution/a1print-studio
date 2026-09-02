@@ -189,13 +189,12 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
           handleCompletePrepaidOrder(razorpayResp.razorpay_payment_id || `pay_${Date.now()}`, 'Razorpay');
         },
         onFailure: (errMsg) => {
-          console.warn('Razorpay SDK modal error, launching Instant UPI Gateway Modal fallback:', errMsg);
           setIsSubmitting(false);
-          setShowUpiModal(true);
+          setErrorMsg(errMsg || 'Payment failed. You can retry with Razorpay or select Cash on Delivery.');
         },
         onDismiss: () => {
           setIsSubmitting(false);
-          setShowUpiModal(true);
+          setErrorMsg('Payment modal closed. You can retry payment anytime or select Cash on Delivery.');
         },
       });
     } else {
