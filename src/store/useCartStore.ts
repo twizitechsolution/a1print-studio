@@ -167,6 +167,19 @@ function getStoredLocalData(): StoreData {
     }));
   }
 
+  // Merge admin overrides map into loadedProducts for 0ms instant local rendering
+  const overridesMap = getStoredProductOverrides();
+  Object.values(overridesMap).forEach((overrideProd) => {
+    if (overrideProd && overrideProd.id && !deletedIds.has(overrideProd.id)) {
+      const idx = loadedProducts.findIndex((p) => p.id === overrideProd.id);
+      if (idx >= 0) {
+        loadedProducts[idx] = { ...loadedProducts[idx], ...overrideProd };
+      } else {
+        loadedProducts.push(overrideProd);
+      }
+    }
+  });
+
   // Filter deleted products
   const activeProds = loadedProducts.filter((p: Product) => p && p.id && !deletedIds.has(p.id));
 
@@ -308,6 +321,7 @@ async function syncFromCloud() {
       const mergedProducts = Array.from(productMap.values());
       if (mergedProducts.length > 0 && JSON.stringify(mergedProducts) !== JSON.stringify(memoryData.products)) {
         memoryData.products = mergedProducts;
+        saveStoredMasterProducts(mergedProducts);
         saveStoredLocalData(memoryData);
         notifyListeners();
       }
