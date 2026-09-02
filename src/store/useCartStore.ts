@@ -178,21 +178,7 @@ function getStoredLocalData(): StoreData {
 let memoryData: StoreData = getStoredLocalData();
 
 function optimizeDataForLocalStorage(data: StoreData): StoreData {
-  const sanitizeValue = (val: any): any => {
-    if (typeof val === 'string' && val.startsWith('data:image') && val.length > 50000) {
-      return val.substring(0, 15000) + '...[COMPRESSED_PREVIEW]';
-    }
-    if (Array.isArray(val)) return val.map(sanitizeValue);
-    if (typeof val === 'object' && val !== null) {
-      const obj: Record<string, any> = {};
-      for (const [k, v] of Object.entries(val)) {
-        obj[k] = sanitizeValue(v);
-      }
-      return obj;
-    }
-    return val;
-  };
-
+  // Only sanitize transient cart items customizedFramePreviewUrl (not master catalog product images!)
   return {
     ...data,
     items: (data.items || []).map((item) => ({
@@ -200,7 +186,6 @@ function optimizeDataForLocalStorage(data: StoreData): StoreData {
       customizedFramePreviewUrl: item.customizedFramePreviewUrl && item.customizedFramePreviewUrl.length > 50000
         ? item.customizedFramePreviewUrl.substring(0, 15000) + '...[COMPRESSED_PREVIEW]'
         : item.customizedFramePreviewUrl,
-      customTextValues: sanitizeValue(item.customTextValues || {}),
     })),
   };
 }
