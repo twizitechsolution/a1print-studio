@@ -70,10 +70,20 @@ function getStoredLocalData(): StoreData {
   const deletedIds = getDeletedProductIds();
 
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    // Try current STORAGE_KEY first, fallback to legacy keys (v15, v14, v1, etc.)
+    const legacyKeys = [STORAGE_KEY, 'a1print_store_data_v15', 'a1print_store_data_v14', 'a1print_store_data_v1', 'a1print_store_data'];
+    let raw: string | null = null;
+    for (const key of legacyKeys) {
+      const val = localStorage.getItem(key);
+      if (val) {
+        raw = val;
+        break;
+      }
+    }
+
     if (raw) {
       const parsed = JSON.parse(raw);
-      const rawProds = Array.isArray(parsed.products) ? parsed.products : [];
+      const rawProds = Array.isArray(parsed.products) && parsed.products.length > 0 ? parsed.products : INITIAL_PRODUCTS;
       const prods = rawProds
         .filter((p: Product) => p && p.id && !deletedIds.has(p.id) && !p.isDeleted)
         .map((p: Product) => ({
@@ -96,7 +106,7 @@ function getStoredLocalData(): StoreData {
       });
 
       return {
-        products: prods,
+        products: prods.length > 0 ? prods : INITIAL_PRODUCTS,
         items: parsed.items || [],
         orders: ordersWithRemarks,
         categories,
@@ -104,7 +114,11 @@ function getStoredLocalData(): StoreData {
     }
   } catch (e) {}
 
-  const defaultProds: Product[] = [];
+  const defaultProds: Product[] = INITIAL_PRODUCTS.map((p) => ({
+    ...p,
+    stockQuantity: p.stockQuantity !== undefined ? p.stockQuantity : 50,
+    stockLogs: p.stockLogs || [],
+  }));
   const initialOrders: Order[] = [];
 
   return {
@@ -206,9 +220,21 @@ async function initCloudSync() {
           stockLogs: cp.stockLogs || [],
         }));
 
-      memoryData.products = validCloudProds;
-      saveStoredLocalData(memoryData);
-      notifyListeners();
+      if (validCloudProds.length > 0) {
+        memoryData.products = validCloudProds;
+        saveStoredLocalData(memoryData);
+        notifyListeners();
+      } else {
+        // If Cloud Firestore returned only deleted docs, seed default catalog to Cloud Firestore
+        memoryData.products.forEach((p) => {
+          firebaseCloudDb.setDocument('products', p.id, p);
+        });
+      }
+    } else {
+      // If Cloud Firestore has 0 products, seed local memory products to Cloud Firestore
+      memoryData.products.forEach((p) => {
+        firebaseCloudDb.setDocument('products', p.id, p);
+      });
     }
 
     // 3. STRICT NON-DESTRUCTIVE UNION MERGING FOR ORDERS (PRESERVES ALL CUSTOMER ORDERS)
