@@ -95,27 +95,9 @@ export const firebaseCloudDb = {
     }
   },
 
-  // Read all documents in a collection using official Firebase JS Firestore SDK
+  // Read all documents in a collection using official Firebase JS Firestore SDK with 1.5s Cold Timeout Guard
   async getCollection(collectionName: string): Promise<any[] | null> {
-    try {
-      // Tier 1: Try official Firebase JS Firestore SDK (No REST quota limits!)
-      const querySnapshot = await getDocs(collection(firebaseDb, collectionName));
-      const items: any[] = [];
-      querySnapshot.forEach((docSnap) => {
-        const data = docSnap.data();
-        if (data && data.jsonPayload) {
-          try {
-            items.push(JSON.parse(data.jsonPayload));
-          } catch (e) {
-            items.push(data);
-          }
-        } else if (data) {
-          items.push(data);
-        }
-      });
-      return items;
-    } catch (sdkErr) {
-      console.warn(`Firestore SDK getCollection error [${collectionName}], trying REST fallback:`, sdkErr);
+    const fetchViaRest = async (): Promise<any[] | null> => {
       try {
         const res = await fetch(`${FIRESTORE_BASE_URL}/${collectionName}`);
         if (!res.ok) return null;
@@ -135,6 +117,41 @@ export const firebaseCloudDb = {
       } catch (e) {
         return null;
       }
+    };
+
+    try {
+      // Step A: Fast 1.5-second timeout race guard against cold SDK gRPC handshake stalls
+      const sdkPromise = (async () => {
+        const querySnapshot = await getDocs(collection(firebaseDb, collectionName));
+        const items: any[] = [];
+        querySnapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          if (data && data.jsonPayload) {
+            try {
+              items.push(JSON.parse(data.jsonPayload));
+            } catch (e) {
+              items.push(data);
+            }
+          } else if (data) {
+            items.push(data);
+          }
+        });
+        return items;
+      })();
+
+      const timeoutPromise = new Promise<null>((resolve) =>
+        setTimeout(() => resolve(null), 1500)
+      );
+
+      const result = await Promise.race([sdkPromise, timeoutPromise]);
+      if (result !== null) {
+        return result;
+      }
+
+      // Step B: If SDK took longer than 1.5s on cold boot, instantly fall back to 150ms HTTP REST API!
+      return await fetchViaRest();
+    } catch (sdkErr) {
+      return await fetchViaRest();
     }
   },
 
