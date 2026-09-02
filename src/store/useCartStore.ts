@@ -101,6 +101,22 @@ function saveStoredMasterProducts(products: Product[]) {
   } catch (e) {}
 }
 
+const PRODUCT_OVERRIDES_KEY = 'a1print_admin_product_overrides_v2';
+
+export function getStoredProductOverrides(): Record<string, Product> {
+  try {
+    const raw = localStorage.getItem(PRODUCT_OVERRIDES_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  return {};
+}
+
+export function saveStoredProductOverrides(map: Record<string, Product>) {
+  try {
+    localStorage.setItem(PRODUCT_OVERRIDES_KEY, JSON.stringify(map));
+  } catch (e) {}
+}
+
 function getStoredLocalData(): StoreData {
   const categories = getStoredCategories();
   const savedRemarks = getStoredAdminRemarks();
@@ -251,22 +267,6 @@ async function syncFromCloud() {
       });
       saveDeletedProductIds(cloudDeletedIds);
     }
-
-const PRODUCT_OVERRIDES_KEY = 'a1print_admin_product_overrides_v2';
-
-function getStoredProductOverrides(): Record<string, Product> {
-  try {
-    const raw = localStorage.getItem(PRODUCT_OVERRIDES_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch (e) {}
-  return {};
-}
-
-function saveStoredProductOverrides(map: Record<string, Product>) {
-  try {
-    localStorage.setItem(PRODUCT_OVERRIDES_KEY, JSON.stringify(map));
-  } catch (e) {}
-}
 
     // 2. STRICT NON-DESTRUCTIVE UNION MERGING FOR PRODUCTS CATALOG WITH TIMESTAMP RECONCILIATION
     if (cloudProds !== null) {
