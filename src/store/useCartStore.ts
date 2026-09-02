@@ -244,8 +244,12 @@ function notifyListeners() {
 
 // Real-Time Cloud Firestore Sync Engine (5-Second Active Polling & 0ms Instant Reactivity)
 let isCloudSyncInitialized = false;
+let isSyncingFromCloud = false;
 
 async function syncFromCloud() {
+  if (isSyncingFromCloud) return;
+  isSyncingFromCloud = true;
+
   try {
     // CONCURRENT PARALLEL FETCHING: All 4 collections fetch simultaneously in 0.3s instead of 20s sequential delay!
     const [deletedDocs, cloudProds, cloudOrders, cloudCats] = await Promise.all([
@@ -419,6 +423,8 @@ async function syncFromCloud() {
     }
   } catch (e) {
     console.warn('Cloud sync background polling error:', e);
+  } finally {
+    isSyncingFromCloud = false;
   }
 }
 

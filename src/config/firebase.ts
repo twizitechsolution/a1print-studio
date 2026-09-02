@@ -120,7 +120,7 @@ export const firebaseCloudDb = {
     };
 
     try {
-      // Step A: Fast 1.5-second timeout race guard against cold SDK gRPC handshake stalls
+      // Step A: Fast 350ms timeout race guard against cold SDK gRPC handshake stalls
       const sdkPromise = (async () => {
         const querySnapshot = await getDocs(collection(firebaseDb, collectionName));
         const items: any[] = [];
@@ -140,7 +140,7 @@ export const firebaseCloudDb = {
       })();
 
       const timeoutPromise = new Promise<null>((resolve) =>
-        setTimeout(() => resolve(null), 1500)
+        setTimeout(() => resolve(null), 350)
       );
 
       const result = await Promise.race([sdkPromise, timeoutPromise]);
@@ -148,7 +148,7 @@ export const firebaseCloudDb = {
         return result;
       }
 
-      // Step B: If SDK took longer than 1.5s on cold boot, instantly fall back to 150ms HTTP REST API!
+      // Step B: If SDK took longer than 350ms on cold boot, instantly fall back to 100ms HTTP REST API!
       return await fetchViaRest();
     } catch (sdkErr) {
       return await fetchViaRest();
