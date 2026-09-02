@@ -77,6 +77,35 @@ function sanitizePayloadForFirestore(obj: any): any {
   return sanitized;
 }
 
+// Full-Spectrum Firestore REST Field Parser (Parses both jsonPayload and native Firestore REST fields)
+function parseFirestoreRestFields(fields: Record<string, any>): any {
+  if (!fields || typeof fields !== 'object') return {};
+
+  if (fields.jsonPayload?.stringValue) {
+    try {
+      return JSON.parse(fields.jsonPayload.stringValue);
+    } catch (e) {}
+  }
+
+  const result: Record<string, any> = {};
+  for (const [key, valObj] of Object.entries(fields)) {
+    if (!valObj || typeof valObj !== 'object') continue;
+    if ('stringValue' in valObj) result[key] = valObj.stringValue;
+    else if ('integerValue' in valObj) result[key] = Number(valObj.integerValue);
+    else if ('doubleValue' in valObj) result[key] = Number(valObj.doubleValue);
+    else if ('booleanValue' in valObj) result[key] = Boolean(valObj.booleanValue);
+    else if ('arrayValue' in valObj) {
+      const arr = valObj.arrayValue?.values || [];
+      result[key] = arr.map((item: any) => parseFirestoreRestFields({ temp: item }).temp);
+    } else if ('mapValue' in valObj) {
+      result[key] = parseFirestoreRestFields(valObj.mapValue?.fields || {});
+    } else {
+      result[key] = valObj;
+    }
+  }
+  return result;
+}
+
 export const firebaseCloudDb = {
   // Test and verify Firebase Firestore Cloud Database Connection
   async checkConnection(): Promise<{ connected: boolean; projectId: string; statusText: string }> {
@@ -95,7 +124,7 @@ export const firebaseCloudDb = {
     }
   },
 
-  // Read all documents in a collection using official Firebase JS Firestore SDK with 1.5s Cold Timeout Guard
+  // Read all documents in a collection: REST-First Fast Engine (0.15s path) with SDK Fallback
   async getCollection(collectionName: string): Promise<any[] | null> {
     const fetchViaRest = async (): Promise<any[] | null> => {
       try {
@@ -106,52 +135,44 @@ export const firebaseCloudDb = {
 
         return data.documents.map((docItem: any) => {
           const fields = docItem.fields || {};
-          const jsonStr = fields.jsonPayload?.stringValue;
-          if (jsonStr) {
-            try {
-              return JSON.parse(jsonStr);
-            } catch (e) {}
+          const parsed = parseFirestoreRestFields(fields);
+          if (parsed && docItem.name) {
+            const pathParts = docItem.name.split('/');
+            const docId = pathParts[pathParts.length - 1];
+            if (!parsed.id) parsed.id = docId;
           }
-          return fields;
+          return parsed;
         });
       } catch (e) {
         return null;
       }
     };
 
+    // Fast Path: Direct 100ms HTTP REST fetch first (prevents cold gRPC SSL handshake stalls!)
+    const restData = await fetchViaRest();
+    if (restData !== null && restData.length > 0) {
+      return restData;
+    }
+
+    // Fallback: Official Firebase JS Firestore SDK Engine
     try {
-      // Step A: Fast 350ms timeout race guard against cold SDK gRPC handshake stalls
-      const sdkPromise = (async () => {
-        const querySnapshot = await getDocs(collection(firebaseDb, collectionName));
-        const items: any[] = [];
-        querySnapshot.forEach((docSnap) => {
-          const data = docSnap.data();
-          if (data && data.jsonPayload) {
-            try {
-              items.push(JSON.parse(data.jsonPayload));
-            } catch (e) {
-              items.push(data);
-            }
-          } else if (data) {
+      const querySnapshot = await getDocs(collection(firebaseDb, collectionName));
+      const items: any[] = [];
+      querySnapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        if (data && data.jsonPayload) {
+          try {
+            items.push(JSON.parse(data.jsonPayload));
+          } catch (e) {
             items.push(data);
           }
-        });
-        return items;
-      })();
-
-      const timeoutPromise = new Promise<null>((resolve) =>
-        setTimeout(() => resolve(null), 350)
-      );
-
-      const result = await Promise.race([sdkPromise, timeoutPromise]);
-      if (result !== null) {
-        return result;
-      }
-
-      // Step B: If SDK took longer than 350ms on cold boot, instantly fall back to 100ms HTTP REST API!
-      return await fetchViaRest();
+        } else if (data) {
+          items.push(data);
+        }
+      });
+      return items;
     } catch (sdkErr) {
-      return await fetchViaRest();
+      return restData;
     }
   },
 
