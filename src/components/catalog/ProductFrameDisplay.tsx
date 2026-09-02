@@ -23,17 +23,21 @@ export const ProductFrameDisplay: React.FC<ProductFrameDisplayProps> = ({
   const photoSlots: PhotoSlotConfig[] = product.photoSlots || [];
   const textZones: TextZoneConfig[] = product.textZones || [];
 
-  const rawImg = product.baseImageUrl || product.thumbnail || product.image || (product.images && product.images[0]);
-  const masterFrameImgSrc =
-    rawImg && !rawImg.includes('[COMPRESSED_FIRESTORE_PREVIEW]')
-      ? rawImg
-      : 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80';
+  const rawImg =
+    (product.baseImageUrl && !product.baseImageUrl.includes('[COMPRESSED_FIRESTORE_PREVIEW]') && product.baseImageUrl.length > 50 ? product.baseImageUrl : null) ||
+    (product.images && product.images[0] && product.images[0].length > 50 ? product.images[0] : null) ||
+    (product.thumbnail && product.thumbnail.length > 50 ? product.thumbnail : null) ||
+    'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80';
 
+  const masterFrameImgSrc = rawImg;
   const isDarkPoster = product.id.includes('brother-sister') || product.id.includes('dad') || product.id.includes('dark');
+  const isLandscape = (product as any)?.orientation === 'landscape';
 
   return (
     <div
-      className={`relative w-full aspect-[3/4.4] rounded-xs border-4 sm:border-8 border-black shadow-xl overflow-hidden font-serif select-none ${
+      className={`relative w-full rounded-xs border-4 sm:border-8 border-black shadow-xl overflow-hidden font-serif select-none transition-all ${
+        isLandscape ? 'aspect-[4/3]' : 'aspect-[3/4.4]'
+      } ${
         isDarkPoster ? 'bg-black text-white' : 'bg-white text-gray-900'
       } ${className}`}
     >
@@ -44,7 +48,11 @@ export const ProductFrameDisplay: React.FC<ProductFrameDisplayProps> = ({
           alt={product.title}
           className="w-full h-full object-cover absolute inset-0 pointer-events-none"
           onError={(e) => {
-            e.currentTarget.src = 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80';
+            if (product.images && product.images[0] && e.currentTarget.src !== product.images[0]) {
+              e.currentTarget.src = product.images[0];
+            } else {
+              e.currentTarget.src = 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80';
+            }
           }}
         />
       )}

@@ -22,7 +22,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     >
       {/* Product Image Container matching reference website lovecraftbyse.com/shop/ */}
       <div 
-        className="relative w-full aspect-3/4 overflow-hidden p-3 flex items-center justify-center bg-gray-100"
+        className={`relative w-full overflow-hidden p-3 flex items-center justify-center bg-gray-100 transition-all ${
+          (product as any)?.orientation === 'landscape' ? 'aspect-4/3' : 'aspect-3/4'
+        }`}
         style={{
           backgroundImage: "url('https://lovecraftbyse.com/wp-content/uploads/2025/06/single-bg.webp')",
           backgroundSize: 'cover',

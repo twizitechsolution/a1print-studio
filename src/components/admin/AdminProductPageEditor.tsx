@@ -102,6 +102,7 @@ export const AdminProductPageEditor: React.FC<AdminProductPageEditorProps> = ({
   // Helper: Compress uploaded images using HTML5 Canvas to prevent Firestore payload quota rejects
   const compressImageFile = (file: File, maxDim = 1200, quality = 0.85): Promise<string> => {
     return new Promise((resolve) => {
+      const isPng = file.type.includes('png') || file.name.toLowerCase().endsWith('.png') || file.type.includes('webp');
       const reader = new FileReader();
       reader.onload = (e) => {
         const img = new Image();
@@ -127,7 +128,9 @@ export const AdminProductPageEditor: React.FC<AdminProductPageEditorProps> = ({
           const ctx = canvas.getContext('2d');
           if (ctx) {
             ctx.drawImage(img, 0, 0, width, height);
-            resolve(canvas.toDataURL('image/jpeg', quality));
+            // CRITICAL: PNG/WEBP files must be exported as image/png to retain 100% alpha transparency!
+            const format = isPng ? 'image/png' : 'image/jpeg';
+            resolve(canvas.toDataURL(format, quality));
           } else {
             resolve(e.target?.result as string);
           }
@@ -478,7 +481,14 @@ export const AdminProductPageEditor: React.FC<AdminProductPageEditorProps> = ({
                   <div className={`shrink-0 rounded-xl bg-gray-100 p-1 flex items-center justify-center overflow-hidden border border-gray-200 transition-all ${
                     orientation === 'portrait' ? 'w-24 h-32' : 'w-36 h-24'
                   }`}>
-                    <img src={baseImageUrl} alt="Main Frame Image" className="w-full h-full object-contain rounded-lg" />
+                    <img
+                      src={baseImageUrl}
+                      alt="Main Frame Image"
+                      className="w-full h-full object-contain rounded-lg"
+                      onError={(e) => {
+                        e.currentTarget.src = 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80';
+                      }}
+                    />
                   </div>
                   <div className="space-y-1 flex-1">
                     <div className="flex items-center gap-2">
@@ -495,6 +505,18 @@ export const AdminProductPageEditor: React.FC<AdminProductPageEditorProps> = ({
                   No main frame image uploaded yet.
                 </div>
               )}
+
+              {/* Direct Image URL input option */}
+              <div className="space-y-1 pt-1 border-t border-pink-100">
+                <label className="text-gray-700 text-[11px] font-bold block">Or Paste Direct Web Image URL:</label>
+                <input
+                  type="text"
+                  placeholder="https://images.unsplash.com/... or https://your-server.com/frame.png"
+                  value={baseImageUrl.startsWith('data:') ? '' : baseImageUrl}
+                  onChange={(e) => setBaseImageUrl(e.target.value.trim())}
+                  className="w-full px-3 py-2 bg-white border border-pink-200 rounded-xl text-gray-800 text-xs font-mono focus:outline-hidden focus:border-[#F82BA9]"
+                />
+              </div>
             </div>
 
             {/* Uploader 2: Real-World Showcase & Angle View Gallery */}
