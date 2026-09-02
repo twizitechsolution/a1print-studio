@@ -208,33 +208,45 @@ async function initCloudSync() {
       saveDeletedProductIds(cloudDeletedIds);
     }
 
-    // 2. FETCH CLOUD FIRESTORE CATALOG
+    // 2. STRICT NON-DESTRUCTIVE UNION MERGING FOR PRODUCTS CATALOG
     const cloudProds = await firebaseCloudDb.getCollection('products');
+    const productMap = new Map<string, Product>();
 
-    if (cloudProds && cloudProds.length > 0) {
-      const validCloudProds = cloudProds
-        .filter((cp) => cp && cp.id && !cloudDeletedIds.has(cp.id) && !cp.isDeleted)
-        .map((cp) => ({
-          ...cp,
-          stockQuantity: cp.stockQuantity !== undefined ? cp.stockQuantity : 50,
-          stockLogs: cp.stockLogs || [],
-        }));
-
-      if (validCloudProds.length > 0) {
-        memoryData.products = validCloudProds;
-        saveStoredLocalData(memoryData);
-        notifyListeners();
-      } else {
-        // If Cloud Firestore returned only deleted docs, seed default catalog to Cloud Firestore
-        memoryData.products.forEach((p) => {
-          firebaseCloudDb.setDocument('products', p.id, p);
-        });
+    // Step A: Load initial/local memory products first
+    memoryData.products.forEach((p) => {
+      if (p && p.id && !cloudDeletedIds.has(p.id) && !p.isDeleted) {
+        productMap.set(p.id, p);
       }
-    } else {
-      // If Cloud Firestore has 0 products, seed local memory products to Cloud Firestore
-      memoryData.products.forEach((p) => {
-        firebaseCloudDb.setDocument('products', p.id, p);
+    });
+
+    // Step B: Merge Cloud Firestore products
+    const cloudProdIds = new Set<string>();
+    if (cloudProds && cloudProds.length > 0) {
+      cloudProds.forEach((cp) => {
+        if (cp && cp.id && !cloudDeletedIds.has(cp.id) && !cp.isDeleted) {
+          cloudProdIds.add(cp.id);
+          const existing = productMap.get(cp.id);
+          productMap.set(cp.id, {
+            ...cp,
+            stockQuantity: cp.stockQuantity !== undefined ? cp.stockQuantity : (existing?.stockQuantity ?? 50),
+            stockLogs: cp.stockLogs || existing?.stockLogs || [],
+          });
+        }
       });
+    }
+
+    // Step C: Background sync push for any local products missing on Cloud Firestore server
+    productMap.forEach((localProd, id) => {
+      if (!cloudProdIds.has(id)) {
+        firebaseCloudDb.setDocument('products', id, localProd);
+      }
+    });
+
+    const mergedProducts = Array.from(productMap.values());
+    if (mergedProducts.length > 0) {
+      memoryData.products = mergedProducts;
+      saveStoredLocalData(memoryData);
+      notifyListeners();
     }
 
     // 3. STRICT NON-DESTRUCTIVE UNION MERGING FOR ORDERS (PRESERVES ALL CUSTOMER ORDERS)
@@ -248,11 +260,11 @@ async function initCloudSync() {
     });
 
     // Step B: Merge Cloud Firestore orders
+    const cloudOrderIds = new Set<string>();
     if (cloudOrders && cloudOrders.length > 0) {
-      const cloudIds = new Set<string>();
       cloudOrders.forEach((co) => {
         if (co && co.id) {
-          cloudIds.add(co.id);
+          cloudOrderIds.add(co.id);
           const existing = orderMap.get(co.id);
           const localRemark = savedRemarks[co.id]?.remark || existing?.adminRemark || '';
           const localRemarkTime = savedRemarks[co.id]?.timestamp || existing?.adminRemarkTimestamp || '';
@@ -266,14 +278,14 @@ async function initCloudSync() {
           });
         }
       });
-
-      // Background retry push for local orders missing in Cloud Firestore
-      orderMap.forEach((localOrder, id) => {
-        if (!cloudIds.has(id)) {
-          firebaseCloudDb.setDocument('orders', id, localOrder);
-        }
-      });
     }
+
+    // Step C: Background retry push for local orders missing on Cloud Firestore server
+    orderMap.forEach((localOrder, id) => {
+      if (!cloudOrderIds.has(id)) {
+        firebaseCloudDb.setDocument('orders', id, localOrder);
+      }
+    });
 
     const mergedOrders = Array.from(orderMap.values()).sort(
       (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
@@ -283,14 +295,38 @@ async function initCloudSync() {
     saveStoredLocalData(memoryData);
     notifyListeners();
 
-    // 4. FETCH CLOUD FIRESTORE CATEGORIES
+    // 4. STRICT NON-DESTRUCTIVE UNION MERGING FOR CATEGORIES
     const cloudCats = await firebaseCloudDb.getCollection('categories');
+    const categoryMap = new Map<string, Category>();
+
+    // Step A: Load DEFAULT + memory categories
+    DEFAULT_CATEGORIES.concat(memoryData.categories || []).forEach((cat) => {
+      if (cat && cat.id) categoryMap.set(cat.id, cat);
+    });
+
+    // Step B: Merge Cloud Firestore categories
+    const cloudCatIds = new Set<string>();
     if (cloudCats && cloudCats.length > 0) {
-      memoryData.categories = cloudCats;
-      saveStoredCategories(cloudCats);
-      saveStoredLocalData(memoryData);
-      notifyListeners();
+      cloudCats.forEach((cc) => {
+        if (cc && cc.id) {
+          cloudCatIds.add(cc.id);
+          categoryMap.set(cc.id, cc);
+        }
+      });
     }
+
+    // Step C: Push local categories missing on Cloud Firestore server
+    categoryMap.forEach((localCat, id) => {
+      if (!cloudCatIds.has(id)) {
+        firebaseCloudDb.setDocument('categories', id, localCat);
+      }
+    });
+
+    const mergedCats = Array.from(categoryMap.values());
+    memoryData.categories = mergedCats;
+    saveStoredCategories(mergedCats);
+    saveStoredLocalData(memoryData);
+    notifyListeners();
   } catch (e) {
     console.warn('Cloud sync initialization fallback:', e);
   }
