@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Product, PhotoSlot, TextZone, SizeOption, FrameOption } from '../../types';
-import { ArrowLeft, Save, Plus, Trash2, Upload, Image as ImageIcon, Sparkles, Star, CheckCircle2, ShieldCheck, CreditCard, DollarSign, Layers, Eye, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Save, Plus, Trash2, Upload, Image as ImageIcon, Sparkles, Star, CheckCircle2, ShieldCheck, CreditCard, DollarSign, Layers, Eye, RefreshCw, Loader2 } from 'lucide-react';
 
 interface AdminProductPageEditorProps {
   product: Product | null;
@@ -16,6 +16,9 @@ export const AdminProductPageEditor: React.FC<AdminProductPageEditorProps> = ({
   onBack,
 }) => {
   const isEditing = Boolean(product && product.id);
+
+  const [isSaving, setIsSaving] = useState(false);
+  const [savedSuccess, setSavedSuccess] = useState(false);
 
   // 1. Basic Info
   const [id, setId] = useState<string>(product?.id || `prod-${Date.now()}`);
@@ -199,71 +202,88 @@ export const AdminProductPageEditor: React.FC<AdminProductPageEditorProps> = ({
 
   // Final Form Submission
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     if (!title.trim()) {
       alert('Please enter a product title!');
       return;
     }
 
-    const updatedSizes: SizeOption[] = [
-      {
-        id: 'size-a4',
-        name: 'A4 (8x12 Inch)',
-        dimensions: orientation === 'landscape' ? '12 x 8 inches' : '8 x 12 inches',
-        price: Number(a4Price),
-        originalPrice: Number(a4OriginalPrice),
-        discountPercentage: Math.round(((a4OriginalPrice - a4Price) / a4OriginalPrice) * 100),
-      },
-      {
-        id: 'size-a3',
-        name: 'A3 (12x18 Inch)',
-        dimensions: orientation === 'landscape' ? '18 x 12 inches' : '12 x 18 inches',
-        price: Number(a3Price),
-        originalPrice: Number(a3OriginalPrice),
-        discountPercentage: Math.round(((a3OriginalPrice - a3Price) / a3OriginalPrice) * 100),
-      },
-    ];
+    setIsSaving(true);
+    setSavedSuccess(false);
 
-    const updatedFrames: FrameOption[] = product?.frames || [
-      {
-        id: 'frame-black',
-        name: 'Classic Black Wood',
-        borderStyle: 'border-8 border-black shadow-2xl',
-        frameColor: '#000000',
-        borderColorClass: 'border-black',
-      },
-    ];
+    try {
+      const safeA4Price = Number(a4Price) || 699;
+      const safeA4Orig = Number(a4OriginalPrice) || 999;
+      const safeA3Price = Number(a3Price) || 999;
+      const safeA3Orig = Number(a3OriginalPrice) || 1499;
 
-    const fullProduct: Product = {
-      id: id.trim() || `prod-${Date.now()}`,
-      slug: slug.trim() || title.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-      title: title.trim(),
-      subtitle: subtitle.trim(),
-      category: category.trim(),
-      categoryLabel: categoryLabel.trim() || 'Photo Collages',
-      rating: product?.rating || 5.0,
-      reviewsCount: reviews.length || 25,
-      thumbnail: baseImageUrl || images[0] || 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80',
-      baseImageUrl: baseImageUrl || images[0] || 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80',
-      images: images.length > 0 ? images : [baseImageUrl],
-      bestseller,
-      onSale,
-      description: description.trim(),
-      features,
-      photoSlots,
-      textZones,
-      sizes: updatedSizes,
-      frames: updatedFrames,
-      isDeleted: false,
-      stockQuantity: product?.stockQuantity !== undefined ? product.stockQuantity : 50,
-      stockLogs: product?.stockLogs || [],
-      allowedPaymentMethods,
-      orientation,
-      reviews,
-      updatedAt: new Date().toISOString(),
-    } as any;
+      const updatedSizes: SizeOption[] = [
+        {
+          id: 'size-a4',
+          name: 'A4 (8x12 Inch)',
+          dimensions: orientation === 'landscape' ? '12 x 8 inches' : '8 x 12 inches',
+          price: safeA4Price,
+          originalPrice: safeA4Orig,
+          discountPercentage: safeA4Orig > 0 ? Math.round(((safeA4Orig - safeA4Price) / safeA4Orig) * 100) : 30,
+        },
+        {
+          id: 'size-a3',
+          name: 'A3 (12x18 Inch)',
+          dimensions: orientation === 'landscape' ? '18 x 12 inches' : '18 x 12 inches',
+          price: safeA3Price,
+          originalPrice: safeA3Orig,
+          discountPercentage: safeA3Orig > 0 ? Math.round(((safeA3Orig - safeA3Price) / safeA3Orig) * 100) : 33,
+        },
+      ];
 
-    onSave(fullProduct);
+      const updatedFrames: FrameOption[] = product?.frames || [
+        {
+          id: 'frame-black',
+          name: 'Classic Black Wood',
+          borderStyle: 'border-8 border-black shadow-2xl',
+          frameColor: '#000000',
+          borderColorClass: 'border-black',
+        },
+      ];
+
+      const fullProduct: Product = {
+        id: id.trim() || `prod-${Date.now()}`,
+        slug: slug.trim() || title.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+        title: title.trim(),
+        subtitle: subtitle.trim(),
+        category: category.trim(),
+        categoryLabel: categoryLabel.trim() || 'Photo Collages',
+        rating: product?.rating || 5.0,
+        reviewsCount: reviews.length || 25,
+        thumbnail: baseImageUrl || images[0] || 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80',
+        baseImageUrl: baseImageUrl || images[0] || 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80',
+        images: images.length > 0 ? images : [baseImageUrl],
+        bestseller,
+        onSale,
+        description: description.trim(),
+        features,
+        photoSlots,
+        textZones,
+        sizes: updatedSizes,
+        frames: updatedFrames,
+        isDeleted: false,
+        stockQuantity: product?.stockQuantity !== undefined ? product.stockQuantity : 50,
+        stockLogs: product?.stockLogs || [],
+        allowedPaymentMethods,
+        orientation,
+        reviews,
+        updatedAt: new Date().toISOString(),
+      } as any;
+
+      onSave(fullProduct);
+      setSavedSuccess(true);
+      setTimeout(() => {
+        setIsSaving(false);
+      }, 500);
+    } catch (err: any) {
+      setIsSaving(false);
+      alert('Error saving product: ' + (err?.message || err));
+    }
   };
 
   return (
@@ -299,13 +319,38 @@ export const AdminProductPageEditor: React.FC<AdminProductPageEditorProps> = ({
           </button>
 
           <button
+            type="button"
             onClick={handleSubmit}
-            className="flex-1 sm:flex-initial px-8 py-3 bg-gradient-to-r from-[#3C187B] to-[#F82BA9] hover:from-[#2A1058] hover:to-[#D61B90] text-white font-extrabold text-xs rounded-2xl shadow-xl transition-all flex items-center justify-center gap-2 cursor-pointer"
+            disabled={isSaving}
+            className={`flex-1 sm:flex-initial px-8 py-3 font-extrabold text-xs rounded-2xl shadow-xl transition-all flex items-center justify-center gap-2 cursor-pointer ${
+              savedSuccess
+                ? 'bg-emerald-600 text-white'
+                : 'bg-gradient-to-r from-[#3C187B] to-[#F82BA9] hover:from-[#2A1058] hover:to-[#D61B90] text-white'
+            }`}
           >
-            <Save className="w-4 h-4" /> Save Product
+            {isSaving ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" /> Saving Product...
+              </>
+            ) : savedSuccess ? (
+              <>
+                <CheckCircle2 className="w-4 h-4" /> Saved & Synchronized!
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4" /> Save Product
+              </>
+            )}
           </button>
         </div>
       </div>
+
+      {savedSuccess && (
+        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-3 text-emerald-800 font-bold text-xs shadow-md animate-bounce">
+          <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+          <span>Product saved & synchronized successfully! Redirecting to catalog...</span>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         
