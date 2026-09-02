@@ -260,6 +260,7 @@ export const AdminProductPageEditor: React.FC<AdminProductPageEditorProps> = ({
       allowedPaymentMethods,
       orientation,
       reviews,
+      updatedAt: new Date().toISOString(),
     } as any;
 
     onSave(fullProduct);

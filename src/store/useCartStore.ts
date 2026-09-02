@@ -252,30 +252,68 @@ async function syncFromCloud() {
       saveDeletedProductIds(cloudDeletedIds);
     }
 
-    // 2. STRICT NON-DESTRUCTIVE UNION MERGING FOR PRODUCTS CATALOG
+const PRODUCT_OVERRIDES_KEY = 'a1print_admin_product_overrides_v2';
+
+function getStoredProductOverrides(): Record<string, Product> {
+  try {
+    const raw = localStorage.getItem(PRODUCT_OVERRIDES_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  return {};
+}
+
+function saveStoredProductOverrides(map: Record<string, Product>) {
+  try {
+    localStorage.setItem(PRODUCT_OVERRIDES_KEY, JSON.stringify(map));
+  } catch (e) {}
+}
+
+    // 2. STRICT NON-DESTRUCTIVE UNION MERGING FOR PRODUCTS CATALOG WITH TIMESTAMP RECONCILIATION
     if (cloudProds !== null) {
+      const overridesMap = getStoredProductOverrides();
       const productMap = new Map<string, Product>();
 
-      // Step A: Load initial/local memory products first
+      // Step A: Load initial/local memory products & admin overrides first
       memoryData.products.forEach((p) => {
         if (p && p.id && !cloudDeletedIds.has(p.id)) {
-          productMap.set(p.id, p);
+          const override = overridesMap[p.id];
+          productMap.set(p.id, override || p);
         }
       });
 
-      // Step B: Merge Cloud Firestore products
+      // Step B: Merge Cloud Firestore products safely (timestamp & image priority guard!)
       const cloudProdIds = new Set<string>();
       if (cloudProds.length > 0) {
         cloudProds.forEach((cp) => {
           if (cp && cp.id && !cloudDeletedIds.has(cp.id)) {
             cloudProdIds.add(cp.id);
-            const existing = productMap.get(cp.id);
-            productMap.set(cp.id, {
-              ...cp,
-              isDeleted: cp.isDeleted || existing?.isDeleted || false,
-              stockQuantity: cp.stockQuantity !== undefined ? cp.stockQuantity : (existing?.stockQuantity ?? 50),
-              stockLogs: cp.stockLogs || existing?.stockLogs || [],
-            });
+            const existing = productMap.get(cp.id) || overridesMap[cp.id];
+
+            const cpTime = cp.updatedAt ? new Date(cp.updatedAt).getTime() : 0;
+            const existingTime = existing?.updatedAt ? new Date(existing.updatedAt).getTime() : 0;
+
+            const isLocalNewerOrCustom = existing && (
+              existingTime >= cpTime ||
+              (existing.baseImageUrl && existing.baseImageUrl.length > 50 && (!cp.baseImageUrl || cp.baseImageUrl.includes('unsplash') || cp.baseImageUrl.length < 50))
+            );
+
+            if (isLocalNewerOrCustom && existing) {
+              const merged: Product = {
+                ...cp,
+                ...existing,
+                isDeleted: cp.isDeleted || existing.isDeleted || false,
+                stockQuantity: cp.stockQuantity !== undefined ? cp.stockQuantity : (existing.stockQuantity ?? 50),
+              };
+              productMap.set(cp.id, merged);
+              firebaseCloudDb.setDocument('products', cp.id, merged);
+            } else {
+              productMap.set(cp.id, {
+                ...cp,
+                isDeleted: cp.isDeleted || existing?.isDeleted || false,
+                stockQuantity: cp.stockQuantity !== undefined ? cp.stockQuantity : (existing?.stockQuantity ?? 50),
+                stockLogs: cp.stockLogs || existing?.stockLogs || [],
+              });
+            }
           }
         });
       }
@@ -447,6 +485,7 @@ export function useCartStore() {
   const addProduct = (newProduct: Product) => {
     const prodWithStock: Product = {
       ...newProduct,
+      updatedAt: newProduct.updatedAt || new Date().toISOString(),
       stockQuantity: newProduct.stockQuantity !== undefined ? newProduct.stockQuantity : 50,
       stockLogs: newProduct.stockLogs || [
         {
@@ -462,6 +501,10 @@ export function useCartStore() {
       ],
     };
 
+    const overrides = getStoredProductOverrides();
+    overrides[prodWithStock.id] = prodWithStock;
+    saveStoredProductOverrides(overrides);
+
     const updated = [...memoryData.products, prodWithStock];
     saveStoredLocalData({ ...memoryData, products: updated });
     notifyListeners();
@@ -469,14 +512,29 @@ export function useCartStore() {
   };
 
   const updateProduct = (id: string, updates: Partial<Product>) => {
+    const overrides = getStoredProductOverrides();
+    let targetUpdated: Product | null = null;
+
     const updatedProducts = memoryData.products.map((p) => {
       if (p.id === id) {
-        const updated = { ...p, ...updates };
+        const updated = { ...p, ...updates, updatedAt: updates.updatedAt || new Date().toISOString() };
+        targetUpdated = updated;
         firebaseCloudDb.setDocument('products', updated.id, updated);
         return updated;
       }
       return p;
     });
+
+    if (!targetUpdated && updates.title) {
+      targetUpdated = { id, ...updates, updatedAt: new Date().toISOString() } as Product;
+      updatedProducts.push(targetUpdated);
+      firebaseCloudDb.setDocument('products', id, targetUpdated);
+    }
+
+    if (targetUpdated) {
+      overrides[id] = targetUpdated;
+      saveStoredProductOverrides(overrides);
+    }
 
     saveStoredLocalData({ ...memoryData, products: updatedProducts });
     notifyListeners();
