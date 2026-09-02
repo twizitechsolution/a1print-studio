@@ -211,7 +211,7 @@ async function syncFromCloud() {
 
     // Step A: Load initial/local memory products first
     memoryData.products.forEach((p) => {
-      if (p && p.id && !cloudDeletedIds.has(p.id) && !p.isDeleted) {
+      if (p && p.id && !cloudDeletedIds.has(p.id)) {
         productMap.set(p.id, p);
       }
     });
@@ -220,11 +220,12 @@ async function syncFromCloud() {
     const cloudProdIds = new Set<string>();
     if (cloudProds && cloudProds.length > 0) {
       cloudProds.forEach((cp) => {
-        if (cp && cp.id && !cloudDeletedIds.has(cp.id) && !cp.isDeleted) {
+        if (cp && cp.id && !cloudDeletedIds.has(cp.id)) {
           cloudProdIds.add(cp.id);
           const existing = productMap.get(cp.id);
           productMap.set(cp.id, {
             ...cp,
+            isDeleted: cp.isDeleted || existing?.isDeleted || false,
             stockQuantity: cp.stockQuantity !== undefined ? cp.stockQuantity : (existing?.stockQuantity ?? 50),
             stockLogs: cp.stockLogs || existing?.stockLogs || [],
           });
@@ -427,10 +428,19 @@ export function useCartStore() {
       updatedAt: new Date().toISOString(),
     });
 
-    // Delete document from Cloud Firestore products collection
-    firebaseCloudDb.deleteDocument('products', id);
+    const updatedProducts = memoryData.products.map((p) => {
+      if (p.id === id) {
+        const updated: Product = {
+          ...p,
+          isDeleted: true,
+          deletedAt: new Date().toISOString(),
+        };
+        firebaseCloudDb.setDocument('products', updated.id, updated);
+        return updated;
+      }
+      return p;
+    });
 
-    const updatedProducts = memoryData.products.filter((p) => p.id !== id);
     saveStoredLocalData({ ...memoryData, products: updatedProducts });
     notifyListeners();
   };
