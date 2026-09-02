@@ -205,17 +205,18 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
   // Active Angle Image state for multi-angle photo gallery switching
   const [activeAngleImage, setActiveAngleImage] = useState<string | null>(null);
 
+  const baseImg = template.baseImageUrl || 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80';
   const rawAngleImages = 
     (template as any).images || 
     (template as any).angleImages || 
     (template as any).product?.images || 
     (template as any).product?.angleImages || 
     [];
-  const baseImg = template.baseImageUrl || 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80';
   
-  const availableAngleImages: string[] = Array.isArray(rawAngleImages) && rawAngleImages.length > 0
-    ? Array.from(new Set(rawAngleImages.filter(Boolean)))
-    : [baseImg];
+  // Uploader 1 (baseImg) MUST ALWAYS be Position 1 (Default Main View), followed by Uploader 2 gallery photos!
+  const availableAngleImages: string[] = Array.from(
+    new Set([baseImg, ...(Array.isArray(rawAngleImages) ? rawAngleImages.filter(Boolean) : [])])
+  );
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState<boolean>(false);
   const [compiledPreviewUrl, setCompiledPreviewUrl] = useState<string | null>(null);
   const [isLoadingPreview, setIsLoadingPreview] = useState<boolean>(false);
