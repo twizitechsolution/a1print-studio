@@ -392,7 +392,11 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
 
           <div 
             id="live-frame-canvas"
-            className="relative w-full max-w-[340px] aspect-[3/4.4] rounded-xs border-[12px] sm:border-[16px] border-black shadow-[0_25px_60px_rgba(0,0,0,0.6)] bg-white overflow-hidden font-serif select-none"
+            className={`relative w-full rounded-xs border-[12px] sm:border-[16px] border-black shadow-[0_25px_60px_rgba(0,0,0,0.6)] bg-white overflow-hidden font-serif select-none transition-all ${
+              ((template.product as any)?.orientation || (template as any).orientation) === 'landscape'
+                ? 'max-w-[480px] aspect-[4/3]'
+                : 'max-w-[340px] aspect-[3/4.4]'
+            }`}
           >
             {/* Base Frame Poster Image with Bulletproof Fallback & onError Guard */}
             <img

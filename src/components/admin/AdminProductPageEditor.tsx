@@ -99,32 +99,62 @@ export const AdminProductPageEditor: React.FC<AdminProductPageEditorProps> = ({
     }
   };
 
-  // Helper: File Upload Handler for Base Poster Frame Overlay (Uploader 1)
-  const handleBaseImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
+  // Helper: Compress uploaded images using HTML5 Canvas to prevent Firestore payload quota rejects
+  const compressImageFile = (file: File, maxDim = 1200, quality = 0.85): Promise<string> => {
+    return new Promise((resolve) => {
       const reader = new FileReader();
-      reader.onload = (event) => {
-        const result = event.target?.result as string;
-        if (result) setBaseImageUrl(result);
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > maxDim) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            }
+          } else {
+            if (height > maxDim) {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            resolve(canvas.toDataURL('image/jpeg', quality));
+          } else {
+            resolve(e.target?.result as string);
+          }
+        };
+        img.onerror = () => resolve(e.target?.result as string);
+        img.src = e.target?.result as string;
       };
       reader.readAsDataURL(file);
+    });
+  };
+
+  // Helper: File Upload Handler for Base Poster Frame Overlay (Uploader 1)
+  const handleBaseImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const compressed = await compressImageFile(file, 1200, 0.85);
+      setBaseImageUrl(compressed);
     }
   };
 
   // Helper: Multi-File Upload Handler for Angle Showcase Gallery (Uploader 2)
-  const handleGalleryUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleGalleryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    files.forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const result = event.target?.result as string;
-        if (result) {
-          setImages((prev) => [...prev, result]);
-        }
-      };
-      reader.readAsDataURL(file);
-    });
+    for (const file of files) {
+      const compressed = await compressImageFile(file, 1000, 0.82);
+      setImages((prev) => [...prev, compressed]);
+    }
   };
 
   const handleRemoveGalleryImage = (index: number) => {
