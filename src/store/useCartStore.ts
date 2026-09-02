@@ -64,14 +64,56 @@ function getStoredAdminRemarks(): Record<string, { remark: string; timestamp: st
   return {};
 }
 
+const MASTER_ORDERS_ARCHIVE_KEY = 'a1print_master_orders_archive_v1';
+const MASTER_PRODUCTS_ARCHIVE_KEY = 'a1print_master_products_archive_v1';
+
+function getStoredMasterOrders(): Order[] {
+  try {
+    const raw = localStorage.getItem(MASTER_ORDERS_ARCHIVE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (e) {}
+  return [];
+}
+
+function saveStoredMasterOrders(orders: Order[]) {
+  try {
+    localStorage.setItem(MASTER_ORDERS_ARCHIVE_KEY, JSON.stringify(orders));
+  } catch (e) {}
+}
+
+function getStoredMasterProducts(): Product[] {
+  try {
+    const raw = localStorage.getItem(MASTER_PRODUCTS_ARCHIVE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (e) {}
+  return [];
+}
+
+function saveStoredMasterProducts(products: Product[]) {
+  try {
+    localStorage.setItem(MASTER_PRODUCTS_ARCHIVE_KEY, JSON.stringify(products));
+  } catch (e) {}
+}
+
 function getStoredLocalData(): StoreData {
   const categories = getStoredCategories();
   const savedRemarks = getStoredAdminRemarks();
   const deletedIds = getDeletedProductIds();
+  const masterOrders = getStoredMasterOrders();
+  const masterProducts = getStoredMasterProducts();
+
+  let loadedProducts: Product[] = masterProducts;
+  let loadedOrders: Order[] = masterOrders;
+  let loadedCartItems: CartItem[] = [];
 
   try {
-    // Try current STORAGE_KEY first, fallback to legacy keys (v15, v14, v1, etc.)
-    const legacyKeys = [STORAGE_KEY, 'a1print_store_data_v15', 'a1print_store_data_v14', 'a1print_store_data_v1', 'a1print_store_data'];
+    const legacyKeys = [STORAGE_KEY, 'a1print_store_data_v20', 'a1print_store_data_v15', 'a1print_store_data_v14', 'a1print_store_data_v1', 'a1print_store_data'];
     let raw: string | null = null;
     for (const key of legacyKeys) {
       const val = localStorage.getItem(key);
@@ -83,48 +125,52 @@ function getStoredLocalData(): StoreData {
 
     if (raw) {
       const parsed = JSON.parse(raw);
-      const rawProds = Array.isArray(parsed.products) && parsed.products.length > 0 ? parsed.products : INITIAL_PRODUCTS;
-      const prods = rawProds
-        .filter((p: Product) => p && p.id && !deletedIds.has(p.id) && !p.isDeleted)
-        .map((p: Product) => ({
-          ...p,
-          stockQuantity: p.stockQuantity !== undefined ? p.stockQuantity : 50,
-          stockLogs: p.stockLogs || [],
-        }));
-
-      const rawOrders = Array.isArray(parsed.orders) ? parsed.orders : [];
-      const ordersWithRemarks = rawOrders.map((o: Order) => {
-        const saved = savedRemarks[o.id];
-        if (saved && saved.remark) {
-          return {
-            ...o,
-            adminRemark: saved.remark,
-            adminRemarkTimestamp: saved.timestamp || o.adminRemarkTimestamp,
-          };
-        }
-        return o;
-      });
-
-      return {
-        products: prods.length > 0 ? prods : INITIAL_PRODUCTS,
-        items: parsed.items || [],
-        orders: ordersWithRemarks,
-        categories,
-      };
+      if (Array.isArray(parsed.products) && parsed.products.length > 0 && loadedProducts.length === 0) {
+        loadedProducts = parsed.products;
+      }
+      if (Array.isArray(parsed.orders) && parsed.orders.length > 0) {
+        // Union merge with master orders
+        const orderMap = new Map<string, Order>();
+        masterOrders.concat(parsed.orders).forEach((o) => {
+          if (o && o.id) orderMap.set(o.id, o);
+        });
+        loadedOrders = Array.from(orderMap.values());
+      }
+      if (Array.isArray(parsed.items)) {
+        loadedCartItems = parsed.items;
+      }
     }
   } catch (e) {}
 
-  const defaultProds: Product[] = INITIAL_PRODUCTS.map((p) => ({
-    ...p,
-    stockQuantity: p.stockQuantity !== undefined ? p.stockQuantity : 50,
-    stockLogs: p.stockLogs || [],
-  }));
-  const initialOrders: Order[] = [];
+  // Fallback to INITIAL_PRODUCTS only if no products exist anywhere
+  if (loadedProducts.length === 0) {
+    loadedProducts = INITIAL_PRODUCTS.map((p) => ({
+      ...p,
+      stockQuantity: p.stockQuantity !== undefined ? p.stockQuantity : 50,
+      stockLogs: p.stockLogs || [],
+    }));
+  }
+
+  // Filter deleted products
+  const activeProds = loadedProducts.filter((p: Product) => p && p.id && !deletedIds.has(p.id));
+
+  // Attach remarks to orders
+  const ordersWithRemarks = loadedOrders.map((o: Order) => {
+    const saved = savedRemarks[o.id];
+    if (saved && saved.remark) {
+      return {
+        ...o,
+        adminRemark: saved.remark,
+        adminRemarkTimestamp: saved.timestamp || o.adminRemarkTimestamp,
+      };
+    }
+    return o;
+  });
 
   return {
-    products: defaultProds,
-    items: [],
-    orders: initialOrders,
+    products: activeProds.length > 0 ? activeProds : INITIAL_PRODUCTS,
+    items: loadedCartItems,
+    orders: ordersWithRemarks,
     categories,
   };
 }
@@ -161,6 +207,15 @@ function optimizeDataForLocalStorage(data: StoreData): StoreData {
 
 function saveStoredLocalData(data: StoreData) {
   memoryData = data;
+
+  // Continuously update un-resettable master archives
+  if (Array.isArray(data.orders) && data.orders.length > 0) {
+    saveStoredMasterOrders(data.orders);
+  }
+  if (Array.isArray(data.products) && data.products.length > 0) {
+    saveStoredMasterProducts(data.products);
+  }
+
   try {
     const optimized = optimizeDataForLocalStorage(data);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(optimized));
@@ -176,7 +231,7 @@ function saveStoredLocalData(data: StoreData) {
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(fallback));
     } catch (err) {
-      console.warn('LocalStorage save error:', err);
+      console.warn('Failed to save to localStorage:', err);
     }
   }
 }
