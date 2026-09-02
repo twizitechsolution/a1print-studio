@@ -16,8 +16,17 @@ interface HomePageProps {
 
 export const HomePage: React.FC<HomePageProps> = ({ onSelectProduct, onNavigate }) => {
   const { products } = useCartStore();
-  const safeProducts = (products && products.length > 0) ? products : [];
-  const featuredProducts = safeProducts.slice(0, 3);
+  const safeProducts = (products && products.length > 0) ? products.filter((p) => p && !p.isDeleted) : [];
+  
+  // 1. New Arrivals: 4 latest products
+  const newArrivals = safeProducts.slice(0, 4);
+
+  // 2. Popular Products: 4 top popular/bestseller products
+  const popularProducts = safeProducts
+    .filter((p) => p.bestseller)
+    .concat(safeProducts.filter((p) => !p.bestseller))
+    .slice(0, 4);
+
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
 
   const categoriesList = [
@@ -277,17 +286,24 @@ export const HomePage: React.FC<HomePageProps> = ({ onSelectProduct, onNavigate 
         </div>
       </section>
 
-      {/* 4. Featured Bestselling Products */}
+      {/* 4. NEW ARRIVALS Section (LovecraftbySE Style 4-Column Grid - TOP) */}
       <section className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 space-y-8 font-jost">
         <div className="text-center space-y-2">
-          <span className="text-xs font-extrabold text-[#F82BA9] uppercase tracking-widest">Bestselling Collection</span>
-          <h2 className="font-playfair text-3xl sm:text-4xl font-extrabold text-[#160E4B]">
-            Most Popular Photo Frames
+          <h2 className="font-playfair text-3xl sm:text-4xl font-extrabold text-[#F82BA9] uppercase tracking-wider">
+            NEW ARRIVALS
           </h2>
+          <div className="flex items-center justify-center gap-2 text-pink-300">
+            <span className="h-px w-8 bg-pink-300" />
+            <span className="text-xs">💖</span>
+            <span className="h-px w-8 bg-pink-300" />
+          </div>
+          <p className="text-sm font-semibold text-gray-700">
+            Explore our latest trending custom photo frames
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-          {featuredProducts.map((product) => (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+          {newArrivals.map((product) => (
             <ProductCard
               key={product.id}
               product={product}
@@ -295,10 +311,52 @@ export const HomePage: React.FC<HomePageProps> = ({ onSelectProduct, onNavigate 
             />
           ))}
         </div>
+
+        <div className="text-center pt-2">
+          <button
+            onClick={() => onNavigate('catalog')}
+            className="px-8 py-3.5 bg-gradient-to-r from-[#3C187B] to-[#F82BA9] hover:from-[#2A1058] hover:to-[#D61B90] text-white font-extrabold text-xs sm:text-sm rounded-2xl shadow-md transition-all inline-flex items-center gap-2 cursor-pointer"
+          >
+            View All New Arrivals <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
       </section>
 
-      {/* 5. Complete Product Grid */}
-      <ProductGrid onSelectProduct={onSelectProduct} />
+      {/* 5. POPULAR PRODUCTS Section (LovecraftbySE Style 4-Column Grid - BELOW NEW ARRIVALS) */}
+      <section className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 space-y-8 font-jost pt-4">
+        <div className="text-center space-y-2">
+          <h2 className="font-playfair text-3xl sm:text-4xl font-extrabold text-[#160E4B] uppercase tracking-wider">
+            POPULAR PRODUCTS
+          </h2>
+          <div className="flex items-center justify-center gap-2 text-purple-300">
+            <span className="h-px w-8 bg-purple-300" />
+            <span className="text-xs">🔥</span>
+            <span className="h-px w-8 bg-purple-300" />
+          </div>
+          <p className="text-sm font-semibold text-gray-700">
+            Our most loved & top selling personalized photo frames
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+          {popularProducts.map((product) => (
+            <ProductCard
+              key={product.id}
+              product={product}
+              onSelectProduct={onSelectProduct}
+            />
+          ))}
+        </div>
+
+        <div className="text-center pt-2">
+          <button
+            onClick={() => onNavigate('catalog')}
+            className="px-8 py-3.5 bg-[#160E4B] hover:bg-[#251877] text-white font-extrabold text-xs sm:text-sm rounded-2xl shadow-md transition-all inline-flex items-center gap-2 cursor-pointer"
+          >
+            Explore Popular Collection <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+      </section>
 
       {/* 5.5. PRODUCTS IN MOTION UGC Video Reels Auto-Scrolling Carousel (media_1787985141028.png) */}
       <ProductsInMotionReel />
