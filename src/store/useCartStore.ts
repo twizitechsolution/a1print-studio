@@ -207,127 +207,133 @@ async function syncFromCloud() {
 
     // 2. STRICT NON-DESTRUCTIVE UNION MERGING FOR PRODUCTS CATALOG
     const cloudProds = await firebaseCloudDb.getCollection('products');
-    const productMap = new Map<string, Product>();
+    if (cloudProds !== null) {
+      const productMap = new Map<string, Product>();
 
-    // Step A: Load initial/local memory products first
-    memoryData.products.forEach((p) => {
-      if (p && p.id && !cloudDeletedIds.has(p.id)) {
-        productMap.set(p.id, p);
-      }
-    });
-
-    // Step B: Merge Cloud Firestore products
-    const cloudProdIds = new Set<string>();
-    if (cloudProds && cloudProds.length > 0) {
-      cloudProds.forEach((cp) => {
-        if (cp && cp.id && !cloudDeletedIds.has(cp.id)) {
-          cloudProdIds.add(cp.id);
-          const existing = productMap.get(cp.id);
-          productMap.set(cp.id, {
-            ...cp,
-            isDeleted: cp.isDeleted || existing?.isDeleted || false,
-            stockQuantity: cp.stockQuantity !== undefined ? cp.stockQuantity : (existing?.stockQuantity ?? 50),
-            stockLogs: cp.stockLogs || existing?.stockLogs || [],
-          });
+      // Step A: Load initial/local memory products first
+      memoryData.products.forEach((p) => {
+        if (p && p.id && !cloudDeletedIds.has(p.id)) {
+          productMap.set(p.id, p);
         }
       });
-    }
 
-    // Step C: Background sync push for any local products missing on Cloud Firestore server
-    productMap.forEach((localProd, id) => {
-      if (!cloudProdIds.has(id)) {
-        firebaseCloudDb.setDocument('products', id, localProd);
+      // Step B: Merge Cloud Firestore products
+      const cloudProdIds = new Set<string>();
+      if (cloudProds.length > 0) {
+        cloudProds.forEach((cp) => {
+          if (cp && cp.id && !cloudDeletedIds.has(cp.id)) {
+            cloudProdIds.add(cp.id);
+            const existing = productMap.get(cp.id);
+            productMap.set(cp.id, {
+              ...cp,
+              isDeleted: cp.isDeleted || existing?.isDeleted || false,
+              stockQuantity: cp.stockQuantity !== undefined ? cp.stockQuantity : (existing?.stockQuantity ?? 50),
+              stockLogs: cp.stockLogs || existing?.stockLogs || [],
+            });
+          }
+        });
       }
-    });
 
-    const mergedProducts = Array.from(productMap.values());
-    if (mergedProducts.length > 0 && JSON.stringify(mergedProducts) !== JSON.stringify(memoryData.products)) {
-      memoryData.products = mergedProducts;
-      saveStoredLocalData(memoryData);
-      notifyListeners();
+      // Step C: Background sync push for any local products missing on Cloud Firestore server
+      productMap.forEach((localProd, id) => {
+        if (!cloudProdIds.has(id)) {
+          firebaseCloudDb.setDocument('products', id, localProd);
+        }
+      });
+
+      const mergedProducts = Array.from(productMap.values());
+      if (mergedProducts.length > 0 && JSON.stringify(mergedProducts) !== JSON.stringify(memoryData.products)) {
+        memoryData.products = mergedProducts;
+        saveStoredLocalData(memoryData);
+        notifyListeners();
+      }
     }
 
     // 3. STRICT NON-DESTRUCTIVE UNION MERGING FOR ORDERS (PRESERVES ALL CUSTOMER ORDERS)
     const cloudOrders = await firebaseCloudDb.getCollection('orders');
-    const savedRemarks = getStoredAdminRemarks();
-    const orderMap = new Map<string, Order>();
+    if (cloudOrders !== null) {
+      const savedRemarks = getStoredAdminRemarks();
+      const orderMap = new Map<string, Order>();
 
-    // Step A: Load all local memory orders first (never drop un-synced orders!)
-    memoryData.orders.forEach((o) => {
-      if (o && o.id) orderMap.set(o.id, o);
-    });
+      // Step A: Load all local memory orders first (never drop un-synced orders!)
+      memoryData.orders.forEach((o) => {
+        if (o && o.id) orderMap.set(o.id, o);
+      });
 
-    // Step B: Merge Cloud Firestore orders
-    const cloudOrderIds = new Set<string>();
-    if (cloudOrders && cloudOrders.length > 0) {
-      cloudOrders.forEach((co) => {
-        if (co && co.id) {
-          cloudOrderIds.add(co.id);
-          const existing = orderMap.get(co.id);
-          const localRemark = savedRemarks[co.id]?.remark || existing?.adminRemark || '';
-          const localRemarkTime = savedRemarks[co.id]?.timestamp || existing?.adminRemarkTimestamp || '';
+      // Step B: Merge Cloud Firestore orders
+      const cloudOrderIds = new Set<string>();
+      if (cloudOrders.length > 0) {
+        cloudOrders.forEach((co) => {
+          if (co && co.id) {
+            cloudOrderIds.add(co.id);
+            const existing = orderMap.get(co.id);
+            const localRemark = savedRemarks[co.id]?.remark || existing?.adminRemark || '';
+            const localRemarkTime = savedRemarks[co.id]?.timestamp || existing?.adminRemarkTimestamp || '';
 
-          orderMap.set(co.id, {
-            ...co,
-            adminRemark: co.adminRemark || localRemark,
-            adminRemarkTimestamp: co.adminRemarkTimestamp || localRemarkTime,
-            orderStatus: co.orderStatus || existing?.orderStatus || 'Received',
-            paymentStatus: co.paymentStatus || existing?.paymentStatus || 'Paid',
-          });
+            orderMap.set(co.id, {
+              ...co,
+              adminRemark: co.adminRemark || localRemark,
+              adminRemarkTimestamp: co.adminRemarkTimestamp || localRemarkTime,
+              orderStatus: co.orderStatus || existing?.orderStatus || 'Received',
+              paymentStatus: co.paymentStatus || existing?.paymentStatus || 'Paid',
+            });
+          }
+        });
+      }
+
+      // Step C: Background retry push for local orders missing on Cloud Firestore server
+      orderMap.forEach((localOrder, id) => {
+        if (!cloudOrderIds.has(id)) {
+          firebaseCloudDb.setDocument('orders', id, localOrder);
         }
       });
-    }
 
-    // Step C: Background retry push for local orders missing on Cloud Firestore server
-    orderMap.forEach((localOrder, id) => {
-      if (!cloudOrderIds.has(id)) {
-        firebaseCloudDb.setDocument('orders', id, localOrder);
+      const mergedOrders = Array.from(orderMap.values()).sort(
+        (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+      );
+
+      if (JSON.stringify(mergedOrders) !== JSON.stringify(memoryData.orders)) {
+        memoryData.orders = mergedOrders;
+        saveStoredLocalData(memoryData);
+        notifyListeners();
       }
-    });
-
-    const mergedOrders = Array.from(orderMap.values()).sort(
-      (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
-    );
-
-    if (JSON.stringify(mergedOrders) !== JSON.stringify(memoryData.orders)) {
-      memoryData.orders = mergedOrders;
-      saveStoredLocalData(memoryData);
-      notifyListeners();
     }
 
     // 4. STRICT NON-DESTRUCTIVE UNION MERGING FOR CATEGORIES
     const cloudCats = await firebaseCloudDb.getCollection('categories');
-    const categoryMap = new Map<string, Category>();
+    if (cloudCats !== null) {
+      const categoryMap = new Map<string, Category>();
 
-    // Step A: Load DEFAULT + memory categories
-    DEFAULT_CATEGORIES.concat(memoryData.categories || []).forEach((cat) => {
-      if (cat && cat.id) categoryMap.set(cat.id, cat);
-    });
+      // Step A: Load DEFAULT + memory categories
+      DEFAULT_CATEGORIES.concat(memoryData.categories || []).forEach((cat) => {
+        if (cat && cat.id) categoryMap.set(cat.id, cat);
+      });
 
-    // Step B: Merge Cloud Firestore categories
-    const cloudCatIds = new Set<string>();
-    if (cloudCats && cloudCats.length > 0) {
-      cloudCats.forEach((cc) => {
-        if (cc && cc.id) {
-          cloudCatIds.add(cc.id);
-          categoryMap.set(cc.id, cc);
+      // Step B: Merge Cloud Firestore categories
+      const cloudCatIds = new Set<string>();
+      if (cloudCats.length > 0) {
+        cloudCats.forEach((cc) => {
+          if (cc && cc.id) {
+            cloudCatIds.add(cc.id);
+            categoryMap.set(cc.id, cc);
+          }
+        });
+      }
+
+      // Step C: Push local categories missing on Cloud Firestore server
+      categoryMap.forEach((localCat, id) => {
+        if (!cloudCatIds.has(id)) {
+          firebaseCloudDb.setDocument('categories', id, localCat);
         }
       });
-    }
 
-    // Step C: Push local categories missing on Cloud Firestore server
-    categoryMap.forEach((localCat, id) => {
-      if (!cloudCatIds.has(id)) {
-        firebaseCloudDb.setDocument('categories', id, localCat);
+      const mergedCats = Array.from(categoryMap.values());
+      if (JSON.stringify(mergedCats) !== JSON.stringify(memoryData.categories)) {
+        memoryData.categories = mergedCats;
+        saveStoredCategories(mergedCats);
+        saveStoredLocalData(memoryData);
+        notifyListeners();
       }
-    });
-
-    const mergedCats = Array.from(categoryMap.values());
-    if (JSON.stringify(mergedCats) !== JSON.stringify(memoryData.categories)) {
-      memoryData.categories = mergedCats;
-      saveStoredCategories(mergedCats);
-      saveStoredLocalData(memoryData);
-      notifyListeners();
     }
   } catch (e) {
     console.warn('Cloud sync background polling error:', e);
@@ -340,10 +346,14 @@ async function initCloudSync() {
 
   await syncFromCloud();
 
-  // Active 5-Second Real-Time Auto-Polling Loop
+  // Smart Periodic Sync & Active Tab Focus Sync
   setInterval(() => {
     syncFromCloud();
-  }, 5000);
+  }, 30000);
+
+  if (typeof window !== 'undefined') {
+    window.addEventListener('focus', () => syncFromCloud());
+  }
 }
 
 export function useCartStore() {

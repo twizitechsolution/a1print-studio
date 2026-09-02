@@ -89,10 +89,15 @@ export const firebaseCloudDb = {
   },
 
   // Read all documents in a collection from live Firebase Firestore
-  async getCollection(collectionName: string): Promise<any[]> {
+  async getCollection(collectionName: string): Promise<any[] | null> {
     try {
       const res = await fetch(`${FIRESTORE_BASE_URL}/${collectionName}`);
-      if (!res.ok) return [];
+      if (!res.ok) {
+        if (res.status === 429) {
+          console.warn(`Firestore REST Quota Exceeded (429) for [${collectionName}]. Preserving local state.`);
+        }
+        return null;
+      }
       const data = await res.json();
       if (!data.documents) return [];
 
@@ -108,7 +113,7 @@ export const firebaseCloudDb = {
       });
     } catch (e) {
       console.warn(`Firestore REST getCollection error [${collectionName}]:`, e);
-      return [];
+      return null;
     }
   },
 
