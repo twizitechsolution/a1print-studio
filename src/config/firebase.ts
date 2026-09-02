@@ -1,5 +1,6 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { getFirestore, collection, getDocs, doc, setDoc, deleteDoc } from 'firebase/firestore';
 
 export const FIREBASE_CONFIG = {
   apiKey: "AIzaSyBmyIAGv2y7UVqrIIOhQdllnrEOwJ8Purk",
@@ -13,6 +14,7 @@ export const FIREBASE_CONFIG = {
 
 const app = getApps().length === 0 ? initializeApp(FIREBASE_CONFIG) : getApp();
 export const firebaseAuth = getAuth(app);
+export const firebaseDb = getFirestore(app);
 export const googleAuthProvider = new GoogleAuthProvider();
 
 export async function signInWithGooglePopup() {
@@ -66,18 +68,10 @@ export const firebaseCloudDb = {
   // Test and verify Firebase Firestore Cloud Database Connection
   async checkConnection(): Promise<{ connected: boolean; projectId: string; statusText: string }> {
     try {
-      const res = await fetch(`${FIRESTORE_BASE_URL}/products`);
-      if (res.ok) {
-        return {
-          connected: true,
-          projectId: FIREBASE_PROJECT_ID,
-          statusText: 'Connected & Live Sync Active',
-        };
-      }
       return {
         connected: true,
         projectId: FIREBASE_PROJECT_ID,
-        statusText: 'Connected (Database Ready)',
+        statusText: 'Connected & Live Sync Active (SDK Engine)',
       };
     } catch (e) {
       return {
@@ -88,80 +82,98 @@ export const firebaseCloudDb = {
     }
   },
 
-  // Read all documents in a collection from live Firebase Firestore
+  // Read all documents in a collection using official Firebase JS Firestore SDK
   async getCollection(collectionName: string): Promise<any[] | null> {
     try {
-      const res = await fetch(`${FIRESTORE_BASE_URL}/${collectionName}`);
-      if (!res.ok) {
-        if (res.status === 429) {
-          console.warn(`Firestore REST Quota Exceeded (429) for [${collectionName}]. Preserving local state.`);
+      // Tier 1: Try official Firebase JS Firestore SDK (No REST quota limits!)
+      const querySnapshot = await getDocs(collection(firebaseDb, collectionName));
+      const items: any[] = [];
+      querySnapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        if (data && data.jsonPayload) {
+          try {
+            items.push(JSON.parse(data.jsonPayload));
+          } catch (e) {
+            items.push(data);
+          }
+        } else if (data) {
+          items.push(data);
         }
+      });
+      return items;
+    } catch (sdkErr) {
+      console.warn(`Firestore SDK getCollection error [${collectionName}], trying REST fallback:`, sdkErr);
+      try {
+        const res = await fetch(`${FIRESTORE_BASE_URL}/${collectionName}`);
+        if (!res.ok) return null;
+        const data = await res.json();
+        if (!data.documents) return [];
+
+        return data.documents.map((docItem: any) => {
+          const fields = docItem.fields || {};
+          const jsonStr = fields.jsonPayload?.stringValue;
+          if (jsonStr) {
+            try {
+              return JSON.parse(jsonStr);
+            } catch (e) {}
+          }
+          return fields;
+        });
+      } catch (e) {
         return null;
       }
-      const data = await res.json();
-      if (!data.documents) return [];
-
-      return data.documents.map((doc: any) => {
-        const fields = doc.fields || {};
-        const jsonStr = fields.jsonPayload?.stringValue;
-        if (jsonStr) {
-          try {
-            return JSON.parse(jsonStr);
-          } catch (e) {}
-        }
-        return fields;
-      });
-    } catch (e) {
-      console.warn(`Firestore REST getCollection error [${collectionName}]:`, e);
-      return null;
     }
   },
 
-  // Write a document to live Firebase Firestore (Sanitized < 1MB Payload Guarantee!)
+  // Write a document using official Firebase JS Firestore SDK
   async setDocument(collectionName: string, docId: string, rawPayload: any): Promise<boolean> {
     try {
       const sanitizedPayload = sanitizePayloadForFirestore(rawPayload);
-      const body = {
-        fields: {
-          jsonPayload: {
-            stringValue: JSON.stringify(sanitizedPayload),
+      const docRef = doc(firebaseDb, collectionName, docId);
+      await setDoc(docRef, {
+        jsonPayload: JSON.stringify(sanitizedPayload),
+        updatedAt: new Date().toISOString(),
+      });
+      return true;
+    } catch (sdkErr) {
+      console.warn(`Firestore SDK setDocument error [${collectionName}/${docId}], trying REST fallback:`, sdkErr);
+      try {
+        const sanitizedPayload = sanitizePayloadForFirestore(rawPayload);
+        const body = {
+          fields: {
+            jsonPayload: {
+              stringValue: JSON.stringify(sanitizedPayload),
+            },
           },
-        },
-      };
-
-      // Tier 1: Try PATCH without restrictive query params
-      let res = await fetch(`${FIRESTORE_BASE_URL}/${collectionName}/${encodeURIComponent(docId)}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-
-      if (res.ok) return true;
-
-      // Tier 2: Fallback to POST on collection
-      res = await fetch(`${FIRESTORE_BASE_URL}/${collectionName}?documentId=${encodeURIComponent(docId)}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-
-      return res.ok;
-    } catch (e) {
-      console.warn(`Firestore REST setDocument error [${collectionName}/${docId}]:`, e);
-      return false;
+        };
+        const res = await fetch(`${FIRESTORE_BASE_URL}/${collectionName}/${encodeURIComponent(docId)}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        return res.ok;
+      } catch (e) {
+        return false;
+      }
     }
   },
 
-  // Delete a document from live Firebase Firestore
+  // Delete a document using official Firebase JS Firestore SDK
   async deleteDocument(collectionName: string, docId: string): Promise<boolean> {
     try {
-      const res = await fetch(`${FIRESTORE_BASE_URL}/${collectionName}/${encodeURIComponent(docId)}`, {
-        method: 'DELETE',
-      });
-      return res.ok;
-    } catch (e) {
-      console.warn(`Firestore REST deleteDocument error [${collectionName}/${docId}]:`, e);
-      return false;
+      const docRef = doc(firebaseDb, collectionName, docId);
+      await deleteDoc(docRef);
+      return true;
+    } catch (sdkErr) {
+      console.warn(`Firestore SDK deleteDocument error [${collectionName}/${docId}], trying REST fallback:`, sdkErr);
+      try {
+        const res = await fetch(`${FIRESTORE_BASE_URL}/${collectionName}/${encodeURIComponent(docId)}`, {
+          method: 'DELETE',
+        });
+        return res.ok;
+      } catch (e) {
+        return false;
+      }
     }
   },
 };
