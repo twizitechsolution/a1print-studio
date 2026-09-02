@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { PaymentSetting } from '../../types/admin';
 import { CreditCard, DollarSign, ShieldCheck, Key, Save, CheckCircle2, RefreshCw } from 'lucide-react';
+import { firebaseCloudDb } from '../../config/firebase';
 
 export const AdminPaymentManager: React.FC = () => {
   const [methods, setMethods] = useState<PaymentSetting[]>([
@@ -13,14 +14,6 @@ export const AdminPaymentManager: React.FC = () => {
       description: 'Instant online card, UPI, & netbanking gateway integration.',
     },
     {
-      id: 'p2',
-      name: 'Direct Instant UPI (PhonePe, GPay, Paytm, BHIM)',
-      provider: 'upi',
-      enabled: true,
-      extraFee: 0,
-      description: 'Zero transaction fee 1-click UPI QR payment gateway.',
-    },
-    {
       id: 'p3',
       name: 'Cash on Delivery (COD) with Extra Handling Fee',
       provider: 'cod',
@@ -31,15 +24,36 @@ export const AdminPaymentManager: React.FC = () => {
   ]);
 
   const [codFee, setCodFee] = useState<number>(0);
-  const [keyId, setKeyId] = useState<string>('rzp_test_TWrhN46NzOrFA4');
-  const [keySecret, setKeySecret] = useState<string>('1OoKv4t5vKRYfYGRRqCpv9H0');
+  const [keyId, setKeyId] = useState<string>('');
+  const [keySecret, setKeySecret] = useState<string>('');
   const [savedStatus, setSavedStatus] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
 
   useEffect(() => {
     const savedKeyId = localStorage.getItem('razorpay_key_id');
     const savedKeySecret = localStorage.getItem('razorpay_key_secret');
     if (savedKeyId) setKeyId(savedKeyId);
     if (savedKeySecret) setKeySecret(savedKeySecret);
+
+    // Sync credentials from Cloud Firestore
+    const syncFromCloud = async () => {
+      try {
+        const docs = await firebaseCloudDb.getCollection('store_settings');
+        const gatewayDoc = docs?.find((d) => d.id === 'payment_gateway');
+        if (gatewayDoc) {
+          if (gatewayDoc.razorpay_key_id) {
+            setKeyId(gatewayDoc.razorpay_key_id);
+            localStorage.setItem('razorpay_key_id', gatewayDoc.razorpay_key_id);
+          }
+          if (gatewayDoc.razorpay_key_secret) {
+            setKeySecret(gatewayDoc.razorpay_key_secret);
+            localStorage.setItem('razorpay_key_secret', gatewayDoc.razorpay_key_secret);
+          }
+          if (gatewayDoc.codFee !== undefined) setCodFee(gatewayDoc.codFee);
+        }
+      } catch (e) {}
+    };
+    syncFromCloud();
   }, []);
 
   const toggleMethod = (id: string) => {
@@ -55,12 +69,30 @@ export const AdminPaymentManager: React.FC = () => {
     );
   };
 
-  const handleSaveCredentials = (e: React.FormEvent) => {
+  const handleSaveCredentials = async (e: React.FormEvent) => {
     e.preventDefault();
-    localStorage.setItem('razorpay_key_id', keyId.trim());
-    localStorage.setItem('razorpay_key_secret', keySecret.trim());
-    setSavedStatus('Razorpay API Keys saved successfully!');
-    setTimeout(() => setSavedStatus(null), 4000);
+    setIsSaving(true);
+    const cleanKeyId = keyId.trim();
+    const cleanKeySecret = keySecret.trim();
+
+    localStorage.setItem('razorpay_key_id', cleanKeyId);
+    localStorage.setItem('razorpay_key_secret', cleanKeySecret);
+
+    try {
+      await firebaseCloudDb.setDocument('store_settings', 'payment_gateway', {
+        id: 'payment_gateway',
+        razorpay_key_id: cleanKeyId,
+        razorpay_key_secret: cleanKeySecret,
+        codFee,
+        updatedAt: new Date().toISOString(),
+      });
+      setSavedStatus('✅ Live Razorpay API Keys saved and synced globally across all customer devices!');
+    } catch (err) {
+      setSavedStatus('✅ Razorpay API Keys saved locally!');
+    } finally {
+      setIsSaving(false);
+      setTimeout(() => setSavedStatus(null), 4000);
+    }
   };
 
   return (

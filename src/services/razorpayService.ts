@@ -1,5 +1,4 @@
-// Razorpay Standard Web Checkout Integration Service
-// Official Documentation: https://razorpay.com/docs/payments/payment-gateway/web-integration/standard/
+import { firebaseCloudDb } from '../config/firebase';
 
 declare global {
   interface Window {
@@ -19,6 +18,26 @@ export interface CustomerCheckoutDetails {
   phone: string;
   address?: string;
 }
+
+// Dynamic Live Razorpay Key Resolver from Cloud Firestore & Local Storage
+export const getLiveRazorpayKeyId = async (): Promise<string> => {
+  const localKey = localStorage.getItem('razorpay_key_id');
+  if (localKey && localKey.trim().length > 5) {
+    return localKey.trim();
+  }
+
+  try {
+    const docs = await firebaseCloudDb.getCollection('store_settings');
+    const gatewayDoc = docs?.find((d) => d.id === 'payment_gateway');
+    if (gatewayDoc && gatewayDoc.razorpay_key_id) {
+      const liveKey = gatewayDoc.razorpay_key_id.trim();
+      localStorage.setItem('razorpay_key_id', liveKey);
+      return liveKey;
+    }
+  } catch (e) {}
+
+  return import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_TWrhN46NzOrFA4';
+};
 
 // 1. Dynamic Script Loader for Official Razorpay Checkout Script
 export const loadRazorpayScript = (): Promise<boolean> => {
@@ -135,8 +154,8 @@ export const launchRazorpayCheckout = async (params: {
       authFailed = true;
     }
 
-    const customKeyId = localStorage.getItem('razorpay_key_id');
-    const keyId = orderData?.key_id || customKeyId || import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_TWrhN46NzOrFA4';
+    const customKeyId = await getLiveRazorpayKeyId();
+    const keyId = orderData?.key_id || customKeyId;
 
     let hasCompletedSuccessfully = false;
 
