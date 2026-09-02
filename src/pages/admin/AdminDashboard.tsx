@@ -9,6 +9,7 @@ import { AdminDarkStatsCards } from '../../components/admin/AdminDarkStatsCards'
 import { AdminCharts } from '../../components/admin/AdminCharts';
 import { AdminOrderList } from '../../components/admin/AdminOrderList';
 import { AdminCatalogManager } from '../../components/admin/AdminCatalogManager';
+import { AdminProductPageEditor } from '../../components/admin/AdminProductPageEditor';
 import { AdminTemplateEditor } from './AdminTemplateEditor';
 import { AdminStoreSettings } from '../../components/admin/AdminStoreSettings';
 import { AdminCustomFieldsManager } from '../../components/admin/AdminCustomFieldsManager';
@@ -85,9 +86,10 @@ const AdminDashboardInner: React.FC<AdminDashboardProps> = ({ orders: initialOrd
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
 
-  const { products, orders, updateOrderStatus, updatePaymentStatus, updateOrderAdminRemark, recordOrderAction } = useCartStore();
+  const { products, orders, categories, addProduct, updateProduct, updateOrderStatus, updatePaymentStatus, updateOrderAdminRemark, recordOrderAction } = useCartStore();
 
   const [editingTemplateProduct, setEditingTemplateProduct] = useState<Product | null>(null);
+  const [editingProductFullPage, setEditingProductFullPage] = useState<{ active: boolean; product: Product | null } | null>(null);
 
   // Live Registered Customers List state from Firestore & Local Storage
   const [registeredCustomers, setRegisteredCustomers] = useState<CustomerUser[]>([]);
@@ -419,13 +421,33 @@ const AdminDashboardInner: React.FC<AdminDashboardProps> = ({ orders: initialOrd
             </div>
           )}
 
-          {/* Module 2: Frame Catalog Manager */}
-          {activeTab === 'catalog' && (
-            <AdminCatalogManager
-              onEditTemplate={(product) => setEditingTemplateProduct(product)}
-              onOpenTemplateEditor={(product) => setEditingTemplateProduct(product)}
-              onOpenVisualEditor={(product) => setEditingTemplateProduct(product)}
+          {/* Module 2: Frame Catalog Manager & Standalone Full-Page Product Editor */}
+          {editingProductFullPage ? (
+            <AdminProductPageEditor
+              product={editingProductFullPage.product}
+              categories={categories.map((c) => ({ id: c.id, name: c.name }))}
+              onSave={(savedProd) => {
+                const exists = products.some((p) => p.id === savedProd.id);
+                if (exists) {
+                  updateProduct(savedProd.id, savedProd);
+                } else {
+                  addProduct(savedProd);
+                }
+                setEditingProductFullPage(null);
+              }}
+              onBack={() => setEditingProductFullPage(null)}
             />
+          ) : (
+            <>
+              {activeTab === 'catalog' && (
+                <AdminCatalogManager
+                  onEditTemplate={(product) => setEditingTemplateProduct(product)}
+                  onOpenTemplateEditor={(product) => setEditingTemplateProduct(product)}
+                  onOpenVisualEditor={(product) => setEditingTemplateProduct(product)}
+                  onEditProductFullPage={(product) => setEditingProductFullPage({ active: true, product })}
+                />
+              )}
+            </>
           )}
 
           {/* Module 3: Customization Fields */}

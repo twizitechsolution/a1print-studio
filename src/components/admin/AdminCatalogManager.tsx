@@ -11,6 +11,7 @@ interface AdminCatalogManagerProps {
   onOpenTemplateEditor?: (product: Product) => void;
   onOpenVisualEditor?: (product: Product) => void;
   onEditTemplate?: (product: Product) => void;
+  onEditProductFullPage?: (product: Product | null) => void;
   products?: Product[];
 }
 
@@ -18,6 +19,7 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
   onOpenTemplateEditor,
   onOpenVisualEditor,
   onEditTemplate,
+  onEditProductFullPage,
 }) => {
   const {
     products,
@@ -67,13 +69,21 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
   const paginatedProducts = activeProducts.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const handleOpenAddModal = () => {
-    setEditingProduct(null);
-    setIsProductModalOpen(true);
+    if (onEditProductFullPage) {
+      onEditProductFullPage(null);
+    } else {
+      setEditingProduct(null);
+      setIsProductModalOpen(true);
+    }
   };
 
   const handleOpenEditModal = (product: Product) => {
-    setEditingProduct(product);
-    setIsProductModalOpen(true);
+    if (onEditProductFullPage) {
+      onEditProductFullPage(product);
+    } else {
+      setEditingProduct(product);
+      setIsProductModalOpen(true);
+    }
   };
 
   const handleSaveProduct = (product: Product) => {
