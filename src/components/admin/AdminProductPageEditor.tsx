@@ -369,86 +369,15 @@ export const AdminProductPageEditor: React.FC<AdminProductPageEditorProps> = ({
             </div>
           </div>
 
-          {/* Card 2: Dual Image Uploader System */}
+          {/* Card 2: Frame Orientation & Auto-Aspect Adjustment (Moved Above Uploaders) */}
           <div className="bg-white p-6 sm:p-8 rounded-3xl border border-purple-100 shadow-md space-y-6">
             <div className="flex items-center gap-3 border-b border-gray-100 pb-4">
               <div className="w-10 h-10 rounded-2xl bg-pink-100 text-[#F82BA9] flex items-center justify-center font-extrabold text-sm">
                 2
               </div>
               <div>
-                <h3 className="font-extrabold text-lg text-[#160E4B]">Dual Frame Image Uploader System</h3>
-                <p className="text-xs text-gray-500">Separate uploads for live poster overlay and real-world showcase images</p>
-              </div>
-            </div>
-
-            {/* Uploader 1: Frame Poster Overlay Template */}
-            <div className="p-5 bg-pink-50/50 rounded-3xl border border-pink-200 space-y-4 font-bold text-xs">
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="text-[#F82BA9] uppercase tracking-wider block">Uploader 1: Transparent Frame Poster Overlay</span>
-                  <p className="text-gray-500 text-[11px]">Primary PNG/SVG frame template overlay used in live customizer visualizer</p>
-                </div>
-                <label className="px-4 py-2 bg-[#F82BA9] hover:bg-[#D61B90] text-white rounded-xl shadow-xs cursor-pointer inline-flex items-center gap-1.5">
-                  <Upload className="w-3.5 h-3.5" /> Upload Overlay
-                  <input type="file" accept="image/*" onChange={handleBaseImageUpload} className="hidden" />
-                </label>
-              </div>
-
-              {baseImageUrl ? (
-                <div className="flex items-center gap-4 bg-white p-3 rounded-2xl border border-pink-200">
-                  <img src={baseImageUrl} alt="Frame Base Overlay" className="w-20 h-24 object-contain rounded-xl bg-gray-100 p-1" />
-                  <div className="space-y-1 flex-1">
-                    <span className="text-gray-900 font-extrabold block">Primary Overlay Image Ready</span>
-                    <span className="text-[11px] text-gray-400 font-mono block truncate max-w-md">{baseImageUrl.substring(0, 60)}...</span>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center py-6 border-2 border-dashed border-pink-200 rounded-2xl bg-white text-gray-400">
-                  No primary overlay uploaded yet.
-                </div>
-              )}
-            </div>
-
-            {/* Uploader 2: Real-World Showcase & Angle View Gallery */}
-            <div className="p-5 bg-purple-50/50 rounded-3xl border border-purple-200 space-y-4 font-bold text-xs">
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="text-[#3C187B] uppercase tracking-wider block">Uploader 2: Showcase Angles & Lifestyle Gallery</span>
-                  <p className="text-gray-500 text-[11px]">Multiple real-world angle photos displayed in product image gallery</p>
-                </div>
-                <label className="px-4 py-2 bg-[#3C187B] hover:bg-[#251877] text-white rounded-xl shadow-xs cursor-pointer inline-flex items-center gap-1.5">
-                  <Plus className="w-3.5 h-3.5" /> Add Gallery Photos
-                  <input type="file" accept="image/*" multiple onChange={handleGalleryUpload} className="hidden" />
-                </label>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
-                {images.map((img, idx) => (
-                  <div key={idx} className="relative group rounded-2xl overflow-hidden border border-purple-200 bg-white aspect-3/4">
-                    <img src={img} alt={`Gallery ${idx}`} className="w-full h-full object-cover" />
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveGalleryImage(idx)}
-                      className="absolute top-2 right-2 p-1.5 bg-red-600 text-white rounded-full opacity-90 hover:opacity-100 transition-opacity cursor-pointer"
-                      title="Remove Image"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Card 3: Frame Orientation & Canvas Ratio */}
-          <div className="bg-white p-6 sm:p-8 rounded-3xl border border-purple-100 shadow-md space-y-6">
-            <div className="flex items-center gap-3 border-b border-gray-100 pb-4">
-              <div className="w-10 h-10 rounded-2xl bg-pink-100 text-[#F82BA9] flex items-center justify-center font-extrabold text-sm">
-                3
-              </div>
-              <div>
-                <h3 className="font-extrabold text-lg text-[#160E4B]">Frame Orientation & Auto-Aspect Adjustment</h3>
-                <p className="text-xs text-gray-500">Selecting orientation automatically adjusts live customizer canvas aspect ratio</p>
+                <h3 className="font-extrabold text-lg text-[#160E4B]">Step 1: Select Frame Orientation</h3>
+                <p className="text-xs text-gray-500">Choosing orientation automatically adjusts upload preview boxes and live visualizer aspect ratio</p>
               </div>
             </div>
 
@@ -485,6 +414,88 @@ export const AdminProductPageEditor: React.FC<AdminProductPageEditorProps> = ({
                   <h4 className="font-extrabold text-sm text-gray-900">Landscape Orientation</h4>
                   <span className="text-[11px] text-gray-500 block">Horizontal frame aspect ratio (12x8 / 18x12 Inch)</span>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 3: Dual Frame Image Uploader System (Dynamically Resizes by Selected Orientation) */}
+          <div className="bg-white p-6 sm:p-8 rounded-3xl border border-purple-100 shadow-md space-y-6">
+            <div className="flex items-center gap-3 border-b border-gray-100 pb-4">
+              <div className="w-10 h-10 rounded-2xl bg-pink-100 text-[#F82BA9] flex items-center justify-center font-extrabold text-sm">
+                3
+              </div>
+              <div>
+                <h3 className="font-extrabold text-lg text-[#160E4B]">Step 2: Dual Frame Image Uploader System</h3>
+                <p className="text-xs text-gray-500">Upload primary main frame and secondary angle showcase photos matching {orientation.toUpperCase()} ratio</p>
+              </div>
+            </div>
+
+            {/* Uploader 1: Main Product Frame Image */}
+            <div className="p-5 bg-pink-50/50 rounded-3xl border border-pink-200 space-y-4 font-bold text-xs">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-[#F82BA9] uppercase tracking-wider block">Uploader 1: Main Product Frame Image ({orientation.toUpperCase()})</span>
+                  <p className="text-gray-500 text-[11px]">Main frame shown across Shop & Cart. All live customizations render directly on this frame!</p>
+                </div>
+                <label className="px-4 py-2 bg-[#F82BA9] hover:bg-[#D61B90] text-white rounded-xl shadow-xs cursor-pointer inline-flex items-center gap-1.5">
+                  <Upload className="w-3.5 h-3.5" /> Upload Main Frame
+                  <input type="file" accept="image/*" onChange={handleBaseImageUpload} className="hidden" />
+                </label>
+              </div>
+
+              {baseImageUrl ? (
+                <div className="flex items-center gap-4 bg-white p-3.5 rounded-2xl border border-pink-200">
+                  <div className={`shrink-0 rounded-xl bg-gray-100 p-1 flex items-center justify-center overflow-hidden border border-gray-200 transition-all ${
+                    orientation === 'portrait' ? 'w-24 h-32' : 'w-36 h-24'
+                  }`}>
+                    <img src={baseImageUrl} alt="Main Frame Image" className="w-full h-full object-contain rounded-lg" />
+                  </div>
+                  <div className="space-y-1 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-900 font-extrabold block">Main Frame Image Ready</span>
+                      <span className="px-2 py-0.5 bg-pink-100 text-[#F82BA9] text-[10px] font-extrabold rounded-md uppercase">
+                        {orientation} ({orientation === 'portrait' ? '3:4' : '4:3'})
+                      </span>
+                    </div>
+                    <span className="text-[11px] text-gray-400 font-mono block truncate max-w-md">{baseImageUrl.substring(0, 60)}...</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-6 border-2 border-dashed border-pink-200 rounded-2xl bg-white text-gray-400">
+                  No main frame image uploaded yet.
+                </div>
+              )}
+            </div>
+
+            {/* Uploader 2: Real-World Showcase & Angle View Gallery */}
+            <div className="p-5 bg-purple-50/50 rounded-3xl border border-purple-200 space-y-4 font-bold text-xs">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-[#3C187B] uppercase tracking-wider block">Uploader 2: Showcase Angles & Lifestyle Gallery ({orientation.toUpperCase()})</span>
+                  <p className="text-gray-500 text-[11px]">Secondary real-world angle photos displayed in product gallery thumbnails</p>
+                </div>
+                <label className="px-4 py-2 bg-[#3C187B] hover:bg-[#251877] text-white rounded-xl shadow-xs cursor-pointer inline-flex items-center gap-1.5">
+                  <Plus className="w-3.5 h-3.5" /> Add Gallery Photos
+                  <input type="file" accept="image/*" multiple onChange={handleGalleryUpload} className="hidden" />
+                </label>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+                {images.map((img, idx) => (
+                  <div key={idx} className={`relative group rounded-2xl overflow-hidden border border-purple-200 bg-white transition-all ${
+                    orientation === 'portrait' ? 'aspect-3/4' : 'aspect-4/3'
+                  }`}>
+                    <img src={img} alt={`Gallery Angle ${idx}`} className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveGalleryImage(idx)}
+                      className="absolute top-2 right-2 p-1.5 bg-red-600 text-white rounded-full opacity-90 hover:opacity-100 transition-opacity cursor-pointer shadow-md"
+                      title="Remove Image"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
