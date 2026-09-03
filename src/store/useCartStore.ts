@@ -310,8 +310,6 @@ async function syncFromCloud() {
       }
     }
 
-    const cloudDeletedIds = getDeletedProductIds();
-
     // 1. STRICT NON-DESTRUCTIVE UNION MERGING FOR PRODUCTS CATALOG WITH VERSION RECONCILIATION
     if (cloudProds !== null && cloudProds.length > 0) {
       const overridesMap = getStoredProductOverrides();
@@ -323,11 +321,7 @@ async function syncFromCloud() {
         if (p && p.id) {
           const override = overridesMap[p.id];
           const item = override || p;
-          if (cloudDeletedIds.has(p.id)) {
-            productMap.set(p.id, { ...item, isDeleted: true });
-          } else {
-            productMap.set(p.id, item);
-          }
+          productMap.set(p.id, item);
         }
       });
 
@@ -340,7 +334,7 @@ async function syncFromCloud() {
 
           const cpTime = cp.updatedAt ? new Date(cp.updatedAt).getTime() : 0;
           const existingTime = existing?.updatedAt ? new Date(existing.updatedAt).getTime() : 0;
-          const isDeletedState = cp.isDeleted || cloudDeletedIds.has(cp.id) || existing?.isDeleted || false;
+          const isDeletedState = Boolean(cp.isDeleted || (existing && existing.isDeleted));
 
           if (!existing || cpVer > exVer || (cpVer === exVer && cpTime > existingTime)) {
             const merged: Product = {
@@ -367,23 +361,10 @@ async function syncFromCloud() {
     }
 
     // Step B: Parallel background fetch for secondary collections without blocking product rendering
-    const [deletedDocs, cloudOrders, cloudCats] = await Promise.all([
-      firebaseCloudDb.getCollection('deleted_products'),
+    const [cloudOrders, cloudCats] = await Promise.all([
       firebaseCloudDb.getCollection('orders'),
       firebaseCloudDb.getCollection('categories'),
     ]);
-
-    // 2. CLOUD FIRESTORE DELETED PRODUCT TOMBSTONES
-    if (deletedDocs && deletedDocs.length > 0) {
-      deletedDocs.forEach((d) => {
-        if (d.ids && Array.isArray(d.ids)) {
-          d.ids.forEach((id: string) => cloudDeletedIds.add(id));
-        } else if (d.id && d.id !== 'global_tombstone') {
-          cloudDeletedIds.add(d.id);
-        }
-      });
-      saveDeletedProductIds(cloudDeletedIds);
-    }
 
     // 3. STRICT NON-DESTRUCTIVE UNION MERGING FOR ORDERS (PRESERVES ALL CUSTOMER ORDERS)
     if (cloudOrders !== null) {
