@@ -320,25 +320,32 @@ async function syncFromCloud() {
 
       // Load initial/local memory products & admin overrides first
       memoryData.products.forEach((p) => {
-        if (p && p.id && !cloudDeletedIds.has(p.id)) {
+        if (p && p.id) {
           const override = overridesMap[p.id];
-          productMap.set(p.id, override || p);
+          const item = override || p;
+          if (cloudDeletedIds.has(p.id)) {
+            productMap.set(p.id, { ...item, isDeleted: true });
+          } else {
+            productMap.set(p.id, item);
+          }
         }
       });
 
       // Merge Cloud Firestore products safely (version & timestamp priority guard!)
       cloudProds.forEach((cp) => {
-        if (cp && cp.id && !cloudDeletedIds.has(cp.id)) {
+        if (cp && cp.id) {
           const existing = productMap.get(cp.id) || overridesMap[cp.id];
           const cpVer = cp.version || 0;
           const exVer = existing?.version || 0;
 
           const cpTime = cp.updatedAt ? new Date(cp.updatedAt).getTime() : 0;
           const existingTime = existing?.updatedAt ? new Date(existing.updatedAt).getTime() : 0;
+          const isDeletedState = cp.isDeleted || cloudDeletedIds.has(cp.id) || existing?.isDeleted || false;
 
           if (!existing || cpVer > exVer || (cpVer === exVer && cpTime > existingTime)) {
             const merged: Product = {
               ...cp,
+              isDeleted: isDeletedState,
               stockQuantity: cp.stockQuantity !== undefined ? cp.stockQuantity : (existing?.stockQuantity ?? 50),
               stockLogs: cp.stockLogs || existing?.stockLogs || [],
               syncStatus: 'synced',
