@@ -277,7 +277,7 @@ function notifyListeners() {
 // Real-Time Cloud Firestore Sync Engine (5-Second Active Polling & 0ms Instant Reactivity)
 let isCloudSyncInitialized = false;
 let isSyncingFromCloud = false;
-let isStoreLoading = true;
+let isStoreLoading = (memoryData.products || []).length === 0 && (memoryData.orders || []).length === 0;
 
 async function syncFromCloud() {
   if (isSyncingFromCloud) return;

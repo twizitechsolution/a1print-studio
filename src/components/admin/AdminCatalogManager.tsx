@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Product } from '../../types';
 import { useCartStore } from '../../store/useCartStore';
-import { Tag, Plus, Edit2, Trash2, Flame, Sliders, FolderPlus, History, RotateCcw, Package, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Tag, Plus, Edit2, Trash2, Flame, Sliders, FolderPlus, History, RotateCcw, Package, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
 import { AdminProductListingModal } from './AdminProductListingModal';
 import { AdminCategoryManager } from './AdminCategoryManager';
 import { AdminRecycleBinModal } from './AdminRecycleBinModal';
