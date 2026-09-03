@@ -149,32 +149,36 @@ export const firebaseCloudDb = {
       }
     };
 
-    // Fast Path: Direct 100ms HTTP REST fetch first (prevents cold gRPC SSL handshake stalls!)
+    // Fast Path: Direct 100ms HTTP REST fetch first
     const restData = await fetchViaRest();
     if (restData !== null && restData.length > 0) {
       return restData;
     }
 
-    // Fallback: Official Firebase JS Firestore SDK Engine
+    // Fallback: Official Firebase JS Firestore SDK Engine (WebSockets / gRPC connection)
     try {
       const querySnapshot = await getDocs(collection(firebaseDb, collectionName));
-      const items: any[] = [];
-      querySnapshot.forEach((docSnap) => {
-        const data = docSnap.data();
-        if (data && data.jsonPayload) {
-          try {
-            items.push(JSON.parse(data.jsonPayload));
-          } catch (e) {
-            items.push(data);
+      if (!querySnapshot.empty) {
+        const items: any[] = [];
+        querySnapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          if (data && data.jsonPayload) {
+            try {
+              items.push(JSON.parse(data.jsonPayload));
+            } catch (e) {
+              items.push({ id: docSnap.id, ...data });
+            }
+          } else if (data) {
+            items.push({ id: docSnap.id, ...data });
           }
-        } else if (data) {
-          items.push(data);
-        }
-      });
-      return items;
+        });
+        return items;
+      }
     } catch (sdkErr) {
-      return restData;
+      console.warn('Firestore SDK getCollection fallback error:', sdkErr);
     }
+
+    return restData || [];
   },
 
   // Write a document using official Firebase JS Firestore SDK

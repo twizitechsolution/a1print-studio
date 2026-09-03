@@ -476,11 +476,32 @@ async function initCloudSync() {
   // Step A: Initial guarded sync
   await syncFromCloud();
 
-  // Attach official Real-Time Firebase WebSockets Snapshot Listeners
+  // Attach official Real-Time Firebase WebSockets Snapshot Listeners (0 REST HTTP quota usage!)
   try {
-    onSnapshot(collection(firebaseDb, 'products'), () => {
-      syncFromCloud();
+    onSnapshot(collection(firebaseDb, 'products'), (snapshot) => {
+      // Re-hydrate directly from snapshot documents
+      const docs: Product[] = [];
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        if (data && data.jsonPayload) {
+          try {
+            docs.push(JSON.parse(data.jsonPayload));
+          } catch (e) {
+            docs.push(data as Product);
+          }
+        } else if (data) {
+          docs.push(data as Product);
+        }
+      });
+      if (docs.length > 0) {
+        memoryData.products = docs;
+        saveStoredLocalData(memoryData);
+        notifyListeners();
+      } else {
+        syncFromCloud();
+      }
     });
+
     onSnapshot(collection(firebaseDb, 'orders'), () => {
       syncFromCloud();
     });
@@ -488,12 +509,7 @@ async function initCloudSync() {
     console.warn('Real-time WebSockets listener fallback:', e);
   }
 
-  // Periodic Outbox Flush & Backup Sync
-  setInterval(async () => {
-    await flushOutboxQueue();
-    await syncFromCloud();
-  }, 15000);
-
+  // Window Focus On-Demand Resync (Replaces aggressive setInterval REST polling)
   if (typeof window !== 'undefined') {
     window.addEventListener('focus', async () => {
       await flushOutboxQueue();
