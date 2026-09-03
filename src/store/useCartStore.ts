@@ -504,8 +504,48 @@ async function initCloudSync() {
       }
     });
 
-    onSnapshot(collection(firebaseDb, 'orders'), () => {
-      syncFromCloud();
+    onSnapshot(collection(firebaseDb, 'orders'), (snapshot) => {
+      const docs: Order[] = [];
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        if (data && data.jsonPayload) {
+          try {
+            docs.push(JSON.parse(data.jsonPayload));
+          } catch (e) {
+            docs.push({ id: docSnap.id, ...data } as Order);
+          }
+        } else if (data) {
+          docs.push({ id: docSnap.id, ...data } as Order);
+        }
+      });
+      if (docs.length > 0) {
+        memoryData.orders = docs;
+        saveStoredLocalData(memoryData);
+        notifyListeners();
+      } else {
+        syncFromCloud();
+      }
+    });
+
+    // Real-Time WebSockets Listener for Registered Customers!
+    onSnapshot(collection(firebaseDb, 'customer_users'), (snapshot) => {
+      const customers: any[] = [];
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        if (data && data.jsonPayload) {
+          try {
+            customers.push(JSON.parse(data.jsonPayload));
+          } catch (e) {
+            customers.push({ id: docSnap.id, ...data });
+          }
+        } else if (data) {
+          customers.push({ id: docSnap.id, ...data });
+        }
+      });
+      if (typeof window !== 'undefined' && customers.length > 0) {
+        localStorage.setItem('a1print_registered_customers_v2', JSON.stringify(customers));
+        notifyListeners();
+      }
     });
   } catch (e) {
     console.warn('Real-time WebSockets listener fallback:', e);
