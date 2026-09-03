@@ -23,6 +23,7 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
 }) => {
   const {
     products,
+    allProducts,
     categories,
     addCategory,
     deleteCategory,
@@ -43,7 +44,7 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
   const [copiedAdLinkId, setCopiedAdLinkId] = useState<string | null>(null);
 
   // Defensive array guards to eliminate any runtime TypeError
-  const safeProducts = Array.isArray(products) ? products.filter(Boolean) : [];
+  const safeProducts = Array.isArray(allProducts || products) ? (allProducts || products).filter(Boolean) : [];
   const safeCategories = Array.isArray(categories) ? categories.filter(Boolean) : [];
 
   // Active Live Products vs Soft-Deleted Recycle Bin Products

@@ -1135,7 +1135,8 @@ export function useCartStore() {
   const totalItems = store.items.reduce((sum, item) => sum + item.quantity, 0);
 
   return {
-    products: store.products,
+    products: (store.products || []).filter((p) => p && !p.isDeleted),
+    allProducts: store.products || [],
     items: store.items,
     orders: store.orders,
     categories: store.categories || DEFAULT_CATEGORIES,

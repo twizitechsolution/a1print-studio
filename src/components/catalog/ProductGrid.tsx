@@ -24,6 +24,7 @@ export const ProductGrid: React.FC<ProductGridProps> = ({
   ];
 
   const filteredProducts = products.filter((product) => {
+    if (!product || product.isDeleted) return false;
     if (selectedCategory === 'all') return true;
     return (
       (product.category || '').toLowerCase().includes(selectedCategory.toLowerCase()) ||

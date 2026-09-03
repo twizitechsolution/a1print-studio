@@ -86,6 +86,7 @@ export const ShopProductGrid: React.FC<ShopProductGridProps> = ({
   };
 
   const filteredProducts = products.filter((product) => {
+    if (!product || product.isDeleted) return false;
     if (selectedCategory === 'all') return true;
     
     // Category or Subcategory match logic
