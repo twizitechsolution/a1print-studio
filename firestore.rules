@@ -1,0 +1,52 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isValidVersionUpdate() {
+      return request.resource.data.version >= resource.data.version;
+    }
+
+    // 1. PRODUCTS COLLECTION
+    match /products/{productId} {
+      allow read: if true; // Public catalog access
+      allow create: if true;
+      allow update: if request.resource.data.isDeleted == true || isValidVersionUpdate();
+      allow delete: if false; // 🛡️ Phase 5 Rule: HARD DELETES ARE STRICTLY FORBIDDEN! Soft-delete only.
+    }
+
+    // 2. ORDERS COLLECTION
+    match /orders/{orderId} {
+      allow read: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if false; // 🛡️ Hard deletes forbidden for order safety!
+    }
+
+    // 3. CATEGORIES COLLECTION
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow create, update: if true;
+      allow delete: if false;
+    }
+
+    // 4. AUDIT LOGS & SNAPSHOTS
+    match /audit_logs/{logId} {
+      allow read, create: if true;
+      allow update, delete: if false; // Audit logs are append-only & immutable!
+    }
+
+    match /snapshots/{snapshotId} {
+      allow read, create: if true;
+      allow update, delete: if false;
+    }
+
+    match /store_settings/{settingId} {
+      allow read, write: if true;
+    }
+  }
+}

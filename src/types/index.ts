@@ -9,7 +9,13 @@ export interface Category {
   description?: string;
   icon?: string;
   color?: string;
-  createdAt: string;
+  createdAt?: string;
+  updatedAt?: string;
+  version?: number;
+  isDeleted?: boolean;
+  deletedAt?: string | null;
+  syncStatus?: 'synced' | 'pending' | 'failed';
+  lastSyncedAt?: string | null;
 }
 
 export interface StockLogItem {
@@ -62,10 +68,15 @@ export interface Product {
   photoSlots?: PhotoSlotConfig[];
   textZones?: TextZoneConfig[];
   stockQuantity?: number;
-  isDeleted?: boolean;
-  deletedAt?: string;
   stockLogs?: StockLogItem[];
   allowedPaymentModes?: ('Prepaid' | 'COD' | 'GoQuick50')[];
+  createdAt?: string;
+  updatedAt?: string;
+  version?: number;
+  isDeleted?: boolean;
+  deletedAt?: string | null;
+  syncStatus?: 'synced' | 'pending' | 'failed';
+  lastSyncedAt?: string | null;
 }
 
 export interface CartItem {
@@ -115,6 +126,12 @@ export interface SupportTicket {
   images: string[];
   status: 'Pending' | 'In Review' | 'Resolved' | 'Closed';
   createdAt: string;
+  updatedAt?: string;
+  version?: number;
+  isDeleted?: boolean;
+  deletedAt?: string | null;
+  syncStatus?: 'synced' | 'pending' | 'failed';
+  lastSyncedAt?: string | null;
   adminReply?: string;
   adminReplyTimestamp?: string;
   repliedBy?: string;
@@ -131,7 +148,6 @@ export interface Order {
   paymentMethod: 'Razorpay' | 'PhonePe' | 'GPay' | 'Paytm' | 'Card' | 'COD';
   paymentStatus: 'Paid' | 'Pending' | 'COD' | 'Refund';
   orderStatus: 'New' | 'Design' | 'Printing' | 'QC' | 'Packing' | 'Shipped' | 'Delivered' | 'Cancelled' | 'Received' | 'Reprint' | 'RTO';
-  createdAt: string;
   notes?: string;
   adminRemark?: string;
   adminRemarkTimestamp?: string;
@@ -144,4 +160,11 @@ export interface Order {
     avatar?: string;
   };
   processingHistory?: ProcessingHistoryItem[];
+  createdAt?: string;
+  updatedAt?: string;
+  version?: number;
+  isDeleted?: boolean;
+  deletedAt?: string | null;
+  syncStatus?: 'synced' | 'pending' | 'failed';
+  lastSyncedAt?: string | null;
 }

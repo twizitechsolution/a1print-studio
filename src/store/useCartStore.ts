@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { CartItem, Order, Product, Category, StockLogItem } from '../types';
 import { PRODUCTS as INITIAL_PRODUCTS } from '../data/products';
-import { firebaseCloudDb } from '../config/firebase';
+import { firebaseCloudDb, firebaseDb, collection, onSnapshot } from '../config/firebase';
+import { enqueueOutboxJob, flushOutboxQueue, writeAuditLog, getStoredOutboxJobs } from '../services/outboxService';
 
 const STORAGE_KEY = 'a1print_store_data_v20';
 const DELETED_IDS_KEY = 'a1print_deleted_product_ids_v20';
@@ -58,13 +59,13 @@ function saveStoredCategories(categories: Category[]) {
 
 function getStoredAdminRemarks(): Record<string, { remark: string; timestamp: string }> {
   try {
-    const raw = localStorage.getItem('a1print_admin_remarks_v1');
+    const raw = localStorage.getItem('a1print_admin_order_remarks_v1');
     if (raw) return JSON.parse(raw);
   } catch (e) {}
   return {};
 }
 
-const MASTER_ORDERS_ARCHIVE_KEY = 'a1print_master_orders_archive_v1';
+const MASTER_ORDERS_ARCHIVE_KEY = 'a1print_master_orders_v1';
 const MASTER_PRODUCTS_ARCHIVE_KEY = 'a1print_master_products_archive_v1';
 
 function getStoredMasterOrders(): Order[] {
@@ -95,9 +96,27 @@ function getStoredMasterProducts(): Product[] {
   return [];
 }
 
-function saveStoredMasterProducts(products: Product[]) {
+// 🛡️ Phase 2 Rule: Never accept an arbitrary full array overwrite. Touch only specific changed records via Delta!
+export function applyProductDelta(changedRecords: Product[]) {
+  if (!Array.isArray(changedRecords) || changedRecords.length === 0) return;
+
+  const currentMaster = getStoredMasterProducts();
+  const masterMap = new Map<string, Product>();
+  currentMaster.forEach((p) => { if (p && p.id) masterMap.set(p.id, p); });
+
+  changedRecords.forEach((p) => {
+    if (!p || !p.id) return;
+    const existing = masterMap.get(p.id);
+    const exVer = existing?.version || 0;
+    const pVer = p.version || 1;
+    if (!existing || pVer >= exVer) {
+      masterMap.set(p.id, p);
+    }
+  });
+
+  const updatedMaster = Array.from(masterMap.values());
   try {
-    localStorage.setItem(MASTER_PRODUCTS_ARCHIVE_KEY, JSON.stringify(products));
+    localStorage.setItem(MASTER_PRODUCTS_ARCHIVE_KEY, JSON.stringify(updatedMaster));
   } catch (e) {}
 }
 
@@ -264,15 +283,40 @@ async function syncFromCloud() {
   isSyncingFromCloud = true;
 
   try {
-    // Step A: FAST PATH - Fetch products first (completes in 0.15s via REST!)
-    const cloudProds = await firebaseCloudDb.getCollection('products');
+    // Step A: FAST PATH - Fetch products via REST or gRPC
+    let cloudProds: any[] | null = null;
+    try {
+      cloudProds = await firebaseCloudDb.getCollection('products');
+    } catch (readErr) {
+      console.warn('Cloud fetch failed, keeping local memory intact:', readErr);
+      return; // Phase 2 Rule 1: Never treat a failed/errored fetch as an empty result!
+    }
+
+    // Phase 2 Rule 2: Sanity-check empty results against local state!
+    if (cloudProds !== null && cloudProds.length === 0 && memoryData.products.length > 0) {
+      console.warn('Sanity Check: Cloud returned 0 products while local cache holds items. Re-verifying...');
+      const reVerify = await firebaseCloudDb.getCollection('products');
+      if (reVerify !== null && reVerify.length > 0) {
+        cloudProds = reVerify;
+      } else {
+        // Still empty after re-verification! Do NOT wipe local data!
+        // Preserve local items and re-enqueue in outbox to restore on cloud
+        memoryData.products.forEach((p) => {
+          if (p && p.id) {
+            enqueueOutboxJob('products', p.id, 'create', p);
+          }
+        });
+        flushOutboxQueue();
+      }
+    }
 
     const cloudDeletedIds = getDeletedProductIds();
 
-    // 1. STRICT NON-DESTRUCTIVE UNION MERGING FOR PRODUCTS CATALOG WITH TIMESTAMP RECONCILIATION
-    if (cloudProds !== null) {
+    // 1. STRICT NON-DESTRUCTIVE UNION MERGING FOR PRODUCTS CATALOG WITH VERSION RECONCILIATION
+    if (cloudProds !== null && cloudProds.length > 0) {
       const overridesMap = getStoredProductOverrides();
       const productMap = new Map<string, Product>();
+      const changedDeltas: Product[] = [];
 
       // Load initial/local memory products & admin overrides first
       memoryData.products.forEach((p) => {
@@ -282,46 +326,34 @@ async function syncFromCloud() {
         }
       });
 
-      // Merge Cloud Firestore products safely (timestamp & image priority guard!)
-      const cloudProdIds = new Set<string>();
-      if (cloudProds.length > 0) {
-        cloudProds.forEach((cp) => {
-          if (cp && cp.id && !cloudDeletedIds.has(cp.id)) {
-            cloudProdIds.add(cp.id);
-            const existing = productMap.get(cp.id) || overridesMap[cp.id];
+      // Merge Cloud Firestore products safely (version & timestamp priority guard!)
+      cloudProds.forEach((cp) => {
+        if (cp && cp.id && !cloudDeletedIds.has(cp.id)) {
+          const existing = productMap.get(cp.id) || overridesMap[cp.id];
+          const cpVer = cp.version || 0;
+          const exVer = existing?.version || 0;
 
-            const cpTime = cp.updatedAt ? new Date(cp.updatedAt).getTime() : 0;
-            const existingTime = existing?.updatedAt ? new Date(existing.updatedAt).getTime() : 0;
+          const cpTime = cp.updatedAt ? new Date(cp.updatedAt).getTime() : 0;
+          const existingTime = existing?.updatedAt ? new Date(existing.updatedAt).getTime() : 0;
 
-            const isLocalNewerOrCustom = existing && (
-              existingTime >= cpTime ||
-              (existing.baseImageUrl && existing.baseImageUrl.length > 50 && (!cp.baseImageUrl || cp.baseImageUrl.includes('unsplash') || cp.baseImageUrl.length < 50))
-            );
-
-            if (isLocalNewerOrCustom && existing) {
-              const merged: Product = {
-                ...cp,
-                ...existing,
-                isDeleted: cp.isDeleted || existing.isDeleted || false,
-                stockQuantity: cp.stockQuantity !== undefined ? cp.stockQuantity : (existing.stockQuantity ?? 50),
-              };
-              productMap.set(cp.id, merged);
-            } else {
-              productMap.set(cp.id, {
-                ...cp,
-                isDeleted: cp.isDeleted || existing?.isDeleted || false,
-                stockQuantity: cp.stockQuantity !== undefined ? cp.stockQuantity : (existing?.stockQuantity ?? 50),
-                stockLogs: cp.stockLogs || existing?.stockLogs || [],
-              });
-            }
+          if (!existing || cpVer > exVer || (cpVer === exVer && cpTime > existingTime)) {
+            const merged: Product = {
+              ...cp,
+              stockQuantity: cp.stockQuantity !== undefined ? cp.stockQuantity : (existing?.stockQuantity ?? 50),
+              stockLogs: cp.stockLogs || existing?.stockLogs || [],
+              syncStatus: 'synced',
+              lastSyncedAt: new Date().toISOString(),
+            };
+            productMap.set(cp.id, merged);
+            changedDeltas.push(merged);
           }
-        });
-      }
+        }
+      });
 
       const mergedProducts = Array.from(productMap.values());
       if (mergedProducts.length > 0 && JSON.stringify(mergedProducts) !== JSON.stringify(memoryData.products)) {
         memoryData.products = mergedProducts;
-        saveStoredMasterProducts(mergedProducts);
+        applyProductDelta(changedDeltas);
         saveStoredLocalData(memoryData);
         notifyListeners();
       }
@@ -441,10 +473,13 @@ async function initCloudSync() {
   if (isCloudSyncInitialized) return;
   isCloudSyncInitialized = true;
 
-  // Immediate 0.3s parallel initial sync
+  // Phase 3 Rule 3: CRITICAL ORDERING RULE — Always flush outbox queue BEFORE pulling cloud data!
+  await flushOutboxQueue();
+
+  // Step A: Initial guarded sync
   await syncFromCloud();
 
-  // Attach official Real-Time Firebase WebSockets Snapshot Listeners (Sub-Second Instant Sync!)
+  // Attach official Real-Time Firebase WebSockets Snapshot Listeners
   try {
     onSnapshot(collection(firebaseDb, 'products'), () => {
       syncFromCloud();
@@ -456,13 +491,17 @@ async function initCloudSync() {
     console.warn('Real-time WebSockets listener fallback:', e);
   }
 
-  // Periodic Backup Sync & Active Tab Focus Sync
-  setInterval(() => {
-    syncFromCloud();
-  }, 30000);
+  // Periodic Outbox Flush & Backup Sync
+  setInterval(async () => {
+    await flushOutboxQueue();
+    await syncFromCloud();
+  }, 15000);
 
   if (typeof window !== 'undefined') {
-    window.addEventListener('focus', () => syncFromCloud());
+    window.addEventListener('focus', async () => {
+      await flushOutboxQueue();
+      await syncFromCloud();
+    });
   }
 }
 
@@ -483,11 +522,17 @@ export function useCartStore() {
       ...categoryData,
       id: `cat-${Date.now()}`,
       createdAt: new Date().toISOString(),
+      version: 1,
+      syncStatus: 'pending',
     };
+    enqueueOutboxJob('categories', newCategory.id, 'create', newCategory);
+    writeAuditLog('CREATE', 'category', newCategory.id, 'Admin User', null, newCategory);
+
     const updatedCategories = [...memoryData.categories, newCategory];
     saveStoredCategories(updatedCategories);
     saveStoredLocalData({ ...memoryData, categories: updatedCategories });
     notifyListeners();
+    flushOutboxQueue();
   };
 
   const deleteCategory = (id: string) => {
@@ -498,9 +543,17 @@ export function useCartStore() {
   };
 
   const addProduct = (newProduct: Product) => {
+    const recordId = newProduct.id || `prod-${Date.now()}`;
+    const now = new Date().toISOString();
     const prodWithStock: Product = {
       ...newProduct,
-      updatedAt: newProduct.updatedAt || new Date().toISOString(),
+      id: recordId,
+      createdAt: newProduct.createdAt || now,
+      updatedAt: now,
+      version: (newProduct.version || 0) + 1,
+      isDeleted: false,
+      deletedAt: null,
+      syncStatus: 'pending',
       stockQuantity: newProduct.stockQuantity !== undefined ? newProduct.stockQuantity : 50,
       stockLogs: newProduct.stockLogs || [
         {
@@ -510,108 +563,146 @@ export function useCartStore() {
           previousStock: 0,
           newStock: newProduct.stockQuantity || 50,
           reason: 'Initial Product Listing Creation',
-          timestamp: new Date().toISOString(),
+          timestamp: now,
           performedBy: 'Super Admin',
         },
       ],
     };
 
-    const overrides = getStoredProductOverrides();
-    overrides[prodWithStock.id] = prodWithStock;
-    saveStoredProductOverrides(overrides);
+    // 1. Enqueue job in Write-Ahead Outbox Queue
+    enqueueOutboxJob('products', recordId, 'create', prodWithStock);
 
-    const updated = [...memoryData.products, prodWithStock];
-    saveStoredLocalData({ ...memoryData, products: updated });
+    // 2. Write Audit Log
+    writeAuditLog('CREATE', 'product', recordId, 'Admin User', null, prodWithStock);
+
+    // 3. Update Admin Overrides & Delta Master Storage
+    const overrides = getStoredProductOverrides();
+    overrides[recordId] = prodWithStock;
+    saveStoredProductOverrides(overrides);
+    applyProductDelta([prodWithStock]);
+
+    // 4. Optimistic Local Store update (0ms instant UI rendering!)
+    const updated = [prodWithStock, ...memoryData.products.filter(p => p.id !== recordId)];
+    memoryData.products = updated;
+    saveStoredLocalData(memoryData);
     notifyListeners();
-    firebaseCloudDb.setDocument('products', prodWithStock.id, prodWithStock);
+
+    // 5. Trigger Outbox Flush Worker
+    flushOutboxQueue();
   };
 
   const updateProduct = (id: string, updates: Partial<Product>) => {
     const overrides = getStoredProductOverrides();
     let targetUpdated: Product | null = null;
+    let oldProduct: Product | null = null;
 
+    const now = new Date().toISOString();
     const updatedProducts = memoryData.products.map((p) => {
       if (p.id === id) {
-        const updated = { ...p, ...updates, updatedAt: updates.updatedAt || new Date().toISOString() };
+        oldProduct = p;
+        const updated: Product = {
+          ...p,
+          ...updates,
+          updatedAt: now,
+          version: (p.version || 0) + 1,
+          syncStatus: 'pending',
+        };
         targetUpdated = updated;
-        firebaseCloudDb.setDocument('products', updated.id, updated);
         return updated;
       }
       return p;
     });
 
     if (!targetUpdated && updates.title) {
-      targetUpdated = { id, ...updates, updatedAt: new Date().toISOString() } as Product;
-      updatedProducts.push(targetUpdated);
-      firebaseCloudDb.setDocument('products', id, targetUpdated);
+      targetUpdated = {
+        id,
+        ...updates,
+        createdAt: now,
+        updatedAt: now,
+        version: 1,
+        syncStatus: 'pending',
+      } as Product;
+      updatedProducts.unshift(targetUpdated);
     }
 
     if (targetUpdated) {
-      overrides[id] = targetUpdated;
+      const finalTarget: Product = targetUpdated;
+      enqueueOutboxJob('products', id, 'update', finalTarget);
+      writeAuditLog('UPDATE', 'product', id, 'Admin User', oldProduct, finalTarget);
+
+      overrides[id] = finalTarget;
       saveStoredProductOverrides(overrides);
+      applyProductDelta([finalTarget]);
     }
 
-    saveStoredLocalData({ ...memoryData, products: updatedProducts });
+    memoryData.products = updatedProducts;
+    saveStoredLocalData(memoryData);
     notifyListeners();
+    flushOutboxQueue();
   };
 
   // Soft Delete Product (Moved to Recycle Bin)
   const softDeleteProduct = (id: string) => {
+    const existing = memoryData.products.find(p => p.id === id);
+    const now = new Date().toISOString();
     const deletedIds = getDeletedProductIds();
     deletedIds.add(id);
     saveDeletedProductIds(deletedIds);
-
-    // Save tombstone to Cloud Firestore so server updates & all devices remember deletion forever!
-    firebaseCloudDb.setDocument('deleted_products', 'global_tombstone', {
-      id: 'global_tombstone',
-      ids: Array.from(deletedIds),
-      updatedAt: new Date().toISOString(),
-    });
 
     const updatedProducts = memoryData.products.map((p) => {
       if (p.id === id) {
         const updated: Product = {
           ...p,
           isDeleted: true,
-          deletedAt: new Date().toISOString(),
+          deletedAt: now,
+          updatedAt: now,
+          version: (p.version || 0) + 1,
+          syncStatus: 'pending',
         };
-        firebaseCloudDb.setDocument('products', updated.id, updated);
+        enqueueOutboxJob('products', id, 'soft_delete', updated);
+        writeAuditLog('SOFT_DELETE', 'product', id, 'Admin User', existing, updated);
+        applyProductDelta([updated]);
         return updated;
       }
       return p;
     });
 
-    saveStoredLocalData({ ...memoryData, products: updatedProducts });
+    memoryData.products = updatedProducts;
+    saveStoredLocalData(memoryData);
     notifyListeners();
+    flushOutboxQueue();
   };
 
   // Restore Soft-Deleted Product from Recycle Bin
   const restoreProduct = (id: string) => {
+    const existing = memoryData.products.find(p => p.id === id);
+    const now = new Date().toISOString();
     const deletedIds = getDeletedProductIds();
     deletedIds.delete(id);
     saveDeletedProductIds(deletedIds);
-
-    firebaseCloudDb.setDocument('deleted_products', 'global_tombstone', {
-      id: 'global_tombstone',
-      ids: Array.from(deletedIds),
-      updatedAt: new Date().toISOString(),
-    });
 
     const updatedProducts = memoryData.products.map((p) => {
       if (p.id === id) {
         const updated: Product = {
           ...p,
           isDeleted: false,
-          deletedAt: undefined,
+          deletedAt: null,
+          updatedAt: now,
+          version: (p.version || 0) + 1,
+          syncStatus: 'pending',
         };
-        firebaseCloudDb.setDocument('products', updated.id, updated);
+        enqueueOutboxJob('products', id, 'update', updated);
+        writeAuditLog('RESTORE', 'product', id, 'Admin User', existing, updated);
+        applyProductDelta([updated]);
         return updated;
       }
       return p;
     });
 
-    saveStoredLocalData({ ...memoryData, products: updatedProducts });
+    memoryData.products = updatedProducts;
+    saveStoredLocalData(memoryData);
     notifyListeners();
+    flushOutboxQueue();
   };
 
   // Permanent Delete Product
@@ -818,21 +909,14 @@ export function useCartStore() {
     });
 
     const updatedOrders = [newOrder, ...memoryData.orders];
+    saveStoredMasterOrders(updatedOrders);
     saveStoredLocalData({ ...memoryData, products: updatedProducts, orders: updatedOrders, items: [] });
     notifyListeners();
 
-    const syncToCloud = async () => {
-      let success = await firebaseCloudDb.setDocument('orders', newOrder.id, newOrder);
-      if (!success) {
-        setTimeout(async () => {
-          let retry1 = await firebaseCloudDb.setDocument('orders', newOrder.id, newOrder);
-          if (!retry1) {
-            setTimeout(() => firebaseCloudDb.setDocument('orders', newOrder.id, newOrder), 4000);
-          }
-        }, 1500);
-      }
-    };
-    syncToCloud();
+    // Enqueue order write job in Write-Ahead Outbox Queue
+    enqueueOutboxJob('orders', newOrder.id, 'create', newOrder);
+    writeAuditLog('CREATE', 'order', newOrder.id, customer.fullName || 'Customer Order', null, newOrder);
+    flushOutboxQueue();
 
     return newOrder;
   };
