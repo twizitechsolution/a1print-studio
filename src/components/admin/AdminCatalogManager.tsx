@@ -25,6 +25,7 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
     products,
     allProducts,
     categories,
+    isStoreLoading,
     addCategory,
     deleteCategory,
     addProduct,
@@ -125,8 +126,11 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
       {/* Frame Catalog Header & Toolbar */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold tracking-tight dark:text-zinc-100 text-slate-900">
-            Frame Product Catalog ({activeProducts.length})
+          <h2 className="text-xl font-bold tracking-tight dark:text-zinc-100 text-slate-900 flex items-center gap-2">
+            Frame Product Catalog ({isStoreLoading && activeProducts.length === 0 ? 'Syncing Cloud...' : activeProducts.length})
+            {isStoreLoading && activeProducts.length === 0 && (
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+            )}
           </h2>
           <p className="text-xs dark:text-zinc-400 text-slate-500 mt-0.5">
             Manage frame products, stock inventory, categories, and multi-angle galleries.

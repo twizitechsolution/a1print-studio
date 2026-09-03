@@ -9,7 +9,7 @@ import { ShieldCheck, Truck, CreditCard, Lock, Sparkles, Edit3, Loader2, UserPlu
 interface CheckoutPageProps {
   items: CartItem[];
   subtotal: number;
-  onPlaceOrder: (orderData: Omit<Order, 'id' | 'createdAt'>) => Order;
+  onPlaceOrder: (orderData: Omit<Order, 'id' | 'createdAt'>) => Order | Promise<Order>;
   onOrderSuccess?: (order: Order) => void;
   onNavigate: (page: string) => void;
 }
@@ -82,7 +82,7 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
     executeFinalOrderPlacement();
   };
 
-  const handleCompletePrepaidOrder = (paymentId: string, gatewayName: 'Razorpay' | 'UPI Direct' = 'Razorpay') => {
+  const handleCompletePrepaidOrder = async (paymentId: string, gatewayName: 'Razorpay' | 'UPI Direct' = 'Razorpay') => {
     try {
       const fullAddressStr = `${address}${landmark ? `, Near ${landmark}` : ''}`;
       const customerData = {
@@ -113,7 +113,7 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
         }
       }
 
-      const order = onPlaceOrder({
+      const order = await onPlaceOrder({
         customer: customerData,
         items,
         subtotal,
@@ -199,9 +199,9 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({
       });
     } else {
       // Cash on Delivery Flow
-      setTimeout(() => {
+      setTimeout(async () => {
         try {
-          const order = onPlaceOrder({
+          const order = await onPlaceOrder({
             customer: customerData,
             items,
             subtotal,

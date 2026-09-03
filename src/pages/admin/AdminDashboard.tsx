@@ -86,7 +86,7 @@ const AdminDashboardInner: React.FC<AdminDashboardProps> = ({ orders: initialOrd
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
 
-  const { products, orders, categories, addProduct, updateProduct, updateOrderStatus, updatePaymentStatus, updateOrderAdminRemark, recordOrderAction } = useCartStore();
+  const { isStoreLoading, products, orders, categories, addProduct, updateProduct, updateOrderStatus, updatePaymentStatus, updateOrderAdminRemark, recordOrderAction } = useCartStore();
 
   const [editingTemplateProduct, setEditingTemplateProduct] = useState<Product | null>(null);
   const [editingProductFullPage, setEditingProductFullPage] = useState<{ active: boolean; product: Product | null } | null>(null);
@@ -457,6 +457,7 @@ const AdminDashboardInner: React.FC<AdminDashboardProps> = ({ orders: initialOrd
           {activeTab === 'orders' && (
             <AdminOrderList
               orders={orders}
+              isStoreLoading={isStoreLoading}
               onUpdateOrderStatus={updateOrderStatus}
               onUpdatePaymentStatus={updatePaymentStatus}
               onUpdateAdminRemark={updateOrderAdminRemark}

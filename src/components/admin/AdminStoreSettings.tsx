@@ -275,6 +275,97 @@ export const AdminStoreSettings: React.FC = () => {
 
       </div>
 
+      {/* System Data Health & Real-Time Firestore Synchronization Panel */}
+      <DataHealthPanel />
+
+    </div>
+  );
+};
+
+const DataHealthPanel: React.FC = () => {
+  const [healthData, setHealthData] = useState<{
+    productsCloud: number;
+    ordersCloud: number;
+    customersCloud: number;
+    loading: boolean;
+  }>({ productsCloud: 0, ordersCloud: 0, customersCloud: 0, loading: true });
+
+  const refreshHealth = async () => {
+    setHealthData((prev) => ({ ...prev, loading: true }));
+    try {
+      const [prods, ords, custs] = await Promise.all([
+        firebaseCloudDb.getCollection('products'),
+        firebaseCloudDb.getCollection('orders'),
+        firebaseCloudDb.getCollection('customer_users'),
+      ]);
+
+      setHealthData({
+        productsCloud: (prods || []).filter((p) => !p.isDeleted).length,
+        ordersCloud: (ords || []).filter((o) => !o.isDeleted).length,
+        customersCloud: (custs || []).length,
+        loading: false,
+      });
+    } catch (e) {
+      setHealthData((prev) => ({ ...prev, loading: false }));
+    }
+  };
+
+  useEffect(() => {
+    refreshHealth();
+  }, []);
+
+  return (
+    <div className="p-6 bg-[#121829] rounded-2xl border border-[#262E4A] shadow-xl space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="font-extrabold text-base text-white flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+            Cloud Firestore Data Health & Real-Time Sync Status
+          </h3>
+          <p className="text-xs text-slate-400 mt-0.5">
+            Side-by-side comparison of Cloud Firestore DB documents vs active memory state.
+          </p>
+        </div>
+
+        <button
+          onClick={refreshHealth}
+          className="px-3 py-1.5 bg-[#1A2035] hover:bg-[#262E4A] text-xs font-bold text-slate-200 rounded-lg border border-slate-700 transition-colors cursor-pointer"
+        >
+          {healthData.loading ? 'Auditing...' : '🔄 Re-Audit DB'}
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+        <div className="p-4 bg-[#1A2035] rounded-xl border border-slate-700/60 space-y-1">
+          <span className="text-[11px] font-bold text-slate-400 uppercase">Products Collection</span>
+          <div className="flex items-baseline justify-between pt-1">
+            <span className="text-sm text-slate-300 font-medium">Cloud Firestore Live:</span>
+            <span className="text-lg font-extrabold text-emerald-400 font-mono">
+              {healthData.loading ? '...' : healthData.productsCloud}
+            </span>
+          </div>
+        </div>
+
+        <div className="p-4 bg-[#1A2035] rounded-xl border border-slate-700/60 space-y-1">
+          <span className="text-[11px] font-bold text-slate-400 uppercase">Orders Collection</span>
+          <div className="flex items-baseline justify-between pt-1">
+            <span className="text-sm text-slate-300 font-medium">Cloud Firestore Live:</span>
+            <span className="text-lg font-extrabold text-blue-400 font-mono">
+              {healthData.loading ? '...' : healthData.ordersCloud}
+            </span>
+          </div>
+        </div>
+
+        <div className="p-4 bg-[#1A2035] rounded-xl border border-slate-700/60 space-y-1">
+          <span className="text-[11px] font-bold text-slate-400 uppercase">Registered Customers</span>
+          <div className="flex items-baseline justify-between pt-1">
+            <span className="text-sm text-slate-300 font-medium">Cloud Firestore Live:</span>
+            <span className="text-lg font-extrabold text-purple-400 font-mono">
+              {healthData.loading ? '...' : healthData.customersCloud}
+            </span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

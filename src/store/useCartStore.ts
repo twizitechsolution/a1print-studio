@@ -277,6 +277,7 @@ function notifyListeners() {
 // Real-Time Cloud Firestore Sync Engine (5-Second Active Polling & 0ms Instant Reactivity)
 let isCloudSyncInitialized = false;
 let isSyncingFromCloud = false;
+let isStoreLoading = true;
 
 async function syncFromCloud() {
   if (isSyncingFromCloud) return;
@@ -454,6 +455,7 @@ async function syncFromCloud() {
     console.warn('Cloud sync background polling error:', e);
   } finally {
     isSyncingFromCloud = false;
+    isStoreLoading = false;
   }
 }
 
@@ -849,10 +851,10 @@ export function useCartStore() {
     notifyListeners();
   };
 
-  const placeOrder = (
+  const placeOrder = async (
     customerOrOrderData: Order['customer'] | any,
     paymentMethodParam?: Order['paymentMethod']
-  ): Order => {
+  ): Promise<Order> => {
     let customer: Order['customer'];
     let paymentMethod: Order['paymentMethod'];
     let orderItems: CartItem[];
@@ -926,10 +928,15 @@ export function useCartStore() {
     saveStoredLocalData({ ...memoryData, products: updatedProducts, orders: updatedOrders, items: [] });
     notifyListeners();
 
-    // Enqueue order write job in Write-Ahead Outbox Queue
+    // Enqueue order write job in Write-Ahead Outbox Queue & await Cloud Firestore confirmation
     enqueueOutboxJob('orders', newOrder.id, 'create', newOrder);
     writeAuditLog('CREATE', 'order', newOrder.id, customer.fullName || 'Customer Order', null, newOrder);
-    flushOutboxQueue();
+    
+    try {
+      await firebaseCloudDb.setDocument('orders', newOrder.id, newOrder);
+    } catch (e) {
+      console.warn('Direct order write error, queued in outbox for retry:', e);
+    }
 
     return newOrder;
   };
@@ -1168,6 +1175,7 @@ export function useCartStore() {
   });
 
   return {
+    isStoreLoading,
     products: activeDisplayProducts,
     allProducts: store.products || [],
     items: store.items,
