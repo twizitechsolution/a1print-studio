@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Product, CartItem, Order } from './types';
 import { useCartStore } from './store/useCartStore';
-import { PRODUCTS as INITIAL_PRODUCTS } from './data/products';
 import { compressImageBase64 } from './utils/imageCompressor';
 
 import { Header } from './components/layout/Header';

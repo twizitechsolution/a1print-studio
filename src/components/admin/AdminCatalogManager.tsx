@@ -6,6 +6,7 @@ import { AdminProductListingModal } from './AdminProductListingModal';
 import { AdminCategoryManager } from './AdminCategoryManager';
 import { AdminRecycleBinModal } from './AdminRecycleBinModal';
 import { AdminStockAuditModal } from './AdminStockAuditModal';
+import { NoProductsFound } from '../common/NoProductsFound';
 
 interface AdminCatalogManagerProps {
   onOpenTemplateEditor?: (product: Product) => void;
@@ -193,20 +194,23 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
       </div>
 
       {/* Frame Catalog Table */}
-      <div className="dark:bg-zinc-900/40 bg-white rounded-xl border dark:border-zinc-800 border-slate-200 shadow-xs overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="dark:bg-zinc-900 bg-slate-100 dark:text-zinc-400 text-slate-600 text-[11px] font-medium uppercase tracking-wider border-b dark:border-zinc-800 border-slate-200">
-              <tr>
-                <th className="p-3.5">Poster</th>
-                <th className="p-3.5">Product Title & Details</th>
-                <th className="p-3.5">Category</th>
-                <th className="p-3.5">Price</th>
-                <th className="p-3.5">Inventory Stock</th>
-                <th className="p-3.5">Bestseller</th>
-                <th className="p-3.5 text-right">Actions</th>
-              </tr>
-            </thead>
+      {activeProducts.length === 0 ? (
+        <NoProductsFound isAdmin onOpenAddProduct={handleOpenAddModal} />
+      ) : (
+        <div className="dark:bg-zinc-900/40 bg-white rounded-xl border dark:border-zinc-800 border-slate-200 shadow-xs overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="dark:bg-zinc-900 bg-slate-100 dark:text-zinc-400 text-slate-600 text-[11px] font-medium uppercase tracking-wider border-b dark:border-zinc-800 border-slate-200">
+                <tr>
+                  <th className="p-3.5">Poster</th>
+                  <th className="p-3.5">Product Title & Details</th>
+                  <th className="p-3.5">Category</th>
+                  <th className="p-3.5">Price</th>
+                  <th className="p-3.5">Inventory Stock</th>
+                  <th className="p-3.5">Bestseller</th>
+                  <th className="p-3.5 text-right">Actions</th>
+                </tr>
+              </thead>
             <tbody className="divide-y dark:divide-zinc-800/60 divide-slate-200 font-medium">
               {paginatedProducts.map((product) => {
                 if (!product) return null;
@@ -364,6 +368,7 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
           </table>
         </div>
       </div>
+      )}
 
       {/* 10-Item Pagination Controls */}
       {totalPages > 1 && (

@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Product } from '../types';
 import { useCartStore } from '../store/useCartStore';
-import { PRODUCTS as INITIAL_PRODUCTS } from '../data/products';
 import { ProductCard } from '../components/catalog/ProductCard';
 import { ProductGrid } from '../components/catalog/ProductGrid';
 import { ProductFrameDisplay } from '../components/catalog/ProductFrameDisplay';

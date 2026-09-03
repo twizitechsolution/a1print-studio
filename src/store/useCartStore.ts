@@ -161,7 +161,8 @@ function getStoredLocalData(): StoreData {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed.products) && parsed.products.length > 0 && loadedProducts.length === 0) {
-        loadedProducts = parsed.products;
+        // Purge any legacy hardcoded sample products from local storage cache
+        loadedProducts = parsed.products.filter((p: any) => p && !p.isSampleData);
       }
       if (Array.isArray(parsed.orders) && parsed.orders.length > 0) {
         // Union merge with master orders
@@ -177,19 +178,10 @@ function getStoredLocalData(): StoreData {
     }
   } catch (e) {}
 
-  // Fallback to INITIAL_PRODUCTS only if no products exist anywhere
-  if (loadedProducts.length === 0) {
-    loadedProducts = INITIAL_PRODUCTS.map((p) => ({
-      ...p,
-      stockQuantity: p.stockQuantity !== undefined ? p.stockQuantity : 50,
-      stockLogs: p.stockLogs || [],
-    }));
-  }
-
   // Merge admin overrides map into loadedProducts for 0ms instant local rendering
   const overridesMap = getStoredProductOverrides();
   Object.values(overridesMap).forEach((overrideProd) => {
-    if (overrideProd && overrideProd.id && !deletedIds.has(overrideProd.id)) {
+    if (overrideProd && overrideProd.id && !deletedIds.has(overrideProd.id) && !overrideProd.isSampleData) {
       const idx = loadedProducts.findIndex((p) => p.id === overrideProd.id);
       if (idx >= 0) {
         loadedProducts[idx] = { ...loadedProducts[idx], ...overrideProd };
@@ -199,8 +191,8 @@ function getStoredLocalData(): StoreData {
     }
   });
 
-  // Filter deleted products
-  const activeProds = loadedProducts.filter((p: Product) => p && p.id && !deletedIds.has(p.id));
+  // Filter deleted products and purge any legacy sample data
+  const activeProds = loadedProducts.filter((p: Product) => p && p.id && !deletedIds.has(p.id) && !p.isSampleData);
 
   // Attach remarks to orders
   const ordersWithRemarks = loadedOrders.map((o: Order) => {
@@ -216,7 +208,7 @@ function getStoredLocalData(): StoreData {
   });
 
   return {
-    products: activeProds.length > 0 ? activeProds : INITIAL_PRODUCTS,
+    products: activeProds,
     items: loadedCartItems,
     orders: ordersWithRemarks,
     categories,
@@ -1254,10 +1246,8 @@ export function useCartStore() {
   const subtotal = store.items.reduce((sum, item) => sum + item.itemTotalPrice, 0);
   const totalItems = store.items.reduce((sum, item) => sum + item.quantity, 0);
 
-  const hasRealProducts = (store.products || []).some((p) => p && !p.isDeleted && !p.isSampleData);
   const activeDisplayProducts = (store.products || []).filter((p) => {
-    if (!p || p.isDeleted) return false;
-    if (hasRealProducts && p.isSampleData) return false;
+    if (!p || p.isDeleted || p.isSampleData) return false;
     return true;
   });
 

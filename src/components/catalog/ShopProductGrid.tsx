@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Product } from '../../types';
 import { useCartStore } from '../../store/useCartStore';
 import { ProductCard } from './ProductCard';
+import { NoProductsFound } from '../common/NoProductsFound';
 import { ChevronDown, ChevronUp, Filter, Sparkles } from 'lucide-react';
 
 interface ShopProductGridProps {
@@ -262,10 +263,7 @@ export const ShopProductGrid: React.FC<ShopProductGridProps> = ({
           </div>
 
           {filteredProducts.length === 0 && (
-            <div className="text-center py-16 bg-white rounded-3xl border border-gray-200 p-8 space-y-2">
-              <p className="font-bold text-base text-gray-800">No frames found in this category.</p>
-              <p className="text-xs text-gray-500">Select another category or click "All Custom Frames" to view all items!</p>
-            </div>
+            <NoProductsFound />
           )}
         </div>
 
