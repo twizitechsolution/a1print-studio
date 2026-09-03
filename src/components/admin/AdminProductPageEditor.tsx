@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Product, PhotoSlot, TextZone, SizeOption, FrameOption } from '../../types';
+import { firebaseCloudDb } from '../../config/firebase';
 import { ArrowLeft, Save, Plus, Trash2, Upload, Image as ImageIcon, Sparkles, Star, CheckCircle2, ShieldCheck, CreditCard, DollarSign, Layers, Eye, RefreshCw, Loader2 } from 'lucide-react';
 
 interface AdminProductPageEditorProps {
@@ -201,7 +202,7 @@ export const AdminProductPageEditor: React.FC<AdminProductPageEditorProps> = ({
   };
 
   // Final Form Submission
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     if (e && e.preventDefault) e.preventDefault();
     if (!title.trim()) {
       alert('Please enter a product title!');
@@ -275,6 +276,8 @@ export const AdminProductPageEditor: React.FC<AdminProductPageEditorProps> = ({
         updatedAt: new Date().toISOString(),
       } as any;
 
+      const serverSuccess = await firebaseCloudDb.setDocument('products', fullProduct.id, fullProduct);
+      
       onSave(fullProduct);
       setSavedSuccess(true);
       setTimeout(() => {
@@ -282,7 +285,7 @@ export const AdminProductPageEditor: React.FC<AdminProductPageEditorProps> = ({
       }, 500);
     } catch (err: any) {
       setIsSaving(false);
-      alert('Error saving product: ' + (err?.message || err));
+      alert('Error saving product to Cloud Firestore: ' + (err?.message || err));
     }
   };
 

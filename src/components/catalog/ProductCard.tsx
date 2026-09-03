@@ -33,7 +33,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       >
         {/* Badges Top Bar */}
         <div className="absolute top-3 left-3 right-3 flex items-center justify-between z-10">
-          {product.bestseller ? (
+          {product.isSampleData ? (
+            <span className="px-2.5 py-1 bg-amber-500 text-white text-[10px] font-extrabold rounded-md shadow-xs flex items-center gap-1">
+              Demo / Sample Product
+            </span>
+          ) : product.bestseller ? (
             <span className="px-2.5 py-1 bg-[#3B82F6] text-white text-[10px] font-extrabold rounded-md shadow-xs flex items-center gap-1">
               Bestseller
             </span>

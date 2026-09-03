@@ -179,20 +179,30 @@ export const firebaseCloudDb = {
 
   // Write a document using official Firebase JS Firestore SDK
   async setDocument(collectionName: string, docId: string, rawPayload: any): Promise<boolean> {
+    const sanitizedPayload = sanitizePayloadForFirestore(rawPayload);
+    const now = new Date().toISOString();
+    const payloadVersion = typeof sanitizedPayload?.version === 'number' ? sanitizedPayload.version : 1;
+    const isDeletedFlag = Boolean(sanitizedPayload?.isDeleted);
+
     try {
-      const sanitizedPayload = sanitizePayloadForFirestore(rawPayload);
       const docRef = doc(firebaseDb, collectionName, docId);
       await setDoc(docRef, {
+        id: sanitizedPayload.id || docId,
+        version: payloadVersion,
+        isDeleted: isDeletedFlag,
+        updatedAt: now,
         jsonPayload: JSON.stringify(sanitizedPayload),
-        updatedAt: new Date().toISOString(),
       });
       return true;
     } catch (sdkErr) {
       console.warn(`Firestore SDK setDocument error [${collectionName}/${docId}], trying REST fallback:`, sdkErr);
       try {
-        const sanitizedPayload = sanitizePayloadForFirestore(rawPayload);
         const body = {
           fields: {
+            id: { stringValue: sanitizedPayload.id || docId },
+            version: { integerValue: String(payloadVersion) },
+            isDeleted: { booleanValue: isDeletedFlag },
+            updatedAt: { stringValue: now },
             jsonPayload: {
               stringValue: JSON.stringify(sanitizedPayload),
             },

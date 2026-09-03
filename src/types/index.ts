@@ -77,6 +77,7 @@ export interface Product {
   deletedAt?: string | null;
   syncStatus?: 'synced' | 'pending' | 'failed';
   lastSyncedAt?: string | null;
+  isSampleData?: boolean;
 }
 
 export interface CartItem {

@@ -33,6 +33,7 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
     restoreProduct,
     permanentDeleteProduct,
     updateStockQuantity,
+    clearStaleLocalSyncData,
   } = useCartStore();
 
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
@@ -154,6 +155,19 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
             className="px-3 py-2 dark:bg-zinc-900 bg-white dark:hover:bg-zinc-800 hover:bg-slate-100 dark:text-zinc-300 text-slate-700 font-medium text-xs rounded-lg border dark:border-zinc-800 border-slate-200 transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
           >
             <FolderPlus className="w-3.5 h-3.5" /> Categories ({safeCategories.length})
+          </button>
+
+          {/* Clear Stale Sync Data Button */}
+          <button
+            onClick={() => {
+              if (confirm('Clear stale local outbox & sync cache? This will align your display count strictly with Cloud Firestore.')) {
+                clearStaleLocalSyncData();
+              }
+            }}
+            title="Clear local outbox cache & resync directly with Cloud Firestore"
+            className="px-3 py-2 dark:bg-zinc-900 bg-white dark:hover:bg-zinc-800 hover:bg-slate-100 dark:text-zinc-300 text-slate-700 font-medium text-xs rounded-lg border dark:border-zinc-800 border-slate-200 transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+          >
+            <RefreshCw className="w-3.5 h-3.5 text-amber-500" /> Clear Stale Sync Data
           </button>
 
           {/* Recycle Bin Button */}

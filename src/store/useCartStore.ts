@@ -1131,11 +1131,28 @@ export function useCartStore() {
     } catch (e) {}
   };
 
+  const clearStaleLocalSyncData = () => {
+    try {
+      localStorage.removeItem('a1print_outbox_v1');
+      localStorage.removeItem('a1print_deleted_product_ids_v20');
+      localStorage.removeItem('a1print_master_products_archive_v1');
+    } catch (e) {}
+    syncFromCloud();
+    notifyListeners();
+  };
+
   const subtotal = store.items.reduce((sum, item) => sum + item.itemTotalPrice, 0);
   const totalItems = store.items.reduce((sum, item) => sum + item.quantity, 0);
 
+  const hasRealProducts = (store.products || []).some((p) => p && !p.isDeleted && !p.isSampleData);
+  const activeDisplayProducts = (store.products || []).filter((p) => {
+    if (!p || p.isDeleted) return false;
+    if (hasRealProducts && p.isSampleData) return false;
+    return true;
+  });
+
   return {
-    products: (store.products || []).filter((p) => p && !p.isDeleted),
+    products: activeDisplayProducts,
     allProducts: store.products || [],
     items: store.items,
     orders: store.orders,
@@ -1152,6 +1169,7 @@ export function useCartStore() {
     restoreProduct,
     permanentDeleteProduct,
     updateStockQuantity,
+    clearStaleLocalSyncData,
     addToCart,
     removeFromCart,
     updateQuantity,

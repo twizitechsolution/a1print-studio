@@ -789,15 +789,30 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
 
         {/* Action Buttons */}
         <div className="space-y-3 pt-1">
+          {template.product?.isSampleData && (
+            <div className="p-3.5 bg-amber-50 border border-amber-300 text-amber-900 text-xs font-extrabold rounded-2xl flex items-center gap-2">
+              <span>⚠️</span>
+              <span>This is a <strong>Demo / Sample Product</strong> for preview purposes only and cannot be purchased.</span>
+            </div>
+          )}
+
           <button
             type="button"
-            disabled={isExportingCanvas}
+            disabled={isExportingCanvas || Boolean(template.product?.isSampleData)}
             onClick={handleProceedWithExport}
-            className="w-full py-4 bg-[#3C187B] hover:bg-[#2A1058] text-white font-extrabold text-sm rounded-2xl shadow-xl transition-all flex items-center justify-center gap-2 cursor-pointer"
+            className={`w-full py-4 text-white font-extrabold text-sm rounded-2xl shadow-xl transition-all flex items-center justify-center gap-2 ${
+              template.product?.isSampleData
+                ? 'bg-gray-400 cursor-not-allowed opacity-70'
+                : 'bg-[#3C187B] hover:bg-[#2A1058] cursor-pointer'
+            }`}
           >
             {isExportingCanvas ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" /> Saving Customized Frame Image...
+              </>
+            ) : template.product?.isSampleData ? (
+              <>
+                Demo Product — Purchase Disabled
               </>
             ) : (
               <>

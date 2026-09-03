@@ -42,6 +42,7 @@ export const PRODUCTS: Product[] = [
     frames: [
       { id: 'frame-black', name: 'Classic Black Wood', borderStyle: 'border-8 border-black shadow-2xl', frameColor: '#000000', borderColorClass: 'border-black' },
     ],
+    isSampleData: true,
   },
   {
     id: 'prod-welcome-baby',
@@ -88,6 +89,7 @@ export const PRODUCTS: Product[] = [
     frames: [
       { id: 'frame-black', name: 'Classic Black Wood', borderStyle: 'border-8 border-black shadow-2xl', frameColor: '#000000', borderColorClass: 'border-black' },
     ],
+    isSampleData: true,
   },
   {
     id: 'prod-dad-heartbeat',
@@ -128,6 +130,7 @@ export const PRODUCTS: Product[] = [
     frames: [
       { id: 'frame-black', name: 'Classic Black Wood', borderStyle: 'border-8 border-black shadow-2xl', frameColor: '#000000', borderColorClass: 'border-black' },
     ],
+    isSampleData: true,
   },
   {
     id: 'prod-anniversary-story',
@@ -168,6 +171,7 @@ export const PRODUCTS: Product[] = [
     frames: [
       { id: 'frame-black', name: 'Classic Black Wood', borderStyle: 'border-8 border-black shadow-2xl', frameColor: '#000000', borderColorClass: 'border-black' },
     ],
+    isSampleData: true,
   },
   {
     id: 'prod-first-year-photo-frame',
@@ -210,6 +214,7 @@ export const PRODUCTS: Product[] = [
     frames: [
       { id: 'frame-black', name: 'Classic Black Wood', borderStyle: 'border-8 border-black shadow-2xl', frameColor: '#000000', borderColorClass: 'border-black' },
     ],
+    isSampleData: true,
   },
   {
     id: 'prod-family-frame',
@@ -248,6 +253,7 @@ export const PRODUCTS: Product[] = [
     frames: [
       { id: 'frame-black', name: 'Classic Black Wood', borderStyle: 'border-8 border-black shadow-2xl', frameColor: '#000000', borderColorClass: 'border-black' },
     ],
+    isSampleData: true,
   },
 ];
 
