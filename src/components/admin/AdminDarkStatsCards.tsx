@@ -1,5 +1,6 @@
 import React from 'react';
 import { Order } from '../../types';
+import { firebaseCloudDb } from '../../config/firebase';
 import {
   ShoppingCart,
   DollarSign,

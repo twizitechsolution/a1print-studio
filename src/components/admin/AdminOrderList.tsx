@@ -82,6 +82,7 @@ const loadBase64Image = (dataUri: string, timeoutMs = 4000): Promise<HTMLImageEl
 
 export const AdminOrderList: React.FC<AdminOrderListProps> = ({
   orders,
+  isStoreLoading,
   onUpdateOrderStatus,
   onUpdatePaymentStatus,
   onUpdateAdminRemark,
