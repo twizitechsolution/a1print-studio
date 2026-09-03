@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Order, CartItem, ProcessingHistoryItem } from '../../types';
 import { LiveCustomizedFrameThumbnail } from '../customizer/LiveCustomizedFrameThumbnail';
-import { Download, Loader2, Printer, X, Calendar, Clock, User, Filter, ChevronLeft, ChevronRight, FileText, CheckCircle2, History, Tag, ShieldCheck } from 'lucide-react';
+import { Download, Loader2, Printer, X, Calendar, Clock, User, Filter, ChevronLeft, ChevronRight, FileText, CheckCircle2, History, Tag, ShieldCheck, Search, Trash2, RotateCcw, ArrowUpDown } from 'lucide-react';
+import { useCartStore } from '../../store/useCartStore';
 
 interface AdminOrderListProps {
   orders: Order[];
@@ -191,9 +192,36 @@ export const AdminOrderList: React.FC<AdminOrderListProps> = ({
     document.body.removeChild(link);
   };
 
-  // Filter Orders by Date Range & Payment Status
-  const filteredOrders = orders.filter((order) => {
-    // 1. Payment Status Filter Check
+  const { softDeleteOrder, restoreOrder, permanentDeleteOrder } = useCartStore();
+
+  // Active Orders vs Orders Recycle Bin View Toggle
+  const [viewMode, setViewMode] = useState<'active' | 'recycleBin'>('active');
+
+  // Search Input State (Order ID, Customer Phone, Customer Name)
+  const [searchQuery, setSearchQuery] = useState<string>('');
+
+  // Sort Dropdown State
+  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'highest_amount' | 'lowest_amount'>('newest');
+
+  // 1. Recycle Bin vs Active View Filter
+  const baseOrders = orders.filter((o) => {
+    if (!o) return false;
+    const isDeletedFlag = Boolean(o.isDeleted);
+    return viewMode === 'recycleBin' ? isDeletedFlag : !isDeletedFlag;
+  });
+
+  // 2. Client-Side Search Filter (Order ID, Customer Mobile, Customer Name)
+  const searchedOrders = baseOrders.filter((order) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.trim().toLowerCase();
+    const idMatch = (order.id || '').toLowerCase().includes(q);
+    const nameMatch = (order.customer?.fullName || '').toLowerCase().includes(q);
+    const phoneMatch = (order.customer?.phone || '').toLowerCase().includes(q);
+    return idMatch || nameMatch || phoneMatch;
+  });
+
+  // 3. Payment Status & Date Range Filter
+  const filteredOrders = searchedOrders.filter((order) => {
     if (paymentStatusFilter !== 'All') {
       if (paymentStatusFilter === 'Paid' && order.paymentStatus !== 'Paid') return false;
       if (paymentStatusFilter === 'COD' && order.paymentStatus !== 'COD') return false;
@@ -206,9 +234,7 @@ export const AdminOrderList: React.FC<AdminOrderListProps> = ({
     const orderDateStr = orderDate.toISOString().split('T')[0];
     const todayStr = new Date().toISOString().split('T')[0];
 
-    if (dateFilterMode === 'today') {
-      return orderDateStr === todayStr;
-    }
+    if (dateFilterMode === 'today') return orderDateStr === todayStr;
     if (dateFilterMode === 'yesterday') {
       const yest = new Date();
       yest.setDate(yest.getDate() - 1);
@@ -224,24 +250,33 @@ export const AdminOrderList: React.FC<AdminOrderListProps> = ({
       return orderDate.getMonth() === now.getMonth() && orderDate.getFullYear() === now.getFullYear();
     }
     if (dateFilterMode === 'custom') {
-      if (specificDate) {
-        return orderDateStr === specificDate;
-      }
-      if (startDate && endDate) {
-        return orderDateStr >= startDate && orderDateStr <= endDate;
-      }
-      if (startDate) {
-        return orderDateStr >= startDate;
-      }
-      if (endDate) {
-        return orderDateStr <= endDate;
-      }
+      if (specificDate) return orderDateStr === specificDate;
+      if (startDate && endDate) return orderDateStr >= startDate && orderDateStr <= endDate;
+      if (startDate) return orderDateStr >= startDate;
+      if (endDate) return orderDateStr <= endDate;
     }
     return true;
   });
 
-  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / pageSize));
-  const paginatedOrders = filteredOrders.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  // 4. Sorting Pipeline
+  const sortedOrders = [...filteredOrders].sort((a, b) => {
+    if (sortBy === 'newest') {
+      return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+    }
+    if (sortBy === 'oldest') {
+      return new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
+    }
+    if (sortBy === 'highest_amount') {
+      return (b.total || b.subtotal || 0) - (a.total || a.subtotal || 0);
+    }
+    if (sortBy === 'lowest_amount') {
+      return (a.total || a.subtotal || 0) - (b.total || b.subtotal || 0);
+    }
+    return 0;
+  });
+
+  const totalPages = Math.max(1, Math.ceil(sortedOrders.length / pageSize));
+  const paginatedOrders = sortedOrders.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   // Pure HTML5 Canvas 300 DPI Print File Exporter
   const handleDownloadCustomerPrintFile = async (order: Order, itemIndex: number) => {
@@ -394,67 +429,96 @@ export const AdminOrderList: React.FC<AdminOrderListProps> = ({
   return (
     <div className="space-y-6 font-jost text-xs select-none">
       
-      {/* Date Range & Specific Date Interactive Filter Toolbar */}
+      {/* Search, Sort, View Mode & Date Range Interactive Filter Toolbar */}
       <div className="p-4 bg-[#121829] rounded-2xl border border-[#262E4A] shadow-xl space-y-3">
+        
+        {/* Top Control Bar: Active vs Recycle Bin Toggle & Live Count */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#262E4A] pb-3">
-          <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-[#3B82F6]" />
-            <h3 className="font-extrabold text-sm text-white">Filter Orders by Placement Date</h3>
+          <div className="flex flex-wrap items-center gap-3">
+            {/* View Mode Toggle Buttons */}
+            <div className="flex items-center bg-[#1A2035] p-1 rounded-xl border border-[#262E4A]">
+              <button
+                type="button"
+                onClick={() => {
+                  setViewMode('active');
+                  setCurrentPage(1);
+                }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all cursor-pointer ${
+                  viewMode === 'active'
+                    ? 'bg-[#3B82F6] text-white shadow-md'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                Active Orders ({orders.filter((o) => o && !o.isDeleted).length})
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setViewMode('recycleBin');
+                  setCurrentPage(1);
+                }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  viewMode === 'recycleBin'
+                    ? 'bg-rose-600 text-white shadow-md'
+                    : 'text-gray-400 hover:text-rose-400'
+                }`}
+              >
+                <Trash2 className="w-3.5 h-3.5" /> Orders Recycle Bin ({orders.filter((o) => o && Boolean(o.isDeleted)).length})
+              </button>
+            </div>
+
             <span className="px-2.5 py-0.5 bg-[#3B82F6]/20 text-[#3B82F6] font-mono text-[11px] font-bold rounded-full flex items-center gap-1.5">
-              {isStoreLoading && filteredOrders.length === 0 ? (
+              {isStoreLoading && sortedOrders.length === 0 ? (
                 <>
                   <Loader2 className="w-3 h-3 animate-spin" /> Syncing Cloud...
                 </>
               ) : (
-                `${filteredOrders.length} ${filteredOrders.length === 1 ? 'Order' : 'Orders'}`
+                `${sortedOrders.length} ${sortedOrders.length === 1 ? 'Order' : 'Orders'}`
               )}
             </span>
           </div>
 
-          {/* Quick Preset Buttons & Payment Filter Dropdown */}
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-1.5">
-              {[
-                { id: 'all', label: 'All Time' },
-                { id: 'today', label: 'Today' },
-                { id: 'yesterday', label: 'Yesterday' },
-                { id: '7days', label: 'Last 7 Days' },
-                { id: 'month', label: 'This Month' },
-                { id: 'custom', label: 'Custom Date Range' },
-              ].map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => {
-                    setDateFilterMode(p.id as any);
-                    setCurrentPage(1);
-                  }}
-                  className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${
-                    dateFilterMode === p.id
-                      ? 'bg-[#3B82F6] text-white shadow-md'
-                      : 'bg-[#1A2035] text-gray-400 hover:text-white border border-[#262E4A]'
-                  }`}
-                >
-                  {p.label}
-                </button>
-              ))}
-            </div>
-
-            {/* Top Toolbar Payment Status Filter Dropdown */}
-            <div className="flex items-center gap-2 shrink-0">
-              <label className="text-gray-400 font-extrabold text-xs">Payment Filter :</label>
-              <select
-                value={paymentStatusFilter}
+          {/* Search Input Box & Sort Dropdown */}
+          <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+            {/* Search Input Box */}
+            <div className="relative flex-1 lg:w-72">
+              <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-3" />
+              <input
+                type="text"
+                placeholder="Search Order ID, Phone, Customer Name..."
+                value={searchQuery}
                 onChange={(e) => {
-                  setPaymentStatusFilter(e.target.value as any);
+                  setSearchQuery(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="px-3.5 py-1.5 bg-[#1A2035] border border-pink-500/40 rounded-xl text-xs font-extrabold text-pink-400 focus:outline-none cursor-pointer"
+                className="w-full pl-9 pr-3 py-2 bg-[#1A2035] border border-[#262E4A] rounded-xl text-xs text-white placeholder-gray-500 font-bold focus:outline-none focus:border-[#3B82F6]"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2.5 top-2.5 text-gray-400 hover:text-white"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Sort Dropdown */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              <ArrowUpDown className="w-3.5 h-3.5 text-purple-400" />
+              <select
+                value={sortBy}
+                onChange={(e) => {
+                  setSortBy(e.target.value as any);
+                  setCurrentPage(1);
+                }}
+                className="px-3 py-2 bg-[#1A2035] border border-purple-500/40 rounded-xl text-xs font-extrabold text-purple-300 focus:outline-none cursor-pointer"
               >
-                <option value="All">All Payments (Paid, COD, Pending, Refund)</option>
-                <option value="Paid">🟢 Paid Only</option>
-                <option value="COD">🟠 COD Only</option>
-                <option value="Pending">🔴 Pending Only</option>
-                <option value="Refund">↩️ Refund Only</option>
+                <option value="newest">🕒 Newest First</option>
+                <option value="oldest">⏳ Oldest First</option>
+                <option value="highest_amount">💰 Highest Amount</option>
+                <option value="lowest_amount">🏷️ Lowest Amount</option>
               </select>
             </div>
           </div>
@@ -687,14 +751,57 @@ export const AdminOrderList: React.FC<AdminOrderListProps> = ({
                     )}
                   </div>
 
-                  <a
-                    href={`https://wa.me/91${order.customer?.phone || ''}?text=Hello%20${encodeURIComponent(order.customer?.fullName || 'Customer')},%20your%20A1print%20order%20${order.id}%20status%20is%20now%20${encodeURIComponent(order.orderStatus || 'New')}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
-                  >
-                    💬 WhatsApp Update
-                  </a>
+                  <div className="flex items-center gap-2">
+                    <a
+                      href={`https://wa.me/91${order.customer?.phone || ''}?text=Hello%20${encodeURIComponent(order.customer?.fullName || 'Customer')},%20your%20A1print%20order%20${order.id}%20status%20is%20now%20${encodeURIComponent(order.orderStatus || 'New')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+                    >
+                      💬 WhatsApp Update
+                    </a>
+
+                    {viewMode === 'active' ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (confirm(`Move Order #${order.id} to Orders Recycle Bin?`)) {
+                            softDeleteOrder(order.id);
+                          }
+                        }}
+                        className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 font-extrabold text-xs rounded-lg border border-rose-500/30 transition-colors flex items-center gap-1 cursor-pointer shadow-xs"
+                        title="Move Order to Recycle Bin"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" /> Delete
+                      </button>
+                    ) : (
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            restoreOrder(order.id);
+                          }}
+                          className="px-3 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-extrabold text-xs rounded-lg border border-emerald-500/30 transition-colors flex items-center gap-1 cursor-pointer shadow-xs"
+                          title="Restore Order to Active Orders"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" /> Restore
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (confirm(`⚠️ PERMANENT DELETE WARNING:\n\nAre you sure you want to PERMANENTLY delete Order #${order.id}?\nThis action CANNOT be undone and will erase the order from Cloud Firestore forever.`)) {
+                              permanentDeleteOrder(order.id);
+                            }
+                          }}
+                          className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs rounded-lg shadow-xs transition-colors flex items-center gap-1 cursor-pointer"
+                          title="Permanently Delete Order"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" /> Permanent Delete
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Admin Remark 2-Column Split Container */}

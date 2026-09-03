@@ -96,11 +96,15 @@ export const AdminRecycleBinModal: React.FC<AdminRecycleBinModalProps> = ({
                           </button>
 
                           <button
-                            onClick={() => onPermanentDeleteProduct(p.id)}
-                            className="p-1.5 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-xl transition-all cursor-pointer"
+                            onClick={() => {
+                              if (confirm(`⚠️ PERMANENT DELETE WARNING:\n\nAre you sure you want to PERMANENTLY delete "${p.title}"?\nThis action CANNOT be undone and will erase the product frame from Cloud Firestore forever.`)) {
+                                onPermanentDeleteProduct(p.id);
+                              }
+                            }}
+                            className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer shadow-xs"
                             title="Permanent Delete"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-3.5 h-3.5" /> Permanent Delete
                           </button>
                         </div>
                       </td>

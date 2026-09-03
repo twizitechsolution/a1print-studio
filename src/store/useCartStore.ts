@@ -696,13 +696,10 @@ export function useCartStore() {
     flushOutboxQueue();
   };
 
-  // Soft Delete Product (Moved to Recycle Bin)
+  // Soft Delete Product (Moved to Recycle Bin - Stays in memoryData & Cloud Firestore)
   const softDeleteProduct = (id: string) => {
     const existing = memoryData.products.find(p => p.id === id);
     const now = new Date().toISOString();
-    const deletedIds = getDeletedProductIds();
-    deletedIds.add(id);
-    saveDeletedProductIds(deletedIds);
 
     const updatedProducts = memoryData.products.map((p) => {
       if (p.id === id) {
@@ -717,6 +714,7 @@ export function useCartStore() {
         enqueueOutboxJob('products', id, 'soft_delete', updated);
         writeAuditLog('SOFT_DELETE', 'product', id, 'Admin User', existing, updated);
         applyProductDelta([updated]);
+        firebaseCloudDb.setDocument('products', id, updated);
         return updated;
       }
       return p;
@@ -732,9 +730,6 @@ export function useCartStore() {
   const restoreProduct = (id: string) => {
     const existing = memoryData.products.find(p => p.id === id);
     const now = new Date().toISOString();
-    const deletedIds = getDeletedProductIds();
-    deletedIds.delete(id);
-    saveDeletedProductIds(deletedIds);
 
     const updatedProducts = memoryData.products.map((p) => {
       if (p.id === id) {
@@ -749,6 +744,7 @@ export function useCartStore() {
         enqueueOutboxJob('products', id, 'update', updated);
         writeAuditLog('RESTORE', 'product', id, 'Admin User', existing, updated);
         applyProductDelta([updated]);
+        firebaseCloudDb.setDocument('products', id, updated);
         return updated;
       }
       return p;
@@ -760,24 +756,75 @@ export function useCartStore() {
     flushOutboxQueue();
   };
 
-  // Permanent Delete Product
+  // Permanent Delete Product from Cloud Firestore & Local Memory
   const permanentDeleteProduct = (id: string) => {
-    const deletedIds = getDeletedProductIds();
-    deletedIds.add(id);
-    saveDeletedProductIds(deletedIds);
-
-    // Save tombstone to Cloud Firestore so server updates & other devices remember deletion forever!
-    firebaseCloudDb.setDocument('deleted_products', 'global_tombstone', {
-      id: 'global_tombstone',
-      ids: Array.from(deletedIds),
-      updatedAt: new Date().toISOString(),
-    });
-
     const updatedProducts = memoryData.products.filter((p) => p.id !== id);
-    saveStoredLocalData({ ...memoryData, products: updatedProducts });
+    memoryData.products = updatedProducts;
+    saveStoredLocalData(memoryData);
     notifyListeners();
 
     firebaseCloudDb.deleteDocument('products', id);
+  };
+
+  // Soft Delete Order (Move to Orders Recycle Bin)
+  const softDeleteOrder = (orderId: string) => {
+    const now = new Date().toISOString();
+
+    const updatedOrders = memoryData.orders.map((ord) => {
+      if (ord.id === orderId) {
+        const updated: Order = {
+          ...ord,
+          isDeleted: true,
+          deletedAt: now,
+          updatedAt: now,
+          version: (ord.version || 0) + 1,
+        };
+        firebaseCloudDb.setDocument('orders', ord.id, updated);
+        return updated;
+      }
+      return ord;
+    });
+
+    memoryData.orders = updatedOrders;
+    saveStoredMasterOrders(updatedOrders);
+    saveStoredLocalData(memoryData);
+    notifyListeners();
+  };
+
+  // Restore Soft-Deleted Order from Recycle Bin
+  const restoreOrder = (orderId: string) => {
+    const now = new Date().toISOString();
+
+    const updatedOrders = memoryData.orders.map((ord) => {
+      if (ord.id === orderId) {
+        const updated: Order = {
+          ...ord,
+          isDeleted: false,
+          deletedAt: null,
+          updatedAt: now,
+          version: (ord.version || 0) + 1,
+        };
+        firebaseCloudDb.setDocument('orders', ord.id, updated);
+        return updated;
+      }
+      return ord;
+    });
+
+    memoryData.orders = updatedOrders;
+    saveStoredMasterOrders(updatedOrders);
+    saveStoredLocalData(memoryData);
+    notifyListeners();
+  };
+
+  // Permanent Delete Order from Cloud Firestore & Local Memory
+  const permanentDeleteOrder = async (orderId: string) => {
+    const updatedOrders = memoryData.orders.filter((ord) => ord.id !== orderId);
+    memoryData.orders = updatedOrders;
+    saveStoredMasterOrders(updatedOrders);
+    saveStoredLocalData(memoryData);
+    notifyListeners();
+
+    await firebaseCloudDb.deleteDocument('orders', orderId);
   };
 
   // Restock / Credit Stock Quantity
@@ -1238,6 +1285,9 @@ export function useCartStore() {
     removeFromCart,
     updateQuantity,
     placeOrder,
+    softDeleteOrder,
+    restoreOrder,
+    permanentDeleteOrder,
     updateOrderStatus,
     updatePaymentStatus,
     updateOrderAdminRemark,
