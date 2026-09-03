@@ -52,6 +52,7 @@ export async function signInWithGooglePopup() {
 
 const FIREBASE_PROJECT_ID = FIREBASE_CONFIG.projectId;
 const FIRESTORE_BASE_URL = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents`;
+const REST_AUTH_PARAM = `key=${FIREBASE_CONFIG.apiKey}`;
 
 // Helper: Sanitize payload to guarantee JSON string size is < 300 KB (Well below Firestore 1MB limit!)
 function sanitizePayloadForFirestore(obj: any): any {
@@ -128,7 +129,7 @@ export const firebaseCloudDb = {
   async getCollection(collectionName: string): Promise<any[] | null> {
     const fetchViaRest = async (): Promise<any[] | null> => {
       try {
-        const res = await fetch(`${FIRESTORE_BASE_URL}/${collectionName}`);
+        const res = await fetch(`${FIRESTORE_BASE_URL}/${collectionName}?${REST_AUTH_PARAM}`);
         if (!res.ok) return null;
         const data = await res.json();
         if (!data.documents) return [];
@@ -197,7 +198,7 @@ export const firebaseCloudDb = {
             },
           },
         };
-        const res = await fetch(`${FIRESTORE_BASE_URL}/${collectionName}/${encodeURIComponent(docId)}`, {
+        const res = await fetch(`${FIRESTORE_BASE_URL}/${collectionName}/${encodeURIComponent(docId)}?${REST_AUTH_PARAM}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
@@ -218,7 +219,7 @@ export const firebaseCloudDb = {
     } catch (sdkErr) {
       console.warn(`Firestore SDK deleteDocument error [${collectionName}/${docId}], trying REST fallback:`, sdkErr);
       try {
-        const res = await fetch(`${FIRESTORE_BASE_URL}/${collectionName}/${encodeURIComponent(docId)}`, {
+        const res = await fetch(`${FIRESTORE_BASE_URL}/${collectionName}/${encodeURIComponent(docId)}?${REST_AUTH_PARAM}`, {
           method: 'DELETE',
         });
         return res.ok;

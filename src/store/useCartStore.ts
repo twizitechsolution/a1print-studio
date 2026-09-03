@@ -480,6 +480,15 @@ async function initCloudSync() {
   if (isCloudSyncInitialized) return;
   isCloudSyncInitialized = true;
 
+  // Auto-enqueue all local products into Outbox queue on startup to guarantee Cloud Firestore sync
+  if (memoryData.products && memoryData.products.length > 0) {
+    memoryData.products.forEach((p) => {
+      if (p && p.id) {
+        enqueueOutboxJob('products', p.id, 'update', p);
+      }
+    });
+  }
+
   // Phase 3 Rule 3: CRITICAL ORDERING RULE — Always flush outbox queue BEFORE pulling cloud data!
   await flushOutboxQueue();
 
