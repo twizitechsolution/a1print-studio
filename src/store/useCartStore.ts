@@ -246,7 +246,7 @@ function saveStoredLocalData(data: StoreData) {
     saveStoredMasterOrders(data.orders);
   }
   if (Array.isArray(data.products) && data.products.length > 0) {
-    saveStoredMasterProducts(data.products);
+    applyProductDelta(data.products);
   }
 
   try {
