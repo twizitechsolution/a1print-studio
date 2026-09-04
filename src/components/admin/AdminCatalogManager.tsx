@@ -38,6 +38,7 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
     clearStaleLocalSyncData,
   } = useCartStore();
 
+  const [viewMode, setViewMode] = useState<'active' | 'recycleBin'>('active');
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [isRecycleBinOpen, setIsRecycleBinOpen] = useState(false);
@@ -51,8 +52,13 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
   const safeCategories = Array.isArray(categories) ? categories.filter(Boolean) : [];
 
   // Active Live Products vs Soft-Deleted Recycle Bin Products
-  const activeProducts = safeProducts.filter((p) => {
-    if (!p || p.isDeleted) return false;
+  const activeProductsList = safeProducts.filter((p) => p && !p.isDeleted);
+  const deletedProductsList = safeProducts.filter((p) => p && Boolean(p.isDeleted));
+
+  const currentProductSet = viewMode === 'active' ? activeProductsList : deletedProductsList;
+
+  const displayedProducts = currentProductSet.filter((p) => {
+    if (!p) return false;
     if (!searchQuery.trim()) return true;
 
     const q = searchQuery.toLowerCase().trim();
@@ -68,13 +74,14 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
     return timeB - timeA;
   });
 
-  const deletedProducts = safeProducts.filter((p) => p && p.isDeleted);
+  const activeProducts = activeProductsList;
+  const deletedProducts = deletedProductsList;
 
   // 10-Item Pagination State
   const [currentPage, setCurrentPage] = useState<number>(1);
   const pageSize = 10;
-  const totalPages = Math.max(1, Math.ceil(activeProducts.length / pageSize));
-  const paginatedProducts = activeProducts.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const totalPages = Math.max(1, Math.ceil(displayedProducts.length / pageSize));
+  const paginatedProducts = displayedProducts.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const handleOpenAddModal = () => {
     if (onEditProductFullPage) {
@@ -139,17 +146,50 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {/* View Mode Toggle Buttons matching Orders section */}
+          <div className="flex items-center bg-[#1A2035] p-1 rounded-xl border border-[#262E4A]">
+            <button
+              type="button"
+              onClick={() => {
+                setViewMode('active');
+                setCurrentPage(1);
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all cursor-pointer ${
+                viewMode === 'active'
+                  ? 'bg-[#3B82F6] text-white shadow-md'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              Active Frames ({activeProducts.length})
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setViewMode('recycleBin');
+                setCurrentPage(1);
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all cursor-pointer flex items-center gap-1.5 ${
+                viewMode === 'recycleBin'
+                  ? 'bg-rose-600 text-white shadow-md'
+                  : 'text-gray-400 hover:text-rose-400'
+              }`}
+            >
+              <Trash2 className="w-3.5 h-3.5" /> Frames Recycle Bin ({deletedProducts.length})
+            </button>
+          </div>
+
           {/* Product ID & Title Search Input */}
           <div className="relative">
             <input
               type="text"
-              placeholder="Search by Product ID, Title..."
+              placeholder="Search Frame ID, Title..."
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
                 setCurrentPage(1);
               }}
-              className="pl-8 pr-3 py-2 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg text-xs dark:text-zinc-100 text-slate-800 focus:outline-none focus:border-purple-500 font-medium w-60 shadow-2xs"
+              className="pl-8 pr-3 py-2 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg text-xs dark:text-zinc-100 text-slate-800 focus:outline-none focus:border-purple-500 font-medium w-52 shadow-2xs"
             />
             <span className="absolute left-2.5 top-2.5 text-zinc-400 text-xs">🔍</span>
           </div>
@@ -162,33 +202,12 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
             <FolderPlus className="w-3.5 h-3.5" /> Categories ({safeCategories.length})
           </button>
 
-          {/* Clear Stale Sync Data Button */}
-          <button
-            onClick={() => {
-              if (confirm('Clear stale local outbox & sync cache? This will align your display count strictly with Cloud Firestore.')) {
-                clearStaleLocalSyncData();
-              }
-            }}
-            title="Clear local outbox cache & resync directly with Cloud Firestore"
-            className="px-3 py-2 dark:bg-zinc-900 bg-white dark:hover:bg-zinc-800 hover:bg-slate-100 dark:text-zinc-300 text-slate-700 font-medium text-xs rounded-lg border dark:border-zinc-800 border-slate-200 transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
-          >
-            <RefreshCw className="w-3.5 h-3.5 text-amber-500" /> Clear Stale Sync Data
-          </button>
-
-          {/* Recycle Bin Button */}
-          <button
-            onClick={() => setIsRecycleBinOpen(true)}
-            className="px-3 py-2 dark:bg-zinc-900 bg-white dark:hover:bg-zinc-800 hover:bg-slate-100 dark:text-zinc-300 text-slate-700 font-medium text-xs rounded-lg border dark:border-zinc-800 border-slate-200 transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
-          >
-            <Trash2 className="w-3.5 h-3.5 text-zinc-400" /> Recycle Bin ({deletedProducts.length})
-          </button>
-
           {/* Add Product Button */}
           <button
             onClick={handleOpenAddModal}
             className="px-3.5 py-2 dark:bg-zinc-100 bg-slate-900 dark:hover:bg-zinc-200 hover:bg-slate-800 dark:text-zinc-950 text-white font-semibold text-xs rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
           >
-            <Plus className="w-3.5 h-3.5" /> Add Product
+            <Plus className="w-3.5 h-3.5" /> Add Frame Product
           </button>
         </div>
       </div>
@@ -321,44 +340,68 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
 
                     <td className="p-4 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => {
-                            const url = `${window.location.origin}/?product=${product.id}`;
-                            navigator.clipboard.writeText(url);
-                            setCopiedAdLinkId(product.id);
-                            setTimeout(() => setCopiedAdLinkId(null), 3000);
-                          }}
-                          className={`px-3 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 shadow-xs ${
-                            copiedAdLinkId === product.id
-                              ? 'bg-emerald-600 text-white'
-                              : 'bg-indigo-600 hover:bg-indigo-700 text-white'
-                          }`}
-                          title="Copy shareable link for Instagram & Facebook Ads"
-                        >
-                          {copiedAdLinkId === product.id ? 'Copied ✓' : 'Copy 🔗'}
-                        </button>
+                        {viewMode === 'recycleBin' ? (
+                          <>
+                            <button
+                              onClick={() => restoreProduct(product.id)}
+                              className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-md transition-colors flex items-center gap-1.5 cursor-pointer shrink-0"
+                            >
+                              <RotateCcw className="w-3.5 h-3.5" /> Restore
+                            </button>
 
-                        <button
-                          onClick={() => handleVisualWorkspaceClick(product)}
-                          className="px-3.5 py-2 bg-[#9333EA] hover:bg-purple-700 text-white font-extrabold text-xs rounded-xl shadow-md transition-colors flex items-center gap-1.5 cursor-pointer shrink-0"
-                        >
-                          <Sliders className="w-3.5 h-3.5" /> Visual Workspace
-                        </button>
+                            <button
+                              onClick={() => {
+                                if (confirm(`Permanently delete "${product.title}" from Cloud Firestore database? This action cannot be undone.`)) {
+                                  permanentDeleteProduct(product.id);
+                                }
+                              }}
+                              className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs rounded-xl shadow-md transition-colors flex items-center gap-1.5 cursor-pointer shrink-0"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" /> Permanent Delete
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              onClick={() => {
+                                const url = `${window.location.origin}/?product=${product.id}`;
+                                navigator.clipboard.writeText(url);
+                                setCopiedAdLinkId(product.id);
+                                setTimeout(() => setCopiedAdLinkId(null), 3000);
+                              }}
+                              className={`px-3 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 shadow-xs ${
+                                copiedAdLinkId === product.id
+                                  ? 'bg-emerald-600 text-white'
+                                  : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                              }`}
+                              title="Copy shareable link for Instagram & Facebook Ads"
+                            >
+                              {copiedAdLinkId === product.id ? 'Copied ✓' : 'Copy 🔗'}
+                            </button>
 
-                        <button
-                          onClick={() => handleOpenEditModal(product)}
-                          className="px-3.5 py-2 bg-[#1A2035] hover:bg-[#262E4A] text-white font-extrabold text-xs rounded-xl border border-[#262E4A] transition-colors flex items-center gap-1.5 cursor-pointer"
-                        >
-                          <Edit2 className="w-3.5 h-3.5 text-[#3B82F6]" /> Edit Details
-                        </button>
+                            <button
+                              onClick={() => handleVisualWorkspaceClick(product)}
+                              className="px-3.5 py-2 bg-[#9333EA] hover:bg-purple-700 text-white font-extrabold text-xs rounded-xl shadow-md transition-colors flex items-center gap-1.5 cursor-pointer shrink-0"
+                            >
+                              <Sliders className="w-3.5 h-3.5" /> Visual Workspace
+                            </button>
 
-                        <button
-                          onClick={() => softDeleteProduct(product.id)}
-                          className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-500/10 rounded-xl transition-colors cursor-pointer"
-                          title="Move to Recycle Bin"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                            <button
+                              onClick={() => handleOpenEditModal(product)}
+                              className="px-3.5 py-2 bg-[#1A2035] hover:bg-[#262E4A] text-white font-extrabold text-xs rounded-xl border border-[#262E4A] transition-colors flex items-center gap-1.5 cursor-pointer"
+                            >
+                              <Edit2 className="w-3.5 h-3.5 text-[#3B82F6]" /> Edit Details
+                            </button>
+
+                            <button
+                              onClick={() => softDeleteProduct(product.id)}
+                              className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-500/10 rounded-xl transition-colors cursor-pointer"
+                              title="Move to Recycle Bin"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>

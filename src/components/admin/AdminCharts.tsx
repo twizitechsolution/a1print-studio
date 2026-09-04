@@ -45,20 +45,22 @@ export const AdminCharts: React.FC<AdminChartsProps> = ({
   const deliveredPct = Math.round((deliveredCount / totalCount) * 100);
   const cancelledPct = Math.round((cancelledCount / totalCount) * 100);
 
-  // Top Selling Frames count aggregation
+  // Top Selling Frames count aggregation (from active orders & real products only)
   const frameSalesMap: Record<string, { title: string; count: number; revenue: number; thumbnail?: string }> = {};
 
-  orders.forEach((ord) => {
+  activeOrders.forEach((ord) => {
     ord.items?.forEach((item) => {
-      const title = item.product?.title || 'Birthday Frame';
-      const thumb = item.product?.thumbnail || '';
-      const price = item.itemTotalPrice || 699;
+      if (item && item.product && !item.product.isSampleData && item.product.title) {
+        const title = item.product.title;
+        const thumb = item.product.thumbnail || item.product.baseImageUrl || '';
+        const price = item.itemTotalPrice || item.product.price || 0;
 
-      if (!frameSalesMap[title]) {
-        frameSalesMap[title] = { title, count: 0, revenue: 0, thumbnail: thumb };
+        if (!frameSalesMap[title]) {
+          frameSalesMap[title] = { title, count: 0, revenue: 0, thumbnail: thumb };
+        }
+        frameSalesMap[title].count += item.quantity || 1;
+        frameSalesMap[title].revenue += price;
       }
-      frameSalesMap[title].count += item.quantity || 1;
-      frameSalesMap[title].revenue += price;
     });
   });
 
@@ -66,8 +68,8 @@ export const AdminCharts: React.FC<AdminChartsProps> = ({
     .sort((a, b) => b.count - a.count)
     .slice(0, 5);
 
-  // Recent 5 orders
-  const recentOrders = orders.slice(0, 5);
+  // Recent 5 active non-deleted orders
+  const recentOrders = activeOrders.slice(0, 5);
 
   return (
     <div className="space-y-6 font-sans">
