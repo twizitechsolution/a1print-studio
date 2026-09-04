@@ -131,22 +131,23 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
   return (
     <div className="space-y-6 font-sans select-none">
       
-      {/* Frame Catalog Header & Toolbar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-bold tracking-tight dark:text-zinc-100 text-slate-900 flex items-center gap-2">
-            Frame Product Catalog ({isStoreLoading && activeProducts.length === 0 ? 'Syncing Cloud...' : activeProducts.length})
-            {isStoreLoading && activeProducts.length === 0 && (
-              <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
-            )}
-          </h2>
-          <p className="text-xs dark:text-zinc-400 text-slate-500 mt-0.5">
-            Manage frame products, stock inventory, categories, and multi-angle galleries.
-          </p>
-        </div>
+      {/* Frame Catalog Header & Interactive Toolbar Container */}
+      <div className="p-4 bg-[#121829] rounded-2xl border border-[#262E4A] shadow-xl space-y-3">
+        {/* Top Header Row: Title & Active/Recycle Bin Pill Toggle */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#262E4A] pb-3">
+          <div>
+            <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+              Frame Product Catalog ({isStoreLoading && activeProducts.length === 0 ? 'Syncing Cloud...' : activeProducts.length})
+              {isStoreLoading && activeProducts.length === 0 && (
+                <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+              )}
+            </h2>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Manage frame products, stock inventory, categories, and multi-angle galleries.
+            </p>
+          </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          {/* View Mode Toggle Buttons matching Orders section */}
+          {/* View Mode Toggle Pill Buttons */}
           <div className="flex items-center bg-[#1A2035] p-1 rounded-xl border border-[#262E4A]">
             <button
               type="button"
@@ -178,7 +179,10 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
               <Trash2 className="w-3.5 h-3.5" /> Frames Recycle Bin ({deletedProducts.length})
             </button>
           </div>
+        </div>
 
+        {/* Toolbar Bottom Controls: Search input, Categories button, Add product button */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
           {/* Product ID & Title Search Input */}
           <div className="relative">
             <input
@@ -189,32 +193,40 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
                 setSearchQuery(e.target.value);
                 setCurrentPage(1);
               }}
-              className="pl-8 pr-3 py-2 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg text-xs dark:text-zinc-100 text-slate-800 focus:outline-none focus:border-purple-500 font-medium w-52 shadow-2xs"
+              className="pl-8 pr-3 py-2 bg-[#1A2035] border border-[#262E4A] rounded-xl text-xs text-white placeholder-gray-500 focus:outline-none focus:border-[#3B82F6] font-medium w-64 shadow-xs"
             />
-            <span className="absolute left-2.5 top-2.5 text-zinc-400 text-xs">🔍</span>
+            <span className="absolute left-2.5 top-2.5 text-gray-400 text-xs">🔍</span>
           </div>
 
-          {/* Category Manager Button */}
-          <button
-            onClick={() => setIsCategoryModalOpen(true)}
-            className="px-3 py-2 dark:bg-zinc-900 bg-white dark:hover:bg-zinc-800 hover:bg-slate-100 dark:text-zinc-300 text-slate-700 font-medium text-xs rounded-lg border dark:border-zinc-800 border-slate-200 transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
-          >
-            <FolderPlus className="w-3.5 h-3.5" /> Categories ({safeCategories.length})
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Category Manager Button */}
+            <button
+              onClick={() => setIsCategoryModalOpen(true)}
+              className="px-3.5 py-2 bg-[#1A2035] hover:bg-[#222943] text-gray-200 font-semibold text-xs rounded-xl border border-[#262E4A] transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+            >
+              <FolderPlus className="w-3.5 h-3.5 text-purple-400" /> Categories ({safeCategories.length})
+            </button>
 
-          {/* Add Product Button */}
-          <button
-            onClick={handleOpenAddModal}
-            className="px-3.5 py-2 dark:bg-zinc-100 bg-slate-900 dark:hover:bg-zinc-200 hover:bg-slate-800 dark:text-zinc-950 text-white font-semibold text-xs rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
-          >
-            <Plus className="w-3.5 h-3.5" /> Add Frame Product
-          </button>
+            {/* Add Product Button */}
+            <button
+              onClick={handleOpenAddModal}
+              className="px-3.5 py-2 bg-[#3B82F6] hover:bg-[#2563EB] text-white font-semibold text-xs rounded-xl border border-[#3B82F6] transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+            >
+              <Plus className="w-3.5 h-3.5" /> Add Frame Product
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Frame Catalog Table */}
-      {activeProducts.length === 0 ? (
+      {viewMode === 'active' && activeProducts.length === 0 ? (
         <NoProductsFound isAdmin onOpenAddProduct={handleOpenAddModal} />
+      ) : viewMode === 'recycleBin' && deletedProducts.length === 0 ? (
+        <div className="bg-[#121829] rounded-2xl border border-[#262E4A] p-12 text-center">
+          <Trash2 className="w-12 h-12 text-gray-500 mx-auto mb-3" />
+          <h3 className="text-base font-bold text-white">Frames Recycle Bin is Empty</h3>
+          <p className="text-xs text-gray-400 mt-1">No soft-deleted frame products found in your catalog.</p>
+        </div>
       ) : (
         <div className="dark:bg-zinc-900/40 bg-white rounded-xl border dark:border-zinc-800 border-slate-200 shadow-xs overflow-hidden">
           <div className="overflow-x-auto">
