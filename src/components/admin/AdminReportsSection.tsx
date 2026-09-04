@@ -9,9 +9,12 @@ interface AdminReportsSectionProps {
 export const AdminReportsSection: React.FC<AdminReportsSectionProps> = ({ orders }) => {
   const [timeRange, setTimeRange] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>('monthly');
 
+  // Filter active non-deleted orders
+  const activeOrders = (orders || []).filter((o) => o && !o.isDeleted);
+
   // Compute Financial Metrics based on Orders
-  const grossSales = orders.reduce((sum, o) => sum + o.total, 0);
-  const totalOrdersCount = orders.length || 1;
+  const grossSales = activeOrders.reduce((sum, o) => sum + o.total, 0);
+  const totalOrdersCount = activeOrders.length || 1;
   const averageOrderValue = Math.round(grossSales / totalOrdersCount);
   
   // Estimated profit margin (approx 65% gross margin for custom printing)
@@ -20,14 +23,14 @@ export const AdminReportsSection: React.FC<AdminReportsSectionProps> = ({ orders
   const shippingExpense = Math.round(grossSales * 0.15);
 
   // Payment Breakdown
-  const codOrdersCount = orders.filter((o) => o.paymentMethod.toLowerCase().includes('cod')).length;
-  const onlineOrdersCount = orders.length - codOrdersCount;
+  const codOrdersCount = activeOrders.filter((o) => (o.paymentMethod || '').toLowerCase().includes('cod')).length;
+  const onlineOrdersCount = activeOrders.length - codOrdersCount;
   const codPercentage = Math.round((codOrdersCount / totalOrdersCount) * 100) || 0;
   const onlinePercentage = 100 - codPercentage;
 
   const handleExportCSV = () => {
     const csvHeader = "Order ID,Customer Name,Phone,Total Amount,Payment Method,Payment Status,Order Status,Date\n";
-    const csvRows = orders.map(o => 
+    const csvRows = activeOrders.map(o => 
       `"${o.id}","${o.customer.fullName}","${o.customer.phone}",${o.total},"${o.paymentMethod}","${o.paymentStatus}","${o.orderStatus}","${o.createdAt}"`
     ).join("\n");
     

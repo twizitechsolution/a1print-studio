@@ -60,41 +60,39 @@ export const AdminDarkStatsCards: React.FC<AdminDarkStatsCardsProps> = ({
   const todayStr = new Date().toISOString().split('T')[0];
   const currentMonthStr = new Date().toISOString().slice(0, 7); // e.g. "2026-08"
 
+  // Filter active non-deleted orders (soft-deleted Recycle Bin orders must NEVER be counted in active operational desk metrics)
+  const activeOrders = (orders || []).filter((o) => o && !o.isDeleted);
+
   // Real-time Order Counts
-  const totalOrders = orders.length;
-  const todayOrders = orders.filter((o) => (o.createdAt || '').startsWith(todayStr)).length;
-  const pendingOrders = orders.filter((o) => !o.orderStatus || o.orderStatus === 'Received').length;
-  const processingOrders = orders.filter((o) => o.orderStatus === 'Printing').length;
-  const printedOrders = orders.filter((o) => o.orderStatus === 'Printing' || o.orderStatus === 'Packed').length;
-  const shippedOrders = orders.filter((o) => o.orderStatus === 'Shipped').length;
-  const deliveredOrders = orders.filter((o) => o.orderStatus === 'Delivered').length;
-  const cancelledOrders = orders.filter((o) => o.orderStatus === 'Cancelled').length;
+  const totalOrders = activeOrders.length;
+  const todayOrders = activeOrders.filter((o) => (o.createdAt || '').startsWith(todayStr)).length;
+  const pendingOrders = activeOrders.filter((o) => !o.orderStatus || o.orderStatus === 'Received').length;
+  const processingOrders = activeOrders.filter((o) => o.orderStatus === 'Printing').length;
+  const printedOrders = activeOrders.filter((o) => o.orderStatus === 'Printing' || o.orderStatus === 'Packed').length;
+  const shippedOrders = activeOrders.filter((o) => o.orderStatus === 'Shipped').length;
+  const deliveredOrders = activeOrders.filter((o) => o.orderStatus === 'Delivered').length;
+  const cancelledOrders = activeOrders.filter((o) => o.orderStatus === 'Cancelled').length;
 
   // Real-time Section 1: Operational Action Desk Counts
-  const printingPendingCount = orders.filter((o) => !o.orderStatus || o.orderStatus === 'Received').length;
-  const designPendingCount = orders.filter((o) => o.items?.some((i) => !i.compiledFrameDataUrl && (!i.customPhotoValues || Object.keys(i.customPhotoValues).length === 0))).length;
-  const packingPendingCount = orders.filter((o) => o.orderStatus === 'Printing').length;
-  const shippingPendingCount = orders.filter((o) => o.orderStatus === 'Printing' || o.orderStatus === 'Packed').length;
-  const paymentPendingCount = orders.filter((o) => o.paymentMethod === 'COD' && o.orderStatus !== 'Delivered').length;
-  const reprintRequiredCount = orders.filter((o) => o.orderStatus === 'Reprint' || (o.notes || '').toLowerCase().includes('reprint')).length;
+  const printingPendingCount = activeOrders.filter((o) => !o.orderStatus || o.orderStatus === 'Received').length;
+  const designPendingCount = activeOrders.filter((o) => o.items?.some((i) => !i.compiledFrameDataUrl && (!i.customPhotoValues || Object.keys(i.customPhotoValues).length === 0))).length;
+  const packingPendingCount = activeOrders.filter((o) => o.orderStatus === 'Printing').length;
+  const shippingPendingCount = activeOrders.filter((o) => o.orderStatus === 'Printing' || o.orderStatus === 'Packed').length;
+  const paymentPendingCount = activeOrders.filter((o) => o.paymentMethod === 'COD' && o.orderStatus !== 'Delivered').length;
+  const reprintRequiredCount = activeOrders.filter((o) => o.orderStatus === 'Reprint' || (o.notes || '').toLowerCase().includes('reprint')).length;
 
   // Real-time Section 2: Shipping Overview Logistics Velocity Counts
-  const readyToShipCount = orders.filter((o) => o.orderStatus === 'Printing' || o.orderStatus === 'Packed').length;
-  const shippedCount = orders.filter((o) => o.orderStatus === 'Shipped').length;
-  const inTransitCount = orders.filter((o) => o.orderStatus === 'Shipped' && (o.trackingNumber || '').length > 0).length;
-  const deliveredCount = orders.filter((o) => o.orderStatus === 'Delivered').length;
-  const rtoCount = orders.filter((o) => o.orderStatus === 'RTO' || (o.notes || '').toLowerCase().includes('rto')).length;
+  const readyToShipCount = activeOrders.filter((o) => o.orderStatus === 'Printing' || o.orderStatus === 'Packed').length;
+  const shippedCount = activeOrders.filter((o) => o.orderStatus === 'Shipped').length;
+  const inTransitCount = activeOrders.filter((o) => o.orderStatus === 'Shipped' && (o.trackingNumber || '').length > 0).length;
+  const deliveredCount = activeOrders.filter((o) => o.orderStatus === 'Delivered').length;
+  const rtoCount = activeOrders.filter((o) => o.orderStatus === 'RTO' || (o.notes || '').toLowerCase().includes('rto')).length;
 
-  // Real-time Unique customers count across orders & Cloud Firestore registered users directory!
-  const customerSet = new Set<string>();
-  orders.forEach((o) => {
-    if (o.customer?.phone) customerSet.add(o.customer.phone.trim());
-    if (o.customer?.email) customerSet.add(o.customer.email.trim().toLowerCase());
-  });
-  const totalCustomers = Math.max(customerSet.size, dbCustomerCount, 1);
+  // Real-time Unique customers count matching Registered Customers Directory!
+  const totalCustomers = Math.max(dbCustomerCount, 1);
 
-  // Real-time Financial Sales Totals (excluding Cancelled orders)
-  const validOrders = orders.filter((o) => o.orderStatus !== 'Cancelled');
+  // Real-time Financial Sales Totals (excluding Cancelled & Soft-Deleted orders)
+  const validOrders = activeOrders.filter((o) => o.orderStatus !== 'Cancelled');
   const totalSales = validOrders.reduce((acc, o) => acc + (o.total || 0), 0);
   const todaySales = validOrders
     .filter((o) => (o.createdAt || '').startsWith(todayStr))

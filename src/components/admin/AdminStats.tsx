@@ -7,10 +7,11 @@ interface AdminStatsProps {
 }
 
 export const AdminStats: React.FC<AdminStatsProps> = ({ orders }) => {
-  const totalRevenue = orders.reduce((acc, o) => acc + o.total, 0);
-  const totalOrders = orders.length;
-  const pendingPrints = orders.filter((o) => o.orderStatus === 'Received' || o.orderStatus === 'Printing').length;
-  const shippedOrders = orders.filter((o) => o.orderStatus === 'Shipped' || o.orderStatus === 'Delivered').length;
+  const activeOrders = (orders || []).filter((o) => o && !o.isDeleted);
+  const totalRevenue = activeOrders.reduce((acc, o) => acc + o.total, 0);
+  const totalOrders = activeOrders.length;
+  const pendingPrints = activeOrders.filter((o) => o.orderStatus === 'Received' || o.orderStatus === 'Printing').length;
+  const shippedOrders = activeOrders.filter((o) => o.orderStatus === 'Shipped' || o.orderStatus === 'Delivered').length;
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 font-jost">

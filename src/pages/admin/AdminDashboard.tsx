@@ -165,6 +165,8 @@ const AdminDashboardInner: React.FC<AdminDashboardProps> = ({ orders: initialOrd
       : currentAdminUser.allowedTabs
   );
 
+  const activeOrders = (orders || []).filter((o) => o && !o.isDeleted);
+
   const navGroups = [
     {
       group: 'Analytics & Main',
@@ -183,7 +185,7 @@ const AdminDashboardInner: React.FC<AdminDashboardProps> = ({ orders: initialOrd
     {
       group: 'Sales & Operations',
       items: [
-        { id: 'orders' as AdminTab, label: 'Orders & Print Queue', icon: Package, badge: orders.length },
+        { id: 'orders' as AdminTab, label: 'Orders & Print Queue', icon: Package, badge: activeOrders.length },
         { id: 'customers' as AdminTab, label: 'Customers Directory', icon: Users },
         { id: 'support' as AdminTab, label: 'Help Desk & Support', icon: MessageSquare },
         { id: 'shipping' as AdminTab, label: 'Shipping Rules', icon: Truck },

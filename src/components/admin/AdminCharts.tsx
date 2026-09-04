@@ -22,18 +22,21 @@ export const AdminCharts: React.FC<AdminChartsProps> = ({
 }) => {
   const [salesTimeframe, setSalesTimeframe] = useState<'daily' | 'monthly' | 'yearly'>('monthly');
 
+  // Filter active non-deleted orders
+  const activeOrders = (orders || []).filter((o) => o && !o.isDeleted);
+
   // Urgent Pending Orders (Received or Printing)
-  const pendingOrders = orders.filter(
+  const pendingOrders = activeOrders.filter(
     (o) => !o.orderStatus || o.orderStatus === 'Received' || o.orderStatus === 'Printing'
   );
 
   // Status counts for Donut Chart
-  const pendingCount = orders.filter((o) => !o.orderStatus || o.orderStatus === 'Received').length;
-  const processingCount = orders.filter((o) => o.orderStatus === 'Printing').length;
-  const shippedCount = orders.filter((o) => o.orderStatus === 'Shipped').length;
-  const deliveredCount = orders.filter((o) => o.orderStatus === 'Delivered').length;
-  const cancelledCount = orders.filter((o) => o.orderStatus === 'Cancelled').length;
-  const totalCount = orders.length || 1;
+  const pendingCount = activeOrders.filter((o) => !o.orderStatus || o.orderStatus === 'Received').length;
+  const processingCount = activeOrders.filter((o) => o.orderStatus === 'Printing').length;
+  const shippedCount = activeOrders.filter((o) => o.orderStatus === 'Shipped').length;
+  const deliveredCount = activeOrders.filter((o) => o.orderStatus === 'Delivered').length;
+  const cancelledCount = activeOrders.filter((o) => o.orderStatus === 'Cancelled').length;
+  const totalCount = activeOrders.length || 1;
 
   // Percentage calculations
   const pendingPct = Math.round((pendingCount / totalCount) * 100);
