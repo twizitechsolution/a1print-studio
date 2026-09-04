@@ -697,10 +697,11 @@ export function useCartStore() {
   };
 
   // Soft Delete Product (Moved to Recycle Bin - Stays in memoryData & Cloud Firestore)
-  const softDeleteProduct = (id: string) => {
+  const softDeleteProduct = async (id: string) => {
     const existing = memoryData.products.find(p => p.id === id);
     const now = new Date().toISOString();
 
+    let targetUpdated: Product | null = null;
     const updatedProducts = memoryData.products.map((p) => {
       if (p.id === id) {
         const updated: Product = {
@@ -711,14 +712,22 @@ export function useCartStore() {
           version: (p.version || 0) + 1,
           syncStatus: 'pending',
         };
+        targetUpdated = updated;
         enqueueOutboxJob('products', id, 'soft_delete', updated);
         writeAuditLog('SOFT_DELETE', 'product', id, 'Admin User', existing, updated);
         applyProductDelta([updated]);
-        firebaseCloudDb.setDocument('products', id, updated);
         return updated;
       }
       return p;
     });
+
+    if (targetUpdated) {
+      try {
+        await firebaseCloudDb.setDocument('products', id, targetUpdated);
+      } catch (e) {
+        console.warn('Soft-delete product cloud sync warning:', e);
+      }
+    }
 
     memoryData.products = updatedProducts;
     saveStoredLocalData(memoryData);
@@ -727,10 +736,11 @@ export function useCartStore() {
   };
 
   // Restore Soft-Deleted Product from Recycle Bin
-  const restoreProduct = (id: string) => {
+  const restoreProduct = async (id: string) => {
     const existing = memoryData.products.find(p => p.id === id);
     const now = new Date().toISOString();
 
+    let targetUpdated: Product | null = null;
     const updatedProducts = memoryData.products.map((p) => {
       if (p.id === id) {
         const updated: Product = {
@@ -741,14 +751,22 @@ export function useCartStore() {
           version: (p.version || 0) + 1,
           syncStatus: 'pending',
         };
+        targetUpdated = updated;
         enqueueOutboxJob('products', id, 'update', updated);
         writeAuditLog('RESTORE', 'product', id, 'Admin User', existing, updated);
         applyProductDelta([updated]);
-        firebaseCloudDb.setDocument('products', id, updated);
         return updated;
       }
       return p;
     });
+
+    if (targetUpdated) {
+      try {
+        await firebaseCloudDb.setDocument('products', id, targetUpdated);
+      } catch (e) {
+        console.warn('Restore product cloud sync warning:', e);
+      }
+    }
 
     memoryData.products = updatedProducts;
     saveStoredLocalData(memoryData);
@@ -757,19 +775,24 @@ export function useCartStore() {
   };
 
   // Permanent Delete Product from Cloud Firestore & Local Memory
-  const permanentDeleteProduct = (id: string) => {
+  const permanentDeleteProduct = async (id: string) => {
     const updatedProducts = memoryData.products.filter((p) => p.id !== id);
     memoryData.products = updatedProducts;
     saveStoredLocalData(memoryData);
     notifyListeners();
 
-    firebaseCloudDb.deleteDocument('products', id);
+    try {
+      await firebaseCloudDb.deleteDocument('products', id);
+    } catch (e) {
+      console.warn('Permanent delete product cloud sync warning:', e);
+    }
   };
 
   // Soft Delete Order (Move to Orders Recycle Bin)
-  const softDeleteOrder = (orderId: string) => {
+  const softDeleteOrder = async (orderId: string) => {
     const now = new Date().toISOString();
 
+    let targetUpdated: Order | null = null;
     const updatedOrders = memoryData.orders.map((ord) => {
       if (ord.id === orderId) {
         const updated: Order = {
@@ -779,11 +802,19 @@ export function useCartStore() {
           updatedAt: now,
           version: (ord.version || 0) + 1,
         };
-        firebaseCloudDb.setDocument('orders', ord.id, updated);
+        targetUpdated = updated;
         return updated;
       }
       return ord;
     });
+
+    if (targetUpdated) {
+      try {
+        await firebaseCloudDb.setDocument('orders', orderId, targetUpdated);
+      } catch (e) {
+        console.warn('Soft-delete order cloud sync warning:', e);
+      }
+    }
 
     memoryData.orders = updatedOrders;
     saveStoredMasterOrders(updatedOrders);
@@ -792,9 +823,10 @@ export function useCartStore() {
   };
 
   // Restore Soft-Deleted Order from Recycle Bin
-  const restoreOrder = (orderId: string) => {
+  const restoreOrder = async (orderId: string) => {
     const now = new Date().toISOString();
 
+    let targetUpdated: Order | null = null;
     const updatedOrders = memoryData.orders.map((ord) => {
       if (ord.id === orderId) {
         const updated: Order = {
@@ -804,11 +836,19 @@ export function useCartStore() {
           updatedAt: now,
           version: (ord.version || 0) + 1,
         };
-        firebaseCloudDb.setDocument('orders', ord.id, updated);
+        targetUpdated = updated;
         return updated;
       }
       return ord;
     });
+
+    if (targetUpdated) {
+      try {
+        await firebaseCloudDb.setDocument('orders', orderId, targetUpdated);
+      } catch (e) {
+        console.warn('Restore order cloud sync warning:', e);
+      }
+    }
 
     memoryData.orders = updatedOrders;
     saveStoredMasterOrders(updatedOrders);
@@ -824,7 +864,11 @@ export function useCartStore() {
     saveStoredLocalData(memoryData);
     notifyListeners();
 
-    await firebaseCloudDb.deleteDocument('orders', orderId);
+    try {
+      await firebaseCloudDb.deleteDocument('orders', orderId);
+    } catch (e) {
+      console.warn('Permanent delete order cloud sync warning:', e);
+    }
   };
 
   // Restock / Credit Stock Quantity
