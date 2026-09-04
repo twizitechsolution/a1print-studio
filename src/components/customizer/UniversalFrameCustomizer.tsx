@@ -402,101 +402,114 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
             </span>
           </div>
 
-          <div 
-            id="live-frame-canvas"
-            className={`relative w-full rounded-xs border-[12px] sm:border-[16px] border-black shadow-[0_25px_60px_rgba(0,0,0,0.6)] bg-white overflow-hidden font-serif select-none transition-all ${
-              ((template.product as any)?.orientation || (template as any).orientation) === 'landscape'
-                ? 'max-w-[480px] aspect-[4/3]'
-                : 'max-w-[340px] aspect-[3/4.4]'
-            }`}
-          >
-            {/* Base Frame Poster Image with Bulletproof Fallback & onError Guard */}
-            <img
-              src={activeAngleImage || (template.baseImageUrl && !template.baseImageUrl.includes('[COMPRESSED_FIRESTORE_PREVIEW]') ? template.baseImageUrl : 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80')}
-              alt={template.title}
-              className="w-full h-full object-cover absolute inset-0 pointer-events-none"
-              onError={(e) => {
-                e.currentTarget.src = 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80';
-              }}
-            />
+          {/* Main Showcase Viewer: Only Main Poster Template (Index 0) gets synthetic frame border + photo slots + text zone overlays! */}
+          {activeAngleImage && activeAngleImage !== baseImg && activeAngleImage !== availableAngleImages[0] ? (
+            /* Clean Showcase Viewer for Secondary Gallery Angle Photos (No Frame Border, No Overlays, No Cropping) */
+            <div className="relative w-full max-w-[440px] aspect-[4/5] rounded-3xl overflow-hidden shadow-2xl bg-white flex items-center justify-center p-3 border border-gray-200">
+              <img
+                src={activeAngleImage}
+                alt={`${template.title} Gallery Angle`}
+                className="w-full h-full object-contain rounded-2xl"
+              />
+            </div>
+          ) : (
+            /* Interactive Main Frame Template Canvas (Synthetic Black Wood Frame + Photo Slots + Text Zones Overlay) */
+            <div 
+              id="live-frame-canvas"
+              className={`relative w-full rounded-xs border-[12px] sm:border-[16px] border-black shadow-[0_25px_60px_rgba(0,0,0,0.6)] bg-white overflow-hidden font-serif select-none transition-all ${
+                ((template.product as any)?.orientation || (template as any).orientation) === 'landscape'
+                  ? 'max-w-[480px] aspect-[4/3]'
+                  : 'max-w-[340px] aspect-[3/4.4]'
+              }`}
+            >
+              {/* Base Frame Poster Image with Bulletproof Fallback & onError Guard */}
+              <img
+                src={baseImg}
+                alt={template.title}
+                className="w-full h-full object-cover absolute inset-0 pointer-events-none"
+                onError={(e) => {
+                  e.currentTarget.src = 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80';
+                }}
+              />
 
-            {/* Dynamic Photo Slot Cutouts Overlay - Transparent by default until customer uploads photo! */}
-            {photoSlots.map((slot) => {
-              const photoSrc = photoValues[slot.id];
-              if (!photoSrc) return null; // Transparent layer: Allows base poster sample artwork to show through!
+              {/* Dynamic Photo Slot Cutouts Overlay - Transparent by default until customer uploads photo! */}
+              {photoSlots.map((slot) => {
+                const photoSrc = photoValues[slot.id];
+                if (!photoSrc) return null; // Transparent layer: Allows base poster sample artwork to show through!
 
-              const shapeStyles = getFrameShapeStyles(slot.shape);
+                const shapeStyles = getFrameShapeStyles(slot.shape);
 
-              return (
-                <div
-                  key={slot.id}
-                  className="absolute overflow-hidden p-0 border-0 shadow-xs bg-transparent"
-                  style={{
-                    left: `${slot.x}%`,
-                    top: `${slot.y}%`,
-                    width: `${slot.width}%`,
-                    height: `${slot.height}%`,
-                    transform: 'translate(-50%, -50%)',
-                    ...shapeStyles,
-                  }}
-                >
-                  <img src={photoSrc} alt={slot.label} className="w-full h-full object-cover rounded-[inherit]" />
-                </div>
-              );
-            })}
+                return (
+                  <div
+                    key={slot.id}
+                    className="absolute overflow-hidden p-0 border-0 shadow-xs bg-transparent"
+                    style={{
+                      left: `${slot.x}%`,
+                      top: `${slot.y}%`,
+                      width: `${slot.width}%`,
+                      height: `${slot.height}%`,
+                      transform: 'translate(-50%, -50%)',
+                      ...shapeStyles,
+                    }}
+                  >
+                    <img src={photoSrc} alt={slot.label} className="w-full h-full object-cover rounded-[inherit]" />
+                  </div>
+                );
+              })}
 
-            {/* Dynamic Text Zones Overlay using Saved Coordinates */}
-            {textZones.map((zone) => {
-              const val = textValues[zone.id] || zone.defaultValue;
+              {/* Dynamic Text Zones Overlay using Saved Coordinates */}
+              {textZones.map((zone) => {
+                const val = textValues[zone.id] || zone.defaultValue;
 
-              const labelLower = (zone.label || '').toLowerCase();
-              const idLower = (zone.id || '').toLowerCase();
-              const valLower = (zone.defaultValue || '').toLowerCase();
+                const labelLower = (zone.label || '').toLowerCase();
+                const idLower = (zone.id || '').toLowerCase();
+                const valLower = (zone.defaultValue || '').toLowerCase();
 
-              const isCalendarZone = zone.type === 'calendar' || zone.isCalendar === true;
+                const isCalendarZone = zone.type === 'calendar' || zone.isCalendar === true;
 
-              // Render Interactive Calendar Grid with Red Heart Highlight if zone is calendar or date type
-              if (isCalendarZone) {
+                // Render Interactive Calendar Grid with Red Heart Highlight if zone is calendar or date type
+                if (isCalendarZone) {
+                  return (
+                    <div
+                      key={zone.id}
+                      className="absolute transform -translate-x-1/2 -translate-y-1/2"
+                      style={{
+                        left: `${zone.x}%`,
+                        top: `${zone.y}%`,
+                      }}
+                    >
+                      <InteractiveCalendarZone
+                        dateString={val}
+                        color={zone.color}
+                        fontFamily={zone.fontFamily}
+                      />
+                    </div>
+                  );
+                }
+
                 return (
                   <div
                     key={zone.id}
-                    className="absolute transform -translate-x-1/2 -translate-y-1/2"
+                    className="absolute transform -translate-x-1/2 -translate-y-1/2 whitespace-pre-wrap break-words leading-tight"
                     style={{
                       left: `${zone.x}%`,
                       top: `${zone.y}%`,
+                      width: zone.maxWidth ? `${zone.maxWidth}%` : '85%',
+                      maxWidth: zone.maxWidth ? `${zone.maxWidth}%` : '85%',
+                      color: zone.color,
+                      fontFamily: zone.fontFamily,
+                      fontSize: `${zone.fontSize * 0.75}px`,
+                      fontWeight: 'bold',
+                      textAlign: zone.align || 'center',
                     }}
                   >
-                    <InteractiveCalendarZone
-                      dateString={val}
-                      color={zone.color}
-                      fontFamily={zone.fontFamily}
-                    />
+                    {val}
                   </div>
                 );
-              }
+              })}
 
-              return (
-                <div
-                  key={zone.id}
-                  className="absolute transform -translate-x-1/2 -translate-y-1/2 whitespace-pre-wrap break-words leading-tight"
-                  style={{
-                    left: `${zone.x}%`,
-                    top: `${zone.y}%`,
-                    width: zone.maxWidth ? `${zone.maxWidth}%` : '85%',
-                    maxWidth: zone.maxWidth ? `${zone.maxWidth}%` : '85%',
-                    color: zone.color,
-                    fontFamily: zone.fontFamily,
-                    fontSize: `${zone.fontSize * 0.75}px`,
-                    fontWeight: 'bold',
-                    textAlign: zone.align || 'center',
-                  }}
-                >
-                  {val}
-                </div>
-              );
-            })}
-
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Dedicated Standalone Multi-Angle Photo Selection Carousel (Matching giftingstudio.in OUTSIDE showcase box) */}
