@@ -33,6 +33,7 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
     updateProduct,
     softDeleteProduct,
     restoreProduct,
+    restoreAllProducts,
     permanentDeleteProduct,
     updateStockQuantity,
     clearStaleLocalSyncData,
@@ -183,6 +184,23 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
               />
               <span className="absolute left-2.5 top-2.5 text-gray-400 text-xs">🔍</span>
             </div>
+
+            {/* Bulk Restore All Soft-Deleted Frames Button (Shows when deleted products exist) */}
+            {deletedProducts.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (confirm(`Restore all ${deletedProducts.length} frame products from Recycle Bin back to Active Frames?`)) {
+                    restoreAllProducts();
+                    setViewMode('active');
+                  }
+                }}
+                className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-md transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                title="Restore all soft-deleted frames back to active catalog"
+              >
+                <RotateCcw className="w-3.5 h-3.5" /> Restore All ({deletedProducts.length}) Frames
+              </button>
+            )}
 
             {/* Category Manager Button */}
             <button

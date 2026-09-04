@@ -126,14 +126,14 @@ export const firebaseCloudDb = {
     }
   },
 
-  // Read all documents in a collection: REST-First Fast Engine (0.15s path) with SDK Fallback
+  // Read all documents in a collection: Official Firebase JS SDK Engine (WebSockets/IndexedDB 0-Quota) with REST Fallback
   async getCollection(collectionName: string): Promise<any[] | null> {
     const fetchViaRest = async (): Promise<any[] | null> => {
       try {
         const res = await fetch(`${FIRESTORE_BASE_URL}/${collectionName}?${REST_AUTH_PARAM}`);
         if (!res.ok) return null;
         const data = await res.json();
-        if (!data.documents) return [];
+        if (data.error || !data.documents) return null;
 
         return data.documents.map((docItem: any) => {
           const fields = docItem.fields || {};
@@ -150,13 +150,7 @@ export const firebaseCloudDb = {
       }
     };
 
-    // Fast Path: Direct 100ms HTTP REST fetch first
-    const restData = await fetchViaRest();
-    if (restData !== null && restData.length > 0) {
-      return restData;
-    }
-
-    // Fallback: Official Firebase JS Firestore SDK Engine (WebSockets / gRPC connection)
+    // Primary Path: Official Firebase JS Firestore SDK Engine (WebSockets / gRPC connection & IndexedDB offline persistence)
     try {
       const querySnapshot = await getDocs(collection(firebaseDb, collectionName));
       if (!querySnapshot.empty) {
@@ -176,10 +170,11 @@ export const firebaseCloudDb = {
         return items;
       }
     } catch (sdkErr) {
-      console.warn('Firestore SDK getCollection fallback error:', sdkErr);
+      console.warn('Firestore SDK getCollection error, attempting REST fallback:', sdkErr);
     }
 
-    return restData || [];
+    // Secondary Fallback: Direct 100ms HTTP REST fetch
+    return await fetchViaRest();
   },
 
   // Write a document using official Firebase JS Firestore SDK
@@ -193,6 +188,11 @@ export const firebaseCloudDb = {
       const docRef = doc(firebaseDb, collectionName, docId);
       await setDoc(docRef, {
         id: sanitizedPayload.id || docId,
+        title: sanitizedPayload.title || '',
+        category: sanitizedPayload.category || '',
+        categoryLabel: sanitizedPayload.categoryLabel || '',
+        thumbnail: sanitizedPayload.thumbnail || '',
+        baseImageUrl: sanitizedPayload.baseImageUrl || '',
         version: payloadVersion,
         isDeleted: isDeletedFlag,
         updatedAt: now,
@@ -205,6 +205,11 @@ export const firebaseCloudDb = {
         const body = {
           fields: {
             id: { stringValue: sanitizedPayload.id || docId },
+            title: { stringValue: sanitizedPayload.title || '' },
+            category: { stringValue: sanitizedPayload.category || '' },
+            categoryLabel: { stringValue: sanitizedPayload.categoryLabel || '' },
+            thumbnail: { stringValue: sanitizedPayload.thumbnail || '' },
+            baseImageUrl: { stringValue: sanitizedPayload.baseImageUrl || '' },
             version: { integerValue: String(payloadVersion) },
             isDeleted: { booleanValue: isDeletedFlag },
             updatedAt: { stringValue: now },

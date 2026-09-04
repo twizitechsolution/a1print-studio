@@ -24,6 +24,71 @@ interface StoreData {
   categories: Category[];
 }
 
+const PERM_DELETED_IDS_KEY = 'a1print_perm_deleted_product_ids_v20';
+const APP_CACHE_VERSION_KEY = 'a1print_store_app_version_v25';
+const CURRENT_APP_VERSION = 'v25_server_truth_prio';
+
+function checkAndMigrateStaleCache() {
+  try {
+    const storedVer = localStorage.getItem(APP_CACHE_VERSION_KEY);
+    if (storedVer !== CURRENT_APP_VERSION) {
+      const overrides = getStoredProductOverrides();
+      let hasChanges = false;
+      Object.keys(overrides).forEach((key) => {
+        if (overrides[key] && overrides[key].syncStatus !== 'pending') {
+          delete overrides[key];
+          hasChanges = true;
+        }
+      });
+      if (hasChanges) {
+        saveStoredProductOverrides(overrides);
+      }
+      localStorage.setItem(APP_CACHE_VERSION_KEY, CURRENT_APP_VERSION);
+    }
+  } catch (e) {}
+}
+
+function getPermanentlyDeletedProductIds(): Set<string> {
+  try {
+    const raw = localStorage.getItem(PERM_DELETED_IDS_KEY);
+    if (raw) {
+      return new Set(JSON.parse(raw));
+    }
+  } catch (e) {}
+  return new Set<string>();
+}
+
+function savePermanentlyDeletedProductIds(ids: Set<string>) {
+  try {
+    localStorage.setItem(PERM_DELETED_IDS_KEY, JSON.stringify(Array.from(ids)));
+  } catch (e) {}
+}
+
+export function removePermanentProductFromStorage(id: string) {
+  // 1. Add to permanent tombstone set
+  const permSet = getPermanentlyDeletedProductIds();
+  permSet.add(id);
+  savePermanentlyDeletedProductIds(permSet);
+
+  // 2. Remove from soft-deleted set
+  const delSet = getDeletedProductIds();
+  if (delSet.has(id)) {
+    delSet.delete(id);
+    saveDeletedProductIds(delSet);
+  }
+
+  // 3. Remove from admin overrides map
+  const overrides = getStoredProductOverrides();
+  delete overrides[id];
+  saveStoredProductOverrides(overrides);
+
+  // 4. Remove from master archive
+  const master = getStoredMasterProducts().filter((p) => p && p.id !== id);
+  try {
+    localStorage.setItem(MASTER_PRODUCTS_ARCHIVE_KEY, JSON.stringify(master));
+  } catch (e) {}
+}
+
 function getDeletedProductIds(): Set<string> {
   try {
     const raw = localStorage.getItem(DELETED_IDS_KEY);
@@ -99,13 +164,14 @@ function getStoredMasterProducts(): Product[] {
 // 🛡️ Phase 2 Rule: Never accept an arbitrary full array overwrite. Touch only specific changed records via Delta!
 export function applyProductDelta(changedRecords: Product[]) {
   if (!Array.isArray(changedRecords) || changedRecords.length === 0) return;
+  const permDeletedIds = getPermanentlyDeletedProductIds();
 
   const currentMaster = getStoredMasterProducts();
   const masterMap = new Map<string, Product>();
-  currentMaster.forEach((p) => { if (p && p.id) masterMap.set(p.id, p); });
+  currentMaster.forEach((p) => { if (p && p.id && !permDeletedIds.has(p.id)) masterMap.set(p.id, p); });
 
   changedRecords.forEach((p) => {
-    if (!p || !p.id) return;
+    if (!p || !p.id || permDeletedIds.has(p.id)) return;
     const existing = masterMap.get(p.id);
     const exVer = existing?.version || 0;
     const pVer = p.version || 1;
@@ -140,8 +206,9 @@ function getStoredLocalData(): StoreData {
   const categories = getStoredCategories();
   const savedRemarks = getStoredAdminRemarks();
   const deletedIds = getDeletedProductIds();
+  const permDeletedIds = getPermanentlyDeletedProductIds();
   const masterOrders = getStoredMasterOrders();
-  const masterProducts = getStoredMasterProducts();
+  const masterProducts = getStoredMasterProducts().filter((p) => p && p.id && !permDeletedIds.has(p.id));
 
   let loadedProducts: Product[] = masterProducts;
   let loadedOrders: Order[] = masterOrders;
@@ -161,8 +228,8 @@ function getStoredLocalData(): StoreData {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed.products) && parsed.products.length > 0 && loadedProducts.length === 0) {
-        // Purge any legacy hardcoded sample products from local storage cache
-        loadedProducts = parsed.products.filter((p: any) => p && !p.isSampleData);
+        // Purge any legacy hardcoded sample products & tombstones from local storage cache
+        loadedProducts = parsed.products.filter((p: any) => p && p.id && !permDeletedIds.has(p.id) && !p.isSampleData);
       }
       if (Array.isArray(parsed.orders) && parsed.orders.length > 0) {
         // Union merge with master orders
@@ -181,7 +248,7 @@ function getStoredLocalData(): StoreData {
   // Merge admin overrides map into loadedProducts for 0ms instant local rendering
   const overridesMap = getStoredProductOverrides();
   Object.values(overridesMap).forEach((overrideProd) => {
-    if (overrideProd && overrideProd.id && !deletedIds.has(overrideProd.id) && !overrideProd.isSampleData) {
+    if (overrideProd && overrideProd.id && !permDeletedIds.has(overrideProd.id) && !overrideProd.isSampleData) {
       const idx = loadedProducts.findIndex((p) => p.id === overrideProd.id);
       if (idx >= 0) {
         loadedProducts[idx] = { ...loadedProducts[idx], ...overrideProd };
@@ -191,8 +258,13 @@ function getStoredLocalData(): StoreData {
     }
   });
 
-  // Filter deleted products and purge any legacy sample data
-  const activeProds = loadedProducts.filter((p: Product) => p && p.id && !deletedIds.has(p.id) && !p.isSampleData);
+  // Filter out permanently deleted tombstones & sample data, while retaining soft-deleted items (isDeleted: true)
+  const processedProducts = loadedProducts
+    .filter((p: Product) => p && p.id && !permDeletedIds.has(p.id) && !p.isSampleData)
+    .map((p: Product) => {
+      const isDel = Boolean(p.isDeleted || deletedIds.has(p.id));
+      return { ...p, isDeleted: isDel };
+    });
 
   // Attach remarks to orders
   const ordersWithRemarks = loadedOrders.map((o: Order) => {
@@ -303,15 +375,16 @@ async function syncFromCloud() {
       }
     }
 
-    // 1. STRICT NON-DESTRUCTIVE UNION MERGING FOR PRODUCTS CATALOG WITH VERSION RECONCILIATION
+    // 1. STRICT NON-DESTRUCTIVE UNION MERGING FOR PRODUCTS CATALOG WITH VERSION & TOMBSTONE RECONCILIATION
     if (cloudProds !== null && cloudProds.length > 0) {
+      const permDeletedIds = getPermanentlyDeletedProductIds();
       const overridesMap = getStoredProductOverrides();
       const productMap = new Map<string, Product>();
       const changedDeltas: Product[] = [];
 
-      // Load initial/local memory products & admin overrides first
+      // Load initial/local memory products & admin overrides first (excluding tombstones)
       memoryData.products.forEach((p) => {
-        if (p && p.id) {
+        if (p && p.id && !permDeletedIds.has(p.id)) {
           const override = overridesMap[p.id];
           const item = override || p;
           productMap.set(p.id, item);
@@ -320,7 +393,7 @@ async function syncFromCloud() {
 
       // Merge Cloud Firestore products safely (version & timestamp priority guard!)
       cloudProds.forEach((cp) => {
-        if (cp && cp.id) {
+        if (cp && cp.id && !permDeletedIds.has(cp.id)) {
           const existing = productMap.get(cp.id) || overridesMap[cp.id];
           const cpVer = cp.version || 0;
           const exVer = existing?.version || 0;
@@ -455,6 +528,9 @@ async function initCloudSync() {
   if (isCloudSyncInitialized) return;
   isCloudSyncInitialized = true;
 
+  // Run automatic cache migration & purge stale non-pending local overrides on deployment
+  checkAndMigrateStaleCache();
+
   // Auto-enqueue all local products into Outbox queue on startup to guarantee Cloud Firestore sync
   if (memoryData.products && memoryData.products.length > 0) {
     memoryData.products.forEach((p) => {
@@ -473,8 +549,15 @@ async function initCloudSync() {
   // Attach official Real-Time Firebase WebSockets Snapshot Listeners (0 REST HTTP quota usage!)
   try {
     onSnapshot(collection(firebaseDb, 'products'), (snapshot) => {
-      // Re-hydrate directly from snapshot documents
-      const docs: Product[] = [];
+      if (snapshot.empty && memoryData.products.length > 0) {
+        return; // Guard: Do NOT wipe local memory if cloud snapshot returns 0 items due to quota/network error!
+      }
+
+      const permDeletedIds = getPermanentlyDeletedProductIds();
+      const overridesMap = getStoredProductOverrides();
+      const productMap = new Map<string, Product>();
+
+      // 1. Process all documents from Cloud Firestore server snapshot first (SERVER TRUTH WINS!)
       snapshot.forEach((docSnap) => {
         const rawData = docSnap.data();
         let parsed: any = {};
@@ -482,16 +565,64 @@ async function initCloudSync() {
           try {
             parsed = JSON.parse(rawData.jsonPayload);
           } catch (e) {
-            parsed = { ...rawData };
+            parsed = { id: docSnap.id, ...rawData };
           }
         } else if (rawData) {
-          parsed = { ...rawData };
+          parsed = { id: docSnap.id, ...rawData };
         }
+        if (!parsed.id) parsed.id = docSnap.id;
+
+        // Skip permanently deleted tombstone products!
+        if (permDeletedIds.has(parsed.id)) return;
+        if (rawData.title && !parsed.title) parsed.title = rawData.title;
+        if (rawData.category && !parsed.category) parsed.category = rawData.category;
+        if (rawData.categoryLabel && !parsed.categoryLabel) parsed.categoryLabel = rawData.categoryLabel;
+        if (rawData.thumbnail && !parsed.thumbnail) parsed.thumbnail = rawData.thumbnail;
+        if (rawData.baseImageUrl && !parsed.baseImageUrl) parsed.baseImageUrl = rawData.baseImageUrl;
         if (rawData.isDeleted !== undefined) parsed.isDeleted = Boolean(rawData.isDeleted);
         if (rawData.version !== undefined) parsed.version = Number(rawData.version);
-        docs.push(parsed as Product);
+
+        // Check if there is an UNSYNCED local-only override (syncStatus === 'pending')
+        const override = overridesMap[parsed.id];
+        const isPendingLocalChange = override && override.syncStatus === 'pending';
+
+        if (isPendingLocalChange) {
+          // Keep local pending edit until acknowledged by Firestore
+          productMap.set(parsed.id, {
+            ...parsed,
+            ...override,
+            isDeleted: Boolean(override.isDeleted),
+          });
+        } else {
+          // Fresh Server Snapshot Document WINS completely over any stale local override!
+          productMap.set(parsed.id, {
+            ...parsed,
+            isDeleted: Boolean(parsed.isDeleted),
+            syncStatus: 'synced',
+            lastSyncedAt: new Date().toISOString(),
+          });
+          // Clean up stale synced override from localStorage
+          if (overridesMap[parsed.id]) {
+            delete overridesMap[parsed.id];
+          }
+        }
       });
-      
+
+      // 2. Preserve any local-only pending creations not yet present in Firestore snapshot
+      memoryData.products.forEach((p) => {
+        if (p && p.id && !permDeletedIds.has(p.id)) {
+          if (!productMap.has(p.id)) {
+            const override = overridesMap[p.id];
+            if (override && override.syncStatus === 'pending') {
+              productMap.set(p.id, override);
+            }
+          }
+        }
+      });
+
+      saveStoredProductOverrides(overridesMap);
+
+      const docs = Array.from(productMap.values());
       memoryData.products = docs;
       saveStoredLocalData(memoryData);
       notifyListeners();
@@ -586,6 +717,14 @@ export function useCartStore() {
   const addProduct = async (newProduct: Product) => {
     const recordId = newProduct.id || `prod-${Date.now()}`;
     const now = new Date().toISOString();
+
+    // Ensure product ID is completely cleared from deleted IDs set
+    const deletedSet = getDeletedProductIds();
+    if (deletedSet.has(recordId)) {
+      deletedSet.delete(recordId);
+      saveDeletedProductIds(deletedSet);
+    }
+
     const prodWithStock: Product = {
       ...newProduct,
       id: recordId,
@@ -644,6 +783,13 @@ export function useCartStore() {
     let targetUpdated: Product | null = null;
     let oldProduct: Product | null = null;
 
+    // Ensure product ID is cleared from deleted IDs set unless explicitly deleting
+    const deletedSet = getDeletedProductIds();
+    if (deletedSet.has(id)) {
+      deletedSet.delete(id);
+      saveDeletedProductIds(deletedSet);
+    }
+
     const now = new Date().toISOString();
     const updatedProducts = memoryData.products.map((p) => {
       if (p.id === id) {
@@ -651,6 +797,8 @@ export function useCartStore() {
         const updated: Product = {
           ...p,
           ...updates,
+          isDeleted: false,
+          deletedAt: null,
           updatedAt: now,
           version: (p.version || 0) + 1,
           syncStatus: 'pending',
@@ -665,6 +813,8 @@ export function useCartStore() {
       targetUpdated = {
         id,
         ...updates,
+        isDeleted: false,
+        deletedAt: null,
         createdAt: now,
         updatedAt: now,
         version: 1,
@@ -701,6 +851,10 @@ export function useCartStore() {
     const existing = memoryData.products.find(p => p.id === id);
     const now = new Date().toISOString();
 
+    const deletedSet = getDeletedProductIds();
+    deletedSet.add(id);
+    saveDeletedProductIds(deletedSet);
+
     let targetUpdated: Product | null = null;
     const updatedProducts = memoryData.products.map((p) => {
       if (p.id === id) {
@@ -722,6 +876,9 @@ export function useCartStore() {
     });
 
     if (targetUpdated) {
+      const overrides = getStoredProductOverrides();
+      overrides[id] = targetUpdated;
+      saveStoredProductOverrides(overrides);
       try {
         await firebaseCloudDb.setDocument('products', id, targetUpdated);
       } catch (e) {
@@ -739,6 +896,12 @@ export function useCartStore() {
   const restoreProduct = async (id: string) => {
     const existing = memoryData.products.find(p => p.id === id);
     const now = new Date().toISOString();
+
+    const deletedSet = getDeletedProductIds();
+    if (deletedSet.has(id)) {
+      deletedSet.delete(id);
+      saveDeletedProductIds(deletedSet);
+    }
 
     let targetUpdated: Product | null = null;
     const updatedProducts = memoryData.products.map((p) => {
@@ -761,6 +924,9 @@ export function useCartStore() {
     });
 
     if (targetUpdated) {
+      const overrides = getStoredProductOverrides();
+      overrides[id] = targetUpdated;
+      saveStoredProductOverrides(overrides);
       try {
         await firebaseCloudDb.setDocument('products', id, targetUpdated);
       } catch (e) {
@@ -774,13 +940,51 @@ export function useCartStore() {
     flushOutboxQueue();
   };
 
+  // Bulk Restore ALL Soft-Deleted Products from Recycle Bin Back to Active
+  const restoreAllProducts = async () => {
+    const deletedSet = getDeletedProductIds();
+    deletedSet.clear();
+    saveDeletedProductIds(deletedSet);
+
+    const overrides = getStoredProductOverrides();
+    const now = new Date().toISOString();
+
+    const updatedProducts = memoryData.products.map((p) => {
+      if (p && Boolean(p.isDeleted)) {
+        const updated: Product = {
+          ...p,
+          isDeleted: false,
+          deletedAt: null,
+          updatedAt: now,
+          version: (p.version || 0) + 1,
+          syncStatus: 'pending',
+        };
+        overrides[p.id] = updated;
+        firebaseCloudDb.setDocument('products', p.id, updated);
+        return updated;
+      }
+      return p;
+    });
+
+    saveStoredProductOverrides(overrides);
+    memoryData.products = updatedProducts;
+    saveStoredLocalData(memoryData);
+    notifyListeners();
+    flushOutboxQueue();
+  };
+
   // Permanent Delete Product from Cloud Firestore & Local Memory
   const permanentDeleteProduct = async (id: string) => {
+    // 1. Mark in permanent tombstone set & purge from overrides/master/soft-deleted stores
+    removePermanentProductFromStorage(id);
+
+    // 2. Remove from active local memory state
     const updatedProducts = memoryData.products.filter((p) => p.id !== id);
     memoryData.products = updatedProducts;
     saveStoredLocalData(memoryData);
     notifyListeners();
 
+    // 3. Delete document from Cloud Firestore
     try {
       await firebaseCloudDb.deleteDocument('products', id);
     } catch (e) {
@@ -1320,6 +1524,7 @@ export function useCartStore() {
     deleteProduct: softDeleteProduct, // Soft delete fallback
     softDeleteProduct,
     restoreProduct,
+    restoreAllProducts,
     permanentDeleteProduct,
     updateStockQuantity,
     clearStaleLocalSyncData,
