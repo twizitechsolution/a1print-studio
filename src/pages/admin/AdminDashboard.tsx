@@ -406,6 +406,7 @@ const AdminDashboardInner: React.FC<AdminDashboardProps> = ({ orders: initialOrd
             <div className="space-y-6">
               <AdminDarkStatsCards
                 orders={orders}
+                customerCount={customerList.length}
                 onSelectStatusFilter={(statusFilter) => {
                   if (statusFilter === 'reports' || statusFilter === 'customers') {
                     setActiveTab(statusFilter as any);

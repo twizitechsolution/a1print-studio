@@ -26,14 +26,17 @@ import {
 
 interface AdminDarkStatsCardsProps {
   orders: Order[];
+  customerCount?: number;
   onSelectStatusFilter?: (status: string) => void;
 }
 
 export const AdminDarkStatsCards: React.FC<AdminDarkStatsCardsProps> = ({
   orders,
+  customerCount,
   onSelectStatusFilter,
 }) => {
   const [dbCustomerCount, setDbCustomerCount] = React.useState<number>(() => {
+    if (typeof customerCount === 'number' && customerCount > 0) return customerCount;
     try {
       const raw = localStorage.getItem('a1print_registered_customers_v2');
       if (raw) {
@@ -45,6 +48,10 @@ export const AdminDarkStatsCards: React.FC<AdminDarkStatsCardsProps> = ({
   });
 
   React.useEffect(() => {
+    if (typeof customerCount === 'number' && customerCount > 0) {
+      setDbCustomerCount(customerCount);
+      return;
+    }
     const fetchCustomers = async () => {
       try {
         const docs = await firebaseCloudDb.getCollection('customer_users');
@@ -54,7 +61,7 @@ export const AdminDarkStatsCards: React.FC<AdminDarkStatsCardsProps> = ({
       } catch (e) {}
     };
     fetchCustomers();
-  }, []);
+  }, [customerCount]);
 
   // Real-time Date Calculations
   const todayStr = new Date().toISOString().split('T')[0];
@@ -89,7 +96,7 @@ export const AdminDarkStatsCards: React.FC<AdminDarkStatsCardsProps> = ({
   const rtoCount = activeOrders.filter((o) => o.orderStatus === 'RTO' || (o.notes || '').toLowerCase().includes('rto')).length;
 
   // Real-time Unique customers count matching Registered Customers Directory!
-  const totalCustomers = Math.max(dbCustomerCount, 1);
+  const totalCustomers = Math.max(typeof customerCount === 'number' ? customerCount : dbCustomerCount, 1);
 
   // Real-time Financial Sales Totals (excluding Cancelled & Soft-Deleted orders)
   const validOrders = activeOrders.filter((o) => o.orderStatus !== 'Cancelled');
