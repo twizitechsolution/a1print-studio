@@ -131,23 +131,10 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
   return (
     <div className="space-y-6 font-sans select-none">
       
-      {/* Frame Catalog Header & Interactive Toolbar Container */}
-      <div className="p-4 bg-[#121829] rounded-2xl border border-[#262E4A] shadow-xl space-y-3">
-        {/* Top Header Row: Title & Active/Recycle Bin Pill Toggle */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#262E4A] pb-3">
-          <div>
-            <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
-              Frame Product Catalog ({isStoreLoading && activeProducts.length === 0 ? 'Syncing Cloud...' : activeProducts.length})
-              {isStoreLoading && activeProducts.length === 0 && (
-                <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
-              )}
-            </h2>
-            <p className="text-xs text-gray-400 mt-0.5">
-              Manage frame products, stock inventory, categories, and multi-angle galleries.
-            </p>
-          </div>
-
-          {/* View Mode Toggle Pill Buttons */}
+      {/* Frame Catalog Single-Row Interactive Toolbar Container */}
+      <div className="p-4 bg-[#121829] rounded-2xl border border-[#262E4A] shadow-xl">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          {/* Left: Active vs Recycle Bin Pill Toggle */}
           <div className="flex items-center bg-[#1A2035] p-1 rounded-xl border border-[#262E4A]">
             <button
               type="button"
@@ -179,30 +166,28 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
               <Trash2 className="w-3.5 h-3.5" /> Frames Recycle Bin ({deletedProducts.length})
             </button>
           </div>
-        </div>
 
-        {/* Toolbar Bottom Controls: Search input, Categories button, Add product button */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-          {/* Product ID & Title Search Input */}
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Search Frame ID, Title..."
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="pl-8 pr-3 py-2 bg-[#1A2035] border border-[#262E4A] rounded-xl text-xs text-white placeholder-gray-500 focus:outline-none focus:border-[#3B82F6] font-medium w-64 shadow-xs"
-            />
-            <span className="absolute left-2.5 top-2.5 text-gray-400 text-xs">🔍</span>
-          </div>
+          {/* Middle & Right: Search Box, Categories, Add Product */}
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Search Input */}
+            <div className="relative min-w-[200px]">
+              <input
+                type="text"
+                placeholder="Search Frame ID, Title..."
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="pl-8 pr-3 py-2 bg-[#1A2035] border border-[#262E4A] rounded-xl text-xs text-white placeholder-gray-500 focus:outline-none focus:border-[#3B82F6] font-medium w-56 sm:w-64 shadow-xs"
+              />
+              <span className="absolute left-2.5 top-2.5 text-gray-400 text-xs">🔍</span>
+            </div>
 
-          <div className="flex flex-wrap items-center gap-2">
             {/* Category Manager Button */}
             <button
               onClick={() => setIsCategoryModalOpen(true)}
-              className="px-3.5 py-2 bg-[#1A2035] hover:bg-[#222943] text-gray-200 font-semibold text-xs rounded-xl border border-[#262E4A] transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+              className="px-3.5 py-2 bg-[#1A2035] hover:bg-[#222943] text-gray-200 font-semibold text-xs rounded-xl border border-[#262E4A] transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs whitespace-nowrap"
             >
               <FolderPlus className="w-3.5 h-3.5 text-purple-400" /> Categories ({safeCategories.length})
             </button>
@@ -210,7 +195,7 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
             {/* Add Product Button */}
             <button
               onClick={handleOpenAddModal}
-              className="px-3.5 py-2 bg-[#3B82F6] hover:bg-[#2563EB] text-white font-semibold text-xs rounded-xl border border-[#3B82F6] transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+              className="px-3.5 py-2 bg-[#3B82F6] hover:bg-[#2563EB] text-white font-semibold text-xs rounded-xl border border-[#3B82F6] transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs whitespace-nowrap"
             >
               <Plus className="w-3.5 h-3.5" /> Add Frame Product
             </button>
