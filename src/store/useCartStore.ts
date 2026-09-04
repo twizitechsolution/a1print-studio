@@ -476,47 +476,49 @@ async function initCloudSync() {
       // Re-hydrate directly from snapshot documents
       const docs: Product[] = [];
       snapshot.forEach((docSnap) => {
-        const data = docSnap.data();
-        if (data && data.jsonPayload) {
+        const rawData = docSnap.data();
+        let parsed: any = {};
+        if (rawData && rawData.jsonPayload) {
           try {
-            docs.push(JSON.parse(data.jsonPayload));
+            parsed = JSON.parse(rawData.jsonPayload);
           } catch (e) {
-            docs.push(data as Product);
+            parsed = { ...rawData };
           }
-        } else if (data) {
-          docs.push(data as Product);
+        } else if (rawData) {
+          parsed = { ...rawData };
         }
+        if (rawData.isDeleted !== undefined) parsed.isDeleted = Boolean(rawData.isDeleted);
+        if (rawData.version !== undefined) parsed.version = Number(rawData.version);
+        docs.push(parsed as Product);
       });
-      if (docs.length > 0) {
-        memoryData.products = docs;
-        saveStoredLocalData(memoryData);
-        notifyListeners();
-      } else {
-        syncFromCloud();
-      }
+      
+      memoryData.products = docs;
+      saveStoredLocalData(memoryData);
+      notifyListeners();
     });
 
     onSnapshot(collection(firebaseDb, 'orders'), (snapshot) => {
       const docs: Order[] = [];
       snapshot.forEach((docSnap) => {
-        const data = docSnap.data();
-        if (data && data.jsonPayload) {
+        const rawData = docSnap.data();
+        let parsed: any = {};
+        if (rawData && rawData.jsonPayload) {
           try {
-            docs.push(JSON.parse(data.jsonPayload));
+            parsed = JSON.parse(rawData.jsonPayload);
           } catch (e) {
-            docs.push({ id: docSnap.id, ...data } as Order);
+            parsed = { id: docSnap.id, ...rawData };
           }
-        } else if (data) {
-          docs.push({ id: docSnap.id, ...data } as Order);
+        } else if (rawData) {
+          parsed = { id: docSnap.id, ...rawData };
         }
+        if (rawData.isDeleted !== undefined) parsed.isDeleted = Boolean(rawData.isDeleted);
+        if (rawData.version !== undefined) parsed.version = Number(rawData.version);
+        docs.push(parsed as Order);
       });
-      if (docs.length > 0) {
-        memoryData.orders = docs;
-        saveStoredLocalData(memoryData);
-        notifyListeners();
-      } else {
-        syncFromCloud();
-      }
+      
+      memoryData.orders = docs;
+      saveStoredLocalData(memoryData);
+      notifyListeners();
     });
 
     // Real-Time WebSockets Listener for Registered Customers!
@@ -534,21 +536,13 @@ async function initCloudSync() {
           customers.push({ id: docSnap.id, ...data });
         }
       });
-      if (typeof window !== 'undefined' && customers.length > 0) {
+      if (typeof window !== 'undefined') {
         localStorage.setItem('a1print_registered_customers_v2', JSON.stringify(customers));
         notifyListeners();
       }
     });
   } catch (e) {
     console.warn('Real-time WebSockets listener fallback:', e);
-  }
-
-  // Window Focus On-Demand Resync (Replaces aggressive setInterval REST polling)
-  if (typeof window !== 'undefined') {
-    window.addEventListener('focus', async () => {
-      await flushOutboxQueue();
-      await syncFromCloud();
-    });
   }
 }
 
