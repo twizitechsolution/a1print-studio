@@ -280,7 +280,7 @@ function getStoredLocalData(): StoreData {
   });
 
   return {
-    products: activeProds,
+    products: processedProducts,
     items: loadedCartItems,
     orders: ordersWithRemarks,
     categories,
