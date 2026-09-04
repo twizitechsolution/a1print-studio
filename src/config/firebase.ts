@@ -54,7 +54,7 @@ const FIREBASE_PROJECT_ID = FIREBASE_CONFIG.projectId;
 const FIRESTORE_BASE_URL = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents`;
 const REST_AUTH_PARAM = `key=${FIREBASE_CONFIG.apiKey}`;
 
-// Helper: Sanitize payload to guarantee JSON string size is < 300 KB (Well below Firestore 1MB limit!)
+// Helper: Sanitize payload to guarantee JSON string size fits safely within Firestore 1MB limit
 function sanitizePayloadForFirestore(obj: any): any {
   if (!obj || typeof obj !== 'object') return obj;
   if (Array.isArray(obj)) {
@@ -64,7 +64,8 @@ function sanitizePayloadForFirestore(obj: any): any {
   const sanitized: Record<string, any> = {};
   for (const [key, val] of Object.entries(obj)) {
     if (typeof val === 'string') {
-      if (val.startsWith('data:image') && val.length > 100000) {
+      // Allow full-res Base64 images up to 800,000 chars (~600KB) to remain 100% intact
+      if (val.startsWith('data:image') && val.length > 800000) {
         sanitized[key] = val.substring(0, 15000) + '...[COMPRESSED_FIRESTORE_PREVIEW]';
       } else {
         sanitized[key] = val;

@@ -104,7 +104,7 @@ export const AdminProductPageEditor: React.FC<AdminProductPageEditorProps> = ({
   };
 
   // Helper: Compress uploaded images using HTML5 Canvas to prevent Firestore payload quota rejects
-  const compressImageFile = (file: File, maxDim = 1200, quality = 0.85): Promise<string> => {
+  const compressImageFile = (file: File, maxDim = 800, quality = 0.72): Promise<string> => {
     return new Promise((resolve) => {
       const isPng = file.type.includes('png') || file.name.toLowerCase().endsWith('.png') || file.type.includes('webp');
       const reader = new FileReader();
@@ -150,7 +150,7 @@ export const AdminProductPageEditor: React.FC<AdminProductPageEditorProps> = ({
   const handleBaseImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const compressed = await compressImageFile(file, 1200, 0.85);
+      const compressed = await compressImageFile(file, 800, 0.72);
       setBaseImageUrl(compressed);
     }
   };
@@ -159,7 +159,7 @@ export const AdminProductPageEditor: React.FC<AdminProductPageEditorProps> = ({
   const handleGalleryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     for (const file of files) {
-      const compressed = await compressImageFile(file, 1000, 0.82);
+      const compressed = await compressImageFile(file, 600, 0.70);
       setImages((prev) => [...prev, compressed]);
     }
   };
@@ -276,13 +276,11 @@ export const AdminProductPageEditor: React.FC<AdminProductPageEditorProps> = ({
         updatedAt: new Date().toISOString(),
       } as any;
 
-      const serverSuccess = await firebaseCloudDb.setDocument('products', fullProduct.id, fullProduct);
-      
       onSave(fullProduct);
       setSavedSuccess(true);
       setTimeout(() => {
         setIsSaving(false);
-      }, 500);
+      }, 300);
     } catch (err: any) {
       setIsSaving(false);
       alert('Error saving product to Cloud Firestore: ' + (err?.message || err));
