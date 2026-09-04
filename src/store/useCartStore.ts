@@ -589,7 +589,7 @@ export function useCartStore() {
     notifyListeners();
   };
 
-  const addProduct = (newProduct: Product) => {
+  const addProduct = async (newProduct: Product) => {
     const recordId = newProduct.id || `prod-${Date.now()}`;
     const now = new Date().toISOString();
     const prodWithStock: Product = {
@@ -634,11 +634,18 @@ export function useCartStore() {
     saveStoredLocalData(memoryData);
     notifyListeners();
 
-    // 5. Trigger Outbox Flush Worker
+    // 5. Direct Cloud Firestore Server Write Acknowledgment
+    try {
+      await firebaseCloudDb.setDocument('products', recordId, prodWithStock);
+    } catch (e) {
+      console.warn('Direct product save error, queued in outbox for retry:', e);
+    }
+
+    // 6. Trigger Outbox Flush Worker
     flushOutboxQueue();
   };
 
-  const updateProduct = (id: string, updates: Partial<Product>) => {
+  const updateProduct = async (id: string, updates: Partial<Product>) => {
     const overrides = getStoredProductOverrides();
     let targetUpdated: Product | null = null;
     let oldProduct: Product | null = null;
@@ -680,6 +687,13 @@ export function useCartStore() {
       overrides[id] = finalTarget;
       saveStoredProductOverrides(overrides);
       applyProductDelta([finalTarget]);
+
+      // Direct Cloud Firestore Server Write Acknowledgment
+      try {
+        await firebaseCloudDb.setDocument('products', id, finalTarget);
+      } catch (e) {
+        console.warn('Direct product update error, queued in outbox for retry:', e);
+      }
     }
 
     memoryData.products = updatedProducts;
