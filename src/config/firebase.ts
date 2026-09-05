@@ -1,7 +1,6 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { getFirestore, collection, getDocs, doc, setDoc, deleteDoc, onSnapshot, enableMultiTabIndexedDbPersistence } from 'firebase/firestore';
-import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 export const FIREBASE_CONFIG = {
   apiKey: "AIzaSyBmyIAGv2y7UVqrIIOhQdllnrEOwJ8Purk",
@@ -16,7 +15,6 @@ export const FIREBASE_CONFIG = {
 const app = getApps().length === 0 ? initializeApp(FIREBASE_CONFIG) : getApp();
 export const firebaseAuth = getAuth(app);
 export const firebaseDb = getFirestore(app);
-export const firebaseStorage = getStorage(app);
 export { collection, doc, onSnapshot };
 
 // Enable IndexedDB offline persistence for instant 0ms cached page loads
@@ -56,9 +54,14 @@ const FIREBASE_PROJECT_ID = FIREBASE_CONFIG.projectId;
 const FIRESTORE_BASE_URL = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents`;
 const REST_AUTH_PARAM = `key=${FIREBASE_CONFIG.apiKey}`;
 
-// ─── Firebase Storage: Image Upload Helpers ───────────────────────────────────
+// ─── Cloudinary: Image Upload Helpers (Free Tier CDN Storage) ─────────────────
 
-/** Convert a data:image/...;base64,... string to a Blob for Firebase Storage upload */
+export const CLOUDINARY_CONFIG = {
+  cloudName: (import.meta as any).env?.VITE_CLOUDINARY_CLOUD_NAME || 'dcnnn0ogm',
+  uploadPreset: (import.meta as any).env?.VITE_CLOUDINARY_UPLOAD_PRESET || 'a1print_products',
+};
+
+/** Convert a data:image/...;base64,... string to a Blob for upload */
 export function base64ToBlob(dataUri: string): Blob {
   const [header, b64Data] = dataUri.split(',');
   const mimeMatch = header.match(/:(.*?);/);
@@ -72,20 +75,45 @@ export function base64ToBlob(dataUri: string): Blob {
   return new Blob([ab], { type: mime });
 }
 
-/** Upload a single image (as Blob) to Firebase Storage and return the download URL */
+/** Upload a single image (as Blob) to Cloudinary and return the secure HTTPS URL */
 export async function uploadProductImage(
   productId: string,
   imageBlob: Blob,
   imageName: string
 ): Promise<string> {
-  const storageRef = ref(firebaseStorage, `products/${productId}/${imageName}`);
-  await uploadBytes(storageRef, imageBlob);
-  return await getDownloadURL(storageRef);
+  const cloudName = CLOUDINARY_CONFIG.cloudName?.trim();
+  const uploadPreset = CLOUDINARY_CONFIG.uploadPreset?.trim();
+
+  if (!cloudName || !uploadPreset) {
+    throw new Error(
+      'Cloudinary configuration missing. Please set VITE_CLOUDINARY_CLOUD_NAME and VITE_CLOUDINARY_UPLOAD_PRESET in your .env file or Vercel Environment Variables.'
+    );
+  }
+
+  const formData = new FormData();
+  formData.append('file', imageBlob, imageName);
+  formData.append('upload_preset', uploadPreset);
+  formData.append('folder', `a1print/products/${productId}`);
+
+  const endpoint = `https://api.cloudinary.com/v1_1/${encodeURIComponent(cloudName)}/image/upload`;
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    body: formData,
+  });
+
+  const data = await response.json();
+  if (!response.ok || data.error) {
+    const errorMsg = data.error?.message || `Cloudinary upload failed (HTTP ${response.status})`;
+    console.error('Cloudinary error response:', data);
+    throw new Error(errorMsg);
+  }
+
+  return data.secure_url || data.url;
 }
 
 /**
- * Upload all Base64 images in a product to Firebase Storage.
- * Returns { baseImageUrl, thumbnail, images } with download URLs replacing Base64.
+ * Upload all Base64 images in a product to Cloudinary.
+ * Returns { baseImageUrl, thumbnail, images } with Cloudinary HTTPS CDN URLs replacing Base64.
  * HTTPS URLs (already uploaded) are left untouched.
  * Calls onProgress(current, total) for UI feedback.
  */

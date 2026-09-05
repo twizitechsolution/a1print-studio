@@ -219,7 +219,7 @@ export const AdminProductPageEditor: React.FC<AdminProductPageEditorProps> = ({
     try {
       const productId = id.trim() || `prod-${Date.now()}`;
 
-      // ── Step 1: Upload all Base64 images to Firebase Storage ──
+      // ── Step 1: Upload all Base64 images to Cloudinary CDN ──
       const hasBase64Images = (baseImageUrl && baseImageUrl.startsWith('data:image')) ||
         images.some(img => img && img.startsWith('data:image'));
 
@@ -227,7 +227,7 @@ export const AdminProductPageEditor: React.FC<AdminProductPageEditorProps> = ({
       let finalImages = images;
 
       if (hasBase64Images) {
-        setUploadProgress('Uploading images to cloud storage...');
+        setUploadProgress('Uploading images to Cloudinary CDN...');
         try {
           const uploadResult = await uploadAllProductImages(
             productId,
@@ -242,8 +242,8 @@ export const AdminProductPageEditor: React.FC<AdminProductPageEditorProps> = ({
           setUploadProgress('Images uploaded! Saving product...');
         } catch (uploadErr: any) {
           const errMsg = uploadErr?.message || 'Image upload failed';
-          console.error('Firebase Storage upload error:', uploadErr);
-          setSaveError(`Image Upload Failed: ${errMsg}. Please check your internet connection and try again.`);
+          console.error('Cloudinary image upload error:', uploadErr);
+          setSaveError(`Image Upload Failed: ${errMsg}`);
           setIsSaving(false);
           setUploadProgress('');
           return; // Stop — do NOT save product with broken images
