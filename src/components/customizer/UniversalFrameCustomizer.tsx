@@ -386,19 +386,25 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
       {/* Left Column: Sticky Live Frame Visualizer (5 Cols) */}
       <div className="lg:col-span-5 lg:sticky lg:top-24 flex flex-col items-center space-y-4">
         
-        {/* Gallery View: If a secondary gallery image is selected, display cleanly as a plain image (NO frame, NO background, NO badges)! */}
+        {/* Gallery View: Full-width edge-to-edge image display with ZERO side gaps (matching giftingstudio.in) */}
         {activeAngleImage && activeAngleImage !== baseImg && activeAngleImage !== availableAngleImages[0] ? (
-          <div className="relative w-full min-h-[480px] sm:min-h-[540px] rounded-3xl overflow-hidden bg-white border border-gray-200 flex items-center justify-center p-3 sm:p-5 shadow-md">
+          <div className="relative w-full aspect-square sm:aspect-[4/5] rounded-3xl overflow-hidden bg-white border border-gray-200 shadow-md flex items-center justify-center">
             <img
               src={activeAngleImage}
               alt={`${template.title} Gallery Photo`}
-              className="w-full h-auto max-h-[520px] object-contain rounded-2xl"
+              className="w-full h-full object-cover transition-all duration-300"
             />
+            {/* Subtle Floating Photo Badge */}
+            <div className="absolute top-4 left-4 z-10">
+              <span className="px-3 py-1 bg-black/60 backdrop-blur-md text-white font-extrabold text-[11px] rounded-full shadow-md uppercase tracking-wider">
+                Gallery View
+              </span>
+            </div>
           </div>
         ) : (
           /* Main Product Image inside Frame with Frame Border & Room Background visible behind it */
           <div 
-            className="relative w-full min-h-[480px] sm:min-h-[540px] rounded-3xl overflow-hidden p-4 sm:p-6 flex items-center justify-center shadow-xl border border-gray-200"
+            className="relative w-full aspect-square sm:aspect-[4/5] rounded-3xl overflow-hidden p-4 sm:p-6 flex items-center justify-center shadow-md border border-gray-200"
             style={{
               backgroundImage: "url('https://lovecraftbyse.com/wp-content/uploads/2025/06/single-bg.webp')",
               backgroundSize: 'cover',
@@ -507,14 +513,10 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
           </div>
         )}
 
-        {/* Dedicated Standalone Multi-Angle Photo Selection Carousel (Always visible when more than 1 image) */}
+        {/* Sleek Multi-Photo Thumbnail Row (Matching giftingstudio.in style) */}
         {availableAngleImages.length > 1 && (
-          <div className="w-full bg-white p-4 rounded-3xl border border-gray-200 shadow-xs text-center space-y-2">
-            <div className="flex items-center justify-between px-1">
-              <span className="text-xs font-extrabold text-gray-800">Select Image to View:</span>
-              <span className="text-[11px] font-bold text-gray-400">{availableAngleImages.length} images</span>
-            </div>
-            <div className="flex items-center justify-center gap-3 overflow-x-auto py-1 px-1">
+          <div className="w-full pt-1">
+            <div className="flex items-center gap-3 overflow-x-auto pb-2 scrollbar-none">
               {availableAngleImages.map((imgUrl: string, idx: number) => {
                 const isMainThumbnail = idx === 0 || imgUrl === baseImg;
                 const isActive = isMainThumbnail
@@ -525,14 +527,16 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                     key={idx}
                     type="button"
                     onClick={() => setActiveAngleImage(isMainThumbnail ? baseImg : imgUrl)}
-                    className={`relative w-16 sm:w-20 h-20 sm:h-24 rounded-2xl overflow-hidden border-2 transition-all cursor-pointer shrink-0 shadow-xs ${
-                      isActive ? 'border-[#F82BA9] ring-4 ring-[#F82BA9]/20 scale-105 shadow-md' : 'border-gray-300 hover:border-pink-300 opacity-75 hover:opacity-100'
+                    className={`relative w-16 sm:w-20 aspect-square rounded-2xl overflow-hidden border-2 transition-all cursor-pointer shrink-0 ${
+                      isActive
+                        ? 'border-[#F82BA9] ring-2 ring-[#F82BA9]/30 shadow-md scale-105'
+                        : 'border-gray-200 hover:border-pink-300 opacity-80 hover:opacity-100 hover:scale-102'
                     }`}
                   >
-                    <img src={imgUrl} alt={`Angle ${idx + 1}`} className="w-full h-full object-cover" />
+                    <img src={imgUrl} alt={`View ${idx + 1}`} className="w-full h-full object-cover" />
                     {isMainThumbnail && (
-                      <span className="absolute bottom-0 inset-x-0 bg-black/75 text-white text-[9px] font-extrabold py-0.5 uppercase tracking-wider">
-                        Frame View
+                      <span className="absolute bottom-0 inset-x-0 bg-black/75 text-white text-[8px] sm:text-[9px] font-extrabold py-0.5 uppercase tracking-wider text-center">
+                        Frame
                       </span>
                     )}
                   </button>
