@@ -714,7 +714,7 @@ export function useCartStore() {
     notifyListeners();
   };
 
-  const addProduct = async (newProduct: Product) => {
+  const addProduct = async (newProduct: Product): Promise<{ success: boolean; error?: string }> => {
     const recordId = newProduct.id || `prod-${Date.now()}`;
     const now = new Date().toISOString();
 
@@ -762,23 +762,35 @@ export function useCartStore() {
     applyProductDelta([prodWithStock]);
 
     // 4. Optimistic Local Store update (0ms instant UI rendering!)
+    const previousProducts = [...memoryData.products];
     const updated = [prodWithStock, ...memoryData.products.filter(p => p.id !== recordId)];
     memoryData.products = updated;
     saveStoredLocalData(memoryData);
     notifyListeners();
 
-    // 5. Direct Cloud Firestore Server Write Acknowledgment
+    // 5. Direct Cloud Firestore Server Write — MUST SUCCEED or rollback
     try {
-      await firebaseCloudDb.setDocument('products', recordId, prodWithStock);
-    } catch (e) {
-      console.warn('Direct product save error, queued in outbox for retry:', e);
+      const writeOk = await firebaseCloudDb.setDocument('products', recordId, prodWithStock);
+      if (!writeOk) {
+        throw new Error('Firestore write returned false — document may exceed 1MB size limit');
+      }
+      // 6. Success — trigger outbox flush
+      flushOutboxQueue();
+      return { success: true };
+    } catch (e: any) {
+      console.error('Product save FAILED, rolling back optimistic update:', e);
+      // ROLLBACK: Remove the optimistic product from memory
+      memoryData.products = previousProducts;
+      saveStoredLocalData(memoryData);
+      // Remove from overrides
+      delete overrides[recordId];
+      saveStoredProductOverrides(overrides);
+      notifyListeners();
+      return { success: false, error: e?.message || 'Failed to save product to database' };
     }
-
-    // 6. Trigger Outbox Flush Worker
-    flushOutboxQueue();
   };
 
-  const updateProduct = async (id: string, updates: Partial<Product>) => {
+  const updateProduct = async (id: string, updates: Partial<Product>): Promise<{ success: boolean; error?: string }> => {
     const overrides = getStoredProductOverrides();
     let targetUpdated: Product | null = null;
     let oldProduct: Product | null = null;
@@ -789,6 +801,10 @@ export function useCartStore() {
       deletedSet.delete(id);
       saveDeletedProductIds(deletedSet);
     }
+
+    // Save previous state for rollback
+    const previousProducts = [...memoryData.products];
+    const previousOverrides = { ...overrides };
 
     const now = new Date().toISOString();
     const updatedProducts = memoryData.products.map((p) => {
@@ -832,18 +848,31 @@ export function useCartStore() {
       saveStoredProductOverrides(overrides);
       applyProductDelta([finalTarget]);
 
-      // Direct Cloud Firestore Server Write Acknowledgment
+      // Optimistic update
+      memoryData.products = updatedProducts;
+      saveStoredLocalData(memoryData);
+      notifyListeners();
+
+      // Direct Cloud Firestore Server Write — MUST SUCCEED or rollback
       try {
-        await firebaseCloudDb.setDocument('products', id, finalTarget);
-      } catch (e) {
-        console.warn('Direct product update error, queued in outbox for retry:', e);
+        const writeOk = await firebaseCloudDb.setDocument('products', id, finalTarget);
+        if (!writeOk) {
+          throw new Error('Firestore write returned false — document may exceed 1MB size limit');
+        }
+        flushOutboxQueue();
+        return { success: true };
+      } catch (e: any) {
+        console.error('Product update FAILED, rolling back:', e);
+        // ROLLBACK
+        memoryData.products = previousProducts;
+        saveStoredLocalData(memoryData);
+        saveStoredProductOverrides(previousOverrides);
+        notifyListeners();
+        return { success: false, error: e?.message || 'Failed to update product in database' };
       }
     }
 
-    memoryData.products = updatedProducts;
-    saveStoredLocalData(memoryData);
-    notifyListeners();
-    flushOutboxQueue();
+    return { success: true };
   };
 
   // Soft Delete Product (Moved to Recycle Bin - Stays in memoryData & Cloud Firestore)

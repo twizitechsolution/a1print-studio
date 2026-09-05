@@ -102,13 +102,12 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
     }
   };
 
-  const handleSaveProduct = (product: Product) => {
+  const handleSaveProduct = async (product: Product) => {
     const exists = products.some((p) => p.id === product.id);
-    if (exists) {
-      updateProduct(product.id, product);
-    } else {
-      addProduct(product);
-    }
+    const result = exists
+      ? await updateProduct(product.id, product)
+      : await addProduct(product);
+    return result;
   };
 
   const handleVisualWorkspaceClick = (product: Product) => {

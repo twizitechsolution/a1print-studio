@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { Product, PhotoSlot, TextZone, SizeOption, FrameOption } from '../../types';
-import { firebaseCloudDb } from '../../config/firebase';
+import { firebaseCloudDb, uploadAllProductImages } from '../../config/firebase';
 import { ArrowLeft, Save, Plus, Trash2, Upload, Image as ImageIcon, Sparkles, Star, CheckCircle2, ShieldCheck, CreditCard, DollarSign, Layers, Eye, RefreshCw, Loader2 } from 'lucide-react';
 
 interface AdminProductPageEditorProps {
   product: Product | null;
   categories: { id: string; name: string }[];
-  onSave: (product: Product) => void;
+  onSave: (product: Product) => void | Promise<void> | Promise<{ success: boolean; error?: string }>;
   onBack: () => void;
 }
 
@@ -20,6 +20,8 @@ export const AdminProductPageEditor: React.FC<AdminProductPageEditorProps> = ({
 
   const [isSaving, setIsSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState('');
 
   // 1. Basic Info
   const [id, setId] = useState<string>(product?.id || `prod-${Date.now()}`);
@@ -201,8 +203,8 @@ export const AdminProductPageEditor: React.FC<AdminProductPageEditorProps> = ({
     setReviews((prev) => prev.filter((_, idx) => idx !== index));
   };
 
-  // Final Form Submission
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Final Form Submission — uploads images to Firebase Storage first, then saves product
+  const handleSubmit = async (e?: React.FormEvent) => {
     if (e && e.preventDefault) e.preventDefault();
     if (!title.trim()) {
       alert('Please enter a product title!');
@@ -211,8 +213,44 @@ export const AdminProductPageEditor: React.FC<AdminProductPageEditorProps> = ({
 
     setIsSaving(true);
     setSavedSuccess(false);
+    setSaveError(null);
+    setUploadProgress('');
 
     try {
+      const productId = id.trim() || `prod-${Date.now()}`;
+
+      // ── Step 1: Upload all Base64 images to Firebase Storage ──
+      const hasBase64Images = (baseImageUrl && baseImageUrl.startsWith('data:image')) ||
+        images.some(img => img && img.startsWith('data:image'));
+
+      let finalBaseImageUrl = baseImageUrl;
+      let finalImages = images;
+
+      if (hasBase64Images) {
+        setUploadProgress('Uploading images to cloud storage...');
+        try {
+          const uploadResult = await uploadAllProductImages(
+            productId,
+            baseImageUrl,
+            images,
+            (current, total) => {
+              setUploadProgress(`Uploading images... ${current}/${total}`);
+            }
+          );
+          finalBaseImageUrl = uploadResult.baseImageUrl;
+          finalImages = uploadResult.images;
+          setUploadProgress('Images uploaded! Saving product...');
+        } catch (uploadErr: any) {
+          const errMsg = uploadErr?.message || 'Image upload failed';
+          console.error('Firebase Storage upload error:', uploadErr);
+          setSaveError(`Image Upload Failed: ${errMsg}. Please check your internet connection and try again.`);
+          setIsSaving(false);
+          setUploadProgress('');
+          return; // Stop — do NOT save product with broken images
+        }
+      }
+
+      // ── Step 2: Build product object with Storage URLs (not Base64) ──
       const safeA4Price = Number(a4Price) || 699;
       const safeA4Orig = Number(a4OriginalPrice) || 999;
       const safeA3Price = Number(a3Price) || 999;
@@ -248,7 +286,7 @@ export const AdminProductPageEditor: React.FC<AdminProductPageEditorProps> = ({
       ];
 
       const fullProduct: Product = {
-        id: id.trim() || `prod-${Date.now()}`,
+        id: productId,
         slug: slug.trim() || title.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
         title: title.trim(),
         subtitle: subtitle.trim(),
@@ -256,9 +294,9 @@ export const AdminProductPageEditor: React.FC<AdminProductPageEditorProps> = ({
         categoryLabel: categoryLabel.trim() || 'Photo Collages',
         rating: product?.rating || 5.0,
         reviewsCount: reviews.length || 25,
-        thumbnail: baseImageUrl || images[0] || 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80',
-        baseImageUrl: baseImageUrl || images[0] || 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80',
-        images: baseImageUrl ? Array.from(new Set([baseImageUrl, ...images.filter(Boolean)])) : images,
+        thumbnail: finalBaseImageUrl || finalImages[0] || 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80',
+        baseImageUrl: finalBaseImageUrl || finalImages[0] || 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80',
+        images: finalBaseImageUrl ? Array.from(new Set([finalBaseImageUrl, ...finalImages.filter(Boolean)])) : finalImages,
         bestseller,
         onSale,
         description: description.trim(),
@@ -276,14 +314,26 @@ export const AdminProductPageEditor: React.FC<AdminProductPageEditorProps> = ({
         updatedAt: new Date().toISOString(),
       } as any;
 
-      onSave(fullProduct);
+      // ── Step 3: Pass to parent save handler ──
+      const result = await onSave(fullProduct);
+
+      // Check if parent returned an error result
+      if (result && typeof result === 'object' && 'success' in result && !result.success) {
+        setSaveError(result.error || 'Save failed. Please try again.');
+        setIsSaving(false);
+        setUploadProgress('');
+        return;
+      }
+
       setSavedSuccess(true);
+      setUploadProgress('');
       setTimeout(() => {
         setIsSaving(false);
       }, 300);
     } catch (err: any) {
       setIsSaving(false);
-      alert('Error saving product to Cloud Firestore: ' + (err?.message || err));
+      setUploadProgress('');
+      setSaveError('Error saving product: ' + (err?.message || err));
     }
   };
 
@@ -326,16 +376,22 @@ export const AdminProductPageEditor: React.FC<AdminProductPageEditorProps> = ({
             className={`flex-1 sm:flex-initial px-8 py-3 font-extrabold text-xs rounded-2xl shadow-xl transition-all flex items-center justify-center gap-2 cursor-pointer ${
               savedSuccess
                 ? 'bg-emerald-600 text-white'
+                : saveError
+                ? 'bg-red-600 hover:bg-red-700 text-white'
                 : 'bg-gradient-to-r from-[#3C187B] to-[#F82BA9] hover:from-[#2A1058] hover:to-[#D61B90] text-white'
             }`}
           >
             {isSaving ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" /> Saving Product...
+                <Loader2 className="w-4 h-4 animate-spin" /> {uploadProgress || 'Saving Product...'}
               </>
             ) : savedSuccess ? (
               <>
                 <CheckCircle2 className="w-4 h-4" /> Saved & Synchronized!
+              </>
+            ) : saveError ? (
+              <>
+                <RefreshCw className="w-4 h-4" /> Retry Save
               </>
             ) : (
               <>
@@ -345,6 +401,29 @@ export const AdminProductPageEditor: React.FC<AdminProductPageEditorProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Error Banner with Retry */}
+      {saveError && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-2xl flex items-center gap-3 text-red-800 font-bold text-xs shadow-md">
+          <span className="text-red-600 text-lg shrink-0">⚠️</span>
+          <span className="flex-1">{saveError}</span>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl font-extrabold text-xs cursor-pointer flex items-center gap-1.5 shrink-0"
+          >
+            <RefreshCw className="w-3.5 h-3.5" /> Retry
+          </button>
+        </div>
+      )}
+
+      {/* Upload Progress Banner */}
+      {uploadProgress && (
+        <div className="p-4 bg-blue-50 border border-blue-200 rounded-2xl flex items-center gap-3 text-blue-800 font-bold text-xs shadow-md">
+          <Loader2 className="w-5 h-5 text-blue-600 shrink-0 animate-spin" />
+          <span>{uploadProgress}</span>
+        </div>
+      )}
 
       {savedSuccess && (
         <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-3 text-emerald-800 font-bold text-xs shadow-md animate-bounce">

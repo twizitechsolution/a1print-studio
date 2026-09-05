@@ -1,6 +1,7 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { getFirestore, collection, getDocs, doc, setDoc, deleteDoc, onSnapshot, enableMultiTabIndexedDbPersistence } from 'firebase/firestore';
+import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 export const FIREBASE_CONFIG = {
   apiKey: "AIzaSyBmyIAGv2y7UVqrIIOhQdllnrEOwJ8Purk",
@@ -15,6 +16,7 @@ export const FIREBASE_CONFIG = {
 const app = getApps().length === 0 ? initializeApp(FIREBASE_CONFIG) : getApp();
 export const firebaseAuth = getAuth(app);
 export const firebaseDb = getFirestore(app);
+export const firebaseStorage = getStorage(app);
 export { collection, doc, onSnapshot };
 
 // Enable IndexedDB offline persistence for instant 0ms cached page loads
@@ -54,7 +56,100 @@ const FIREBASE_PROJECT_ID = FIREBASE_CONFIG.projectId;
 const FIRESTORE_BASE_URL = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents`;
 const REST_AUTH_PARAM = `key=${FIREBASE_CONFIG.apiKey}`;
 
-// Helper: Sanitize payload to guarantee JSON string size fits safely within Firestore 1MB limit
+// ─── Firebase Storage: Image Upload Helpers ───────────────────────────────────
+
+/** Convert a data:image/...;base64,... string to a Blob for Firebase Storage upload */
+export function base64ToBlob(dataUri: string): Blob {
+  const [header, b64Data] = dataUri.split(',');
+  const mimeMatch = header.match(/:(.*?);/);
+  const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+  const byteString = atob(b64Data);
+  const ab = new ArrayBuffer(byteString.length);
+  const ia = new Uint8Array(ab);
+  for (let i = 0; i < byteString.length; i++) {
+    ia[i] = byteString.charCodeAt(i);
+  }
+  return new Blob([ab], { type: mime });
+}
+
+/** Upload a single image (as Blob) to Firebase Storage and return the download URL */
+export async function uploadProductImage(
+  productId: string,
+  imageBlob: Blob,
+  imageName: string
+): Promise<string> {
+  const storageRef = ref(firebaseStorage, `products/${productId}/${imageName}`);
+  await uploadBytes(storageRef, imageBlob);
+  return await getDownloadURL(storageRef);
+}
+
+/**
+ * Upload all Base64 images in a product to Firebase Storage.
+ * Returns { baseImageUrl, thumbnail, images } with download URLs replacing Base64.
+ * HTTPS URLs (already uploaded) are left untouched.
+ * Calls onProgress(current, total) for UI feedback.
+ */
+export async function uploadAllProductImages(
+  productId: string,
+  baseImageUrl: string,
+  imagesList: string[],
+  onProgress?: (current: number, total: number) => void
+): Promise<{ baseImageUrl: string; thumbnail: string; images: string[] }> {
+  // Collect all unique Base64 images that need uploading
+  const allImages = new Map<string, string>(); // base64 -> assigned name
+  let nameIdx = 0;
+
+  if (baseImageUrl && baseImageUrl.startsWith('data:image')) {
+    const ext = baseImageUrl.includes('image/png') ? 'png' : 'jpg';
+    allImages.set(baseImageUrl, `main.${ext}`);
+    nameIdx++;
+  }
+
+  for (const img of imagesList) {
+    if (img && img.startsWith('data:image') && !allImages.has(img)) {
+      const ext = img.includes('image/png') ? 'png' : 'jpg';
+      allImages.set(img, `angle-${nameIdx}.${ext}`);
+      nameIdx++;
+    }
+  }
+
+  const total = allImages.size;
+  if (total === 0) {
+    // No Base64 images to upload — all are already URLs
+    return {
+      baseImageUrl,
+      thumbnail: baseImageUrl || imagesList[0] || '',
+      images: imagesList,
+    };
+  }
+
+  // Upload all Base64 images in parallel and build a lookup map
+  let completed = 0;
+  const uploadedUrls = new Map<string, string>(); // base64 -> download URL
+
+  const uploadPromises = Array.from(allImages.entries()).map(async ([b64, name]) => {
+    const blob = base64ToBlob(b64);
+    const url = await uploadProductImage(productId, blob, name);
+    uploadedUrls.set(b64, url);
+    completed++;
+    onProgress?.(completed, total);
+  });
+
+  await Promise.all(uploadPromises);
+
+  // Replace Base64 with URLs
+  const newBaseImageUrl = uploadedUrls.get(baseImageUrl) || baseImageUrl;
+  const newImages = imagesList.map((img) => uploadedUrls.get(img) || img);
+
+  return {
+    baseImageUrl: newBaseImageUrl,
+    thumbnail: newBaseImageUrl || newImages[0] || '',
+    images: newImages,
+  };
+}
+
+// Helper: Sanitize payload — strip any Base64 image data before writing to Firestore.
+// Images should be Firebase Storage URLs by now; this is a safety net.
 function sanitizePayloadForFirestore(obj: any): any {
   if (!obj || typeof obj !== 'object') return obj;
   if (Array.isArray(obj)) {
@@ -64,9 +159,9 @@ function sanitizePayloadForFirestore(obj: any): any {
   const sanitized: Record<string, any> = {};
   for (const [key, val] of Object.entries(obj)) {
     if (typeof val === 'string') {
-      // Allow full-res Base64 images up to 800,000 chars (~600KB) to remain 100% intact
-      if (val.startsWith('data:image') && val.length > 800000) {
-        sanitized[key] = val.substring(0, 15000) + '...[COMPRESSED_FIRESTORE_PREVIEW]';
+      // SAFETY NET: Strip any Base64 image data that shouldn't be in Firestore
+      if (val.startsWith('data:image')) {
+        sanitized[key] = ''; // Images must be Storage URLs, not Base64
       } else {
         sanitized[key] = val;
       }

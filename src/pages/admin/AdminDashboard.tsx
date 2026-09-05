@@ -429,14 +429,15 @@ const AdminDashboardInner: React.FC<AdminDashboardProps> = ({ orders: initialOrd
             <AdminProductPageEditor
               product={editingProductFullPage.product}
               categories={categories.map((c) => ({ id: c.id, name: c.name }))}
-              onSave={(savedProd) => {
+              onSave={async (savedProd) => {
                 const exists = products.some((p) => p.id === savedProd.id);
-                if (exists) {
-                  updateProduct(savedProd.id, savedProd);
-                } else {
-                  addProduct(savedProd);
+                const result = exists
+                  ? await updateProduct(savedProd.id, savedProd)
+                  : await addProduct(savedProd);
+                if (result.success) {
+                  setEditingProductFullPage(null);
                 }
-                setEditingProductFullPage(null);
+                return result;
               }}
               onBack={() => setEditingProductFullPage(null)}
             />
