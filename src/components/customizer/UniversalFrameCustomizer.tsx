@@ -250,16 +250,18 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
     }
   };
 
-  // ⚡ Auto-Snap Back to Uploader 1 Main Frame Image as soon as customer starts editing!
+  // ⚡ Auto-Snap Back to Uploader 1 Main Frame Image only when customer actively makes a new edit
+  const prevCustomInputsRef = useRef({ photoValues, textValues });
   useEffect(() => {
-    if (activeAngleImage !== null) {
-      const hasPhotoEdit = Object.values(photoValues).some(Boolean);
-      const hasTextEdit = Object.values(textValues).some(Boolean);
-      if (hasPhotoEdit || hasTextEdit) {
-        setActiveAngleImage(null); // Instantly clears angle selection and snaps to Uploader 1 main frame!
-      }
+    const prev = prevCustomInputsRef.current;
+    const photoChanged = JSON.stringify(prev.photoValues) !== JSON.stringify(photoValues);
+    const textChanged = JSON.stringify(prev.textValues) !== JSON.stringify(textValues);
+    prevCustomInputsRef.current = { photoValues, textValues };
+
+    if ((photoChanged || textChanged) && activeAngleImage !== null && activeAngleImage !== baseImg) {
+      setActiveAngleImage(null); // Switch back to main frame only when customer makes an actual edit!
     }
-  }, [photoValues, textValues]);
+  }, [photoValues, textValues, activeAngleImage, baseImg]);
 
   useEffect(() => {
     const loadWatermark = () => {
@@ -384,36 +386,36 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
       {/* Left Column: Sticky Live Frame Visualizer (5 Cols) */}
       <div className="lg:col-span-5 lg:sticky lg:top-24 flex flex-col items-center space-y-4">
         
-        <div 
-          className="relative w-full min-h-[480px] sm:min-h-[540px] rounded-3xl overflow-hidden p-4 sm:p-6 flex items-center justify-center shadow-xl border border-gray-200"
-          style={{
-            backgroundImage: "url('https://lovecraftbyse.com/wp-content/uploads/2025/06/single-bg.webp')",
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-          }}
-        >
-          {/* Top-Left Promotional Badges (LovecraftbySE Style) */}
-          <div className="absolute top-4 left-4 z-20 flex items-center gap-2">
-            <span className="px-3 py-1 bg-[#F82BA9] text-white font-extrabold text-[11px] rounded-md shadow-md uppercase tracking-wider">
-              33% Off
-            </span>
-            <span className="px-3 py-1 bg-sky-500 text-white font-extrabold text-[11px] rounded-md shadow-md uppercase tracking-wider">
-              COD Available
-            </span>
+        {/* Gallery View: If a secondary gallery image is selected, display cleanly as a plain image (NO frame, NO background, NO badges)! */}
+        {activeAngleImage && activeAngleImage !== baseImg && activeAngleImage !== availableAngleImages[0] ? (
+          <div className="relative w-full min-h-[480px] sm:min-h-[540px] rounded-3xl overflow-hidden bg-white border border-gray-200 flex items-center justify-center p-3 sm:p-5 shadow-md">
+            <img
+              src={activeAngleImage}
+              alt={`${template.title} Gallery Photo`}
+              className="w-full h-auto max-h-[520px] object-contain rounded-2xl"
+            />
           </div>
-
-          {/* Main Showcase Viewer: Only Main Poster Template (Index 0) gets synthetic frame border + photo slots + text zone overlays! */}
-          {activeAngleImage && activeAngleImage !== baseImg && activeAngleImage !== availableAngleImages[0] ? (
-            /* Clean Showcase Viewer for Secondary Gallery Angle Photos (No Frame Border, No Overlays, No Cropping) */
-            <div className="relative w-full max-w-[440px] aspect-[4/5] rounded-3xl overflow-hidden shadow-2xl bg-white flex items-center justify-center p-3 border border-gray-200">
-              <img
-                src={activeAngleImage}
-                alt={`${template.title} Gallery Angle`}
-                className="w-full h-full object-contain rounded-2xl"
-              />
+        ) : (
+          /* Main Product Image inside Frame with Frame Border & Room Background visible behind it */
+          <div 
+            className="relative w-full min-h-[480px] sm:min-h-[540px] rounded-3xl overflow-hidden p-4 sm:p-6 flex items-center justify-center shadow-xl border border-gray-200"
+            style={{
+              backgroundImage: "url('https://lovecraftbyse.com/wp-content/uploads/2025/06/single-bg.webp')",
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+            }}
+          >
+            {/* Top-Left Promotional Badges (LovecraftbySE Style) */}
+            <div className="absolute top-4 left-4 z-20 flex items-center gap-2">
+              <span className="px-3 py-1 bg-[#F82BA9] text-white font-extrabold text-[11px] rounded-md shadow-md uppercase tracking-wider">
+                33% Off
+              </span>
+              <span className="px-3 py-1 bg-sky-500 text-white font-extrabold text-[11px] rounded-md shadow-md uppercase tracking-wider">
+                COD Available
+              </span>
             </div>
-          ) : (
-            /* Interactive Main Frame Template Canvas (Synthetic Black Wood Frame + Photo Slots + Text Zones Overlay) */
+
+            {/* Interactive Main Frame Template Canvas (Synthetic Black Wood Frame + Photo Slots + Text Zones Overlay) */}
             <div 
               id="live-frame-canvas"
               className={`relative w-full rounded-xs border-[12px] sm:border-[16px] border-black shadow-[0_25px_60px_rgba(0,0,0,0.6)] bg-white overflow-hidden font-serif select-none transition-all ${
@@ -460,11 +462,6 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
               {/* Dynamic Text Zones Overlay using Saved Coordinates */}
               {textZones.map((zone) => {
                 const val = textValues[zone.id] || zone.defaultValue;
-
-                const labelLower = (zone.label || '').toLowerCase();
-                const idLower = (zone.id || '').toLowerCase();
-                const valLower = (zone.defaultValue || '').toLowerCase();
-
                 const isCalendarZone = zone.type === 'calendar' || zone.isCalendar === true;
 
                 // Render Interactive Calendar Grid with Red Heart Highlight if zone is calendar or date type
@@ -479,9 +476,8 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                       }}
                     >
                       <InteractiveCalendarZone
-                        dateString={val}
-                        color={zone.color}
-                        fontFamily={zone.fontFamily}
+                        value={val}
+                        color={zone.color || '#160E4B'}
                       />
                     </div>
                   );
@@ -490,13 +486,12 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                 return (
                   <div
                     key={zone.id}
-                    className="absolute transform -translate-x-1/2 -translate-y-1/2 whitespace-pre-wrap break-words leading-tight"
+                    className="absolute transform -translate-x-1/2 -translate-y-1/2 pointer-events-none select-none tracking-tight whitespace-pre-wrap leading-tight"
                     style={{
                       left: `${zone.x}%`,
                       top: `${zone.y}%`,
-                      width: zone.maxWidth ? `${zone.maxWidth}%` : '85%',
-                      maxWidth: zone.maxWidth ? `${zone.maxWidth}%` : '85%',
-                      color: zone.color,
+                      width: zone.width ? `${zone.width}%` : 'auto',
+                      color: zone.color || '#160E4B',
                       fontFamily: zone.fontFamily,
                       fontSize: `${zone.fontSize * 0.75}px`,
                       fontWeight: 'bold',
@@ -509,26 +504,37 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
               })}
 
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
-        {/* Dedicated Standalone Multi-Angle Photo Selection Carousel (Matching giftingstudio.in OUTSIDE showcase box) */}
-        {!hasStartedCustomization && availableAngleImages.length > 1 && (
+        {/* Dedicated Standalone Multi-Angle Photo Selection Carousel (Always visible when more than 1 image) */}
+        {availableAngleImages.length > 1 && (
           <div className="w-full bg-white p-4 rounded-3xl border border-gray-200 shadow-xs text-center space-y-2">
-            <span className="text-xs font-extrabold text-gray-800 block">Select Frame Angle View:</span>
-            <div className="flex items-center justify-center gap-3 overflow-x-auto py-1 px-2">
+            <div className="flex items-center justify-between px-1">
+              <span className="text-xs font-extrabold text-gray-800">Select Image to View:</span>
+              <span className="text-[11px] font-bold text-gray-400">{availableAngleImages.length} images</span>
+            </div>
+            <div className="flex items-center justify-center gap-3 overflow-x-auto py-1 px-1">
               {availableAngleImages.map((imgUrl: string, idx: number) => {
-                const isActive = (activeAngleImage || template.baseImageUrl) === imgUrl;
+                const isMainThumbnail = idx === 0 || imgUrl === baseImg;
+                const isActive = isMainThumbnail
+                  ? (!activeAngleImage || activeAngleImage === baseImg)
+                  : activeAngleImage === imgUrl;
                 return (
                   <button
                     key={idx}
                     type="button"
-                    onClick={() => setActiveAngleImage(imgUrl)}
+                    onClick={() => setActiveAngleImage(isMainThumbnail ? baseImg : imgUrl)}
                     className={`relative w-16 sm:w-20 h-20 sm:h-24 rounded-2xl overflow-hidden border-2 transition-all cursor-pointer shrink-0 shadow-xs ${
                       isActive ? 'border-[#F82BA9] ring-4 ring-[#F82BA9]/20 scale-105 shadow-md' : 'border-gray-300 hover:border-pink-300 opacity-75 hover:opacity-100'
                     }`}
                   >
                     <img src={imgUrl} alt={`Angle ${idx + 1}`} className="w-full h-full object-cover" />
+                    {isMainThumbnail && (
+                      <span className="absolute bottom-0 inset-x-0 bg-black/75 text-white text-[9px] font-extrabold py-0.5 uppercase tracking-wider">
+                        Frame View
+                      </span>
+                    )}
                   </button>
                 );
               })}
