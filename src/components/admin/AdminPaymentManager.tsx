@@ -30,10 +30,24 @@ export const AdminPaymentManager: React.FC = () => {
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
   useEffect(() => {
+    const ACTIVE_TEST_KEY_ID = 'rzp_test_TYSPQZzQyFvo5R';
+    const ACTIVE_TEST_SECRET = 'NsYccXBCP1E6HWC7HlfNPuqZ';
+
     const savedKeyId = localStorage.getItem('razorpay_key_id');
     const savedKeySecret = localStorage.getItem('razorpay_key_secret');
-    if (savedKeyId) setKeyId(savedKeyId);
-    if (savedKeySecret) setKeySecret(savedKeySecret);
+    if (savedKeyId && !savedKeyId.includes('TWrhN46NzOrFA4')) {
+      setKeyId(savedKeyId);
+    } else {
+      setKeyId(ACTIVE_TEST_KEY_ID);
+      localStorage.setItem('razorpay_key_id', ACTIVE_TEST_KEY_ID);
+    }
+
+    if (savedKeySecret && !savedKeySecret.includes('1OoKv4t5vKRYfYGRRqCpv9H0')) {
+      setKeySecret(savedKeySecret);
+    } else {
+      setKeySecret(ACTIVE_TEST_SECRET);
+      localStorage.setItem('razorpay_key_secret', ACTIVE_TEST_SECRET);
+    }
 
     // Sync credentials from Cloud Firestore
     const syncFromCloud = async () => {
@@ -41,13 +55,19 @@ export const AdminPaymentManager: React.FC = () => {
         const docs = await firebaseCloudDb.getCollection('store_settings');
         const gatewayDoc = docs?.find((d) => d.id === 'payment_gateway');
         if (gatewayDoc) {
-          if (gatewayDoc.razorpay_key_id) {
+          if (gatewayDoc.razorpay_key_id && !gatewayDoc.razorpay_key_id.includes('TWrhN46NzOrFA4') && !gatewayDoc.razorpay_key_id.includes('TYNgRtF4okt1OS')) {
             setKeyId(gatewayDoc.razorpay_key_id);
             localStorage.setItem('razorpay_key_id', gatewayDoc.razorpay_key_id);
+          } else {
+            setKeyId(ACTIVE_TEST_KEY_ID);
+            localStorage.setItem('razorpay_key_id', ACTIVE_TEST_KEY_ID);
           }
-          if (gatewayDoc.razorpay_key_secret) {
+          if (gatewayDoc.razorpay_key_secret && !gatewayDoc.razorpay_key_secret.includes('1OoKv4t5vKRYfYGRRqCpv9H0') && !gatewayDoc.razorpay_key_secret.includes('CVrTE63SZWXHNl02pCZ0BXd6')) {
             setKeySecret(gatewayDoc.razorpay_key_secret);
             localStorage.setItem('razorpay_key_secret', gatewayDoc.razorpay_key_secret);
+          } else {
+            setKeySecret(ACTIVE_TEST_SECRET);
+            localStorage.setItem('razorpay_key_secret', ACTIVE_TEST_SECRET);
           }
           if (gatewayDoc.codFee !== undefined) setCodFee(gatewayDoc.codFee);
         }

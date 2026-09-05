@@ -15,7 +15,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed. Use POST.' });
   }
 
-  const keySecret = process.env.RAZORPAY_KEY_SECRET || 'CVrTE63SZWXHNl02pCZ0BXd6';
+  const keySecret = process.env.RAZORPAY_KEY_SECRET || 'NsYccXBCP1E6HWC7HlfNPuqZ';
   if (!keySecret) {
     return res.status(500).json({
       success: false,

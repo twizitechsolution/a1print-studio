@@ -21,25 +21,14 @@ export interface CustomerCheckoutDetails {
 
 // Dynamic Live Razorpay Key Resolver from Environment or Database
 export const getLiveRazorpayKeyId = async (): Promise<string> => {
+  const ACTIVE_KEY = 'rzp_test_TYSPQZzQyFvo5R';
+
   const localKey = localStorage.getItem('razorpay_key_id');
-  // Clear obsolete/expired test keys from prior sessions
-  if (localKey && localKey.includes('rzp_test_TWrhN46NzOrFA4')) {
-    localStorage.removeItem('razorpay_key_id');
-  } else if (localKey && localKey.trim().length > 5) {
-    return localKey.trim();
+  if (localKey !== ACTIVE_KEY) {
+    localStorage.setItem('razorpay_key_id', ACTIVE_KEY);
   }
 
-  try {
-    const docs = await firebaseCloudDb.getCollection('store_settings');
-    const gatewayDoc = docs?.find((d) => d.id === 'payment_gateway');
-    if (gatewayDoc && gatewayDoc.razorpay_key_id && !gatewayDoc.razorpay_key_id.includes('TWrhN46NzOrFA4')) {
-      const liveKey = gatewayDoc.razorpay_key_id.trim();
-      localStorage.setItem('razorpay_key_id', liveKey);
-      return liveKey;
-    }
-  } catch (e) {}
-
-  return import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_TYNgRtF4okt1OS';
+  return (import.meta as any).env?.VITE_RAZORPAY_KEY_ID || ACTIVE_KEY;
 };
 
 // 1. Dynamic Script Loader for Official Razorpay Checkout Script

@@ -19,8 +19,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
     const { amount, currency = 'INR', receipt, customKeyId, customKeySecret } = body;
 
-    const keyId = customKeyId || process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_TYNgRtF4okt1OS';
-    const keySecret = customKeySecret || process.env.RAZORPAY_KEY_SECRET || 'CVrTE63SZWXHNl02pCZ0BXd6';
+    const keyId = customKeyId || process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_TYSPQZzQyFvo5R';
+    const keySecret = customKeySecret || process.env.RAZORPAY_KEY_SECRET || 'NsYccXBCP1E6HWC7HlfNPuqZ';
 
     if (!keyId || !keySecret) {
       return res.status(401).json({ error: 'Razorpay API credentials missing. Please configure RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET.' });
