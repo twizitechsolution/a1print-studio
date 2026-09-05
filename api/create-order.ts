@@ -19,11 +19,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
     const { amount, currency = 'INR', receipt, customKeyId, customKeySecret } = body;
 
-    const keyId = customKeyId || process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_TWrhN46NzOrFA4';
-    const keySecret = customKeySecret || process.env.RAZORPAY_KEY_SECRET || '1OoKv4t5vKRYfYGRRqCpv9H0';
+    const keyId = customKeyId || process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID;
+    const keySecret = customKeySecret || process.env.RAZORPAY_KEY_SECRET;
 
     if (!keyId || !keySecret) {
-      return res.status(401).json({ error: 'Razorpay API credentials missing. Please check server environment variables.' });
+      return res.status(401).json({ error: 'Razorpay API credentials missing. Please configure RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET.' });
     }
 
     const amountInPaise = Number(amount);

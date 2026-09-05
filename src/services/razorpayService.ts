@@ -19,7 +19,7 @@ export interface CustomerCheckoutDetails {
   address?: string;
 }
 
-// Dynamic Live Razorpay Key Resolver from Cloud Firestore & Local Storage
+// Dynamic Live Razorpay Key Resolver from Environment or Database
 export const getLiveRazorpayKeyId = async (): Promise<string> => {
   const localKey = localStorage.getItem('razorpay_key_id');
   if (localKey && localKey.trim().length > 5) {
@@ -36,7 +36,7 @@ export const getLiveRazorpayKeyId = async (): Promise<string> => {
     }
   } catch (e) {}
 
-  return import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_TWrhN46NzOrFA4';
+  return import.meta.env.VITE_RAZORPAY_KEY_ID || '';
 };
 
 // 1. Dynamic Script Loader for Official Razorpay Checkout Script
@@ -58,7 +58,7 @@ export const loadRazorpayScript = (): Promise<boolean> => {
   });
 };
 
-// 2. Serverless Backend Order Creation Call
+// 2. Serverless Backend Order Creation Call: POST /api/create-order
 export const createRazorpayOrder = async (amountInRupees: number, receiptId?: string) => {
   const amountInPaise = Math.round(amountInRupees * 100);
 
@@ -66,18 +66,13 @@ export const createRazorpayOrder = async (amountInRupees: number, receiptId?: st
     throw new Error('Minimum payment amount must be at least ₹1.00 (100 paise).');
   }
 
-  const customKeyId = localStorage.getItem('razorpay_key_id') || undefined;
-  const customKeySecret = localStorage.getItem('razorpay_key_secret') || undefined;
-
   const response = await fetch('/api/create-order', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       amount: amountInPaise,
       currency: 'INR',
-      receipt: receiptId || `receipt_${Date.now()}`,
-      customKeyId,
-      customKeySecret,
+      receipt: receiptId || `rcpt_${Date.now()}`,
     }),
   });
 
@@ -92,10 +87,10 @@ export const createRazorpayOrder = async (amountInRupees: number, receiptId?: st
     }
   }
 
-  throw new Error(`Razorpay Order API endpoint returned status ${response.status}.`);
+  throw new Error(`Razorpay Order creation failed (HTTP ${response.status}). Please check API credentials.`);
 };
 
-// 3. Payment Verification
+// 3. Backend Payment Signature Verification Call: POST /api/verify-payment
 export const verifyRazorpayPayment = async (payload: RazorpayPaymentSuccessResponse) => {
   const response = await fetch('/api/verify-payment', {
     method: 'POST',
@@ -114,14 +109,6 @@ export const verifyRazorpayPayment = async (payload: RazorpayPaymentSuccessRespo
     }
   }
 
-  if (payload.razorpay_payment_id) {
-    return {
-      success: true,
-      payment_id: payload.razorpay_payment_id,
-      order_id: payload.razorpay_order_id,
-    };
-  }
-
   throw new Error('Payment signature verification failed.');
 };
 
@@ -136,95 +123,42 @@ export const launchRazorpayCheckout = async (params: {
   onDismiss?: () => void;
 }) => {
   try {
-    // Step A: Load SDK Script
+    // Step A: Ensure Razorpay SDK Script is loaded
     const isLoaded = await loadRazorpayScript();
-    if (!isLoaded) {
+    if (!isLoaded || !window.Razorpay) {
       params.onFailure('Unable to load Razorpay Payment Gateway. Please check your internet connection.');
       return;
     }
 
-    // Step B: Mandatory Server Order Creation
-    let orderData: any = null;
-    let authFailed = false;
-
+    // Step B: Call backend /api/create-order to create order on Razorpay
+    let orderData: any;
     try {
       orderData = await createRazorpayOrder(params.amountInRupees);
     } catch (err: any) {
-      console.warn('Order creation API notice:', err.message);
-      authFailed = true;
-    }
-
-    const customKeyId = await getLiveRazorpayKeyId();
-    const keyId = orderData?.key_id || customKeyId;
-
-    let hasCompletedSuccessfully = false;
-
-    // If order creation returned a valid order_id, initialize Razorpay Modal
-    if (orderData && orderData.order_id) {
-      const options = {
-        key: keyId,
-        amount: orderData.amount,
-        currency: orderData.currency || 'INR',
-        order_id: orderData.order_id,
-        name: 'A1print Studio',
-        description: params.description || params.orderTitle || 'Personalized Photo Frame Gift Order',
-        image: 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=200&q=80',
-        prefill: {
-          name: params.customer.name,
-          email: params.customer.email,
-          contact: params.customer.phone,
-        },
-        notes: {
-          address: params.customer.address || '',
-        },
-        theme: {
-          color: '#F82BA9',
-        },
-        handler: async (response: RazorpayPaymentSuccessResponse) => {
-          hasCompletedSuccessfully = true;
-          try {
-            const verificationResult = await verifyRazorpayPayment(response);
-            if (verificationResult.success) {
-              params.onSuccess(response);
-            } else {
-              params.onSuccess(response); // Fallback to accepting payment response
-            }
-          } catch (err: any) {
-            params.onSuccess(response);
-          }
-        },
-        modal: {
-          ondismiss: () => {
-            if (hasCompletedSuccessfully) return;
-            if (params.onDismiss) {
-              params.onDismiss();
-            } else {
-              params.onFailure('Payment modal closed. You can retry or choose Cash on Delivery.');
-            }
-          },
-        },
-      };
-
-      const rzp = new window.Razorpay(options);
-
-      rzp.on('payment.failed', (response: any) => {
-        if (hasCompletedSuccessfully) return;
-        console.error('Razorpay payment failed:', response.error);
-        const errorMsg = response.error?.description || response.error?.reason || 'Payment failed. Please try again.';
-        params.onFailure(errorMsg);
-      });
-
-      rzp.open();
+      console.error('Order creation error:', err);
+      params.onFailure(err.message || 'Failed to initialize payment with server.');
       return;
     }
 
-    // Step C: Direct Web Checkout Modal with key & amount
-    const options: Record<string, any> = {
+    const liveKey = await getLiveRazorpayKeyId();
+    const keyId = orderData.key_id || liveKey;
+
+    if (!keyId) {
+      params.onFailure('Razorpay Key ID is not configured.');
+      return;
+    }
+
+    let isCompleted = false;
+
+    // Step C: Open Razorpay Modal with order_id
+    const options = {
       key: keyId,
-      amount: Math.round(params.amountInRupees * 100),
-      currency: 'INR',
+      amount: orderData.amount,
+      currency: orderData.currency || 'INR',
+      order_id: orderData.order_id,
       name: 'A1print Studio',
       description: params.description || params.orderTitle || 'Personalized Photo Frame Gift Order',
+      image: 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=200&q=80',
       prefill: {
         name: params.customer.name,
         email: params.customer.email,
@@ -237,25 +171,42 @@ export const launchRazorpayCheckout = async (params: {
         color: '#F82BA9',
       },
       handler: async (response: RazorpayPaymentSuccessResponse) => {
-        hasCompletedSuccessfully = true;
-        params.onSuccess({
-          razorpay_payment_id: response.razorpay_payment_id || `pay_${Date.now()}`,
-          razorpay_order_id: response.razorpay_order_id || `order_${Date.now()}`,
-        });
+        isCompleted = true;
+        try {
+          // Step D: Send payment_id, order_id, signature to /api/verify-payment
+          const verificationResult = await verifyRazorpayPayment(response);
+          if (verificationResult && verificationResult.success) {
+            params.onSuccess(response);
+          } else {
+            params.onFailure('Payment signature verification failed. Payment was not recorded as paid.');
+          }
+        } catch (verifyErr: any) {
+          console.error('Payment verification failed:', verifyErr);
+          params.onFailure(verifyErr.message || 'Payment signature verification failed.');
+        }
       },
       modal: {
         ondismiss: () => {
-          if (hasCompletedSuccessfully) return;
+          if (isCompleted) return;
           if (params.onDismiss) {
             params.onDismiss();
           } else {
-            params.onFailure('Payment modal closed. You can retry or choose Cash on Delivery.');
+            params.onFailure('Payment cancelled. You can retry or choose Cash on Delivery.');
           }
         },
       },
     };
 
     const rzp = new window.Razorpay(options);
+
+    // Handle payment.failed event
+    rzp.on('payment.failed', (failResponse: any) => {
+      if (isCompleted) return;
+      console.error('Razorpay payment failed:', failResponse.error);
+      const errorMsg = failResponse.error?.description || failResponse.error?.reason || 'Payment failed. Please try again.';
+      params.onFailure(errorMsg);
+    });
+
     rzp.open();
   } catch (err: any) {
     console.error('Launch Razorpay Checkout error:', err);
