@@ -8,6 +8,7 @@ export interface Category {
   name: string;
   description?: string;
   icon?: string;
+  imageUrl?: string;
   color?: string;
   createdAt?: string;
   updatedAt?: string;

@@ -111,6 +111,36 @@ export async function uploadProductImage(
   return data.secure_url || data.url;
 }
 
+/** Upload a single category thumbnail image (as Blob) to Cloudinary */
+export async function uploadCategoryImage(
+  categorySlug: string,
+  imageBlob: Blob,
+  imageName: string
+): Promise<string> {
+  const cloudName = CLOUDINARY_CONFIG.cloudName?.trim() || 'dcnnn0ogm';
+  const uploadPreset = CLOUDINARY_CONFIG.uploadPreset?.trim() || 'a1print_products';
+
+  const formData = new FormData();
+  formData.append('file', imageBlob, imageName);
+  formData.append('upload_preset', uploadPreset);
+  formData.append('folder', `a1print/categories/${categorySlug}`);
+
+  const endpoint = `https://api.cloudinary.com/v1_1/${encodeURIComponent(cloudName)}/image/upload`;
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    body: formData,
+  });
+
+  const data = await response.json();
+  if (!response.ok || data.error) {
+    const errorMsg = data.error?.message || `Cloudinary upload failed (HTTP ${response.status})`;
+    console.error('Cloudinary category upload error:', data);
+    throw new Error(errorMsg);
+  }
+
+  return data.secure_url || data.url;
+}
+
 /**
  * Upload all Base64 images in a product to Cloudinary.
  * Returns { baseImageUrl, thumbnail, images } with Cloudinary HTTPS CDN URLs replacing Base64.

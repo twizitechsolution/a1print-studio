@@ -1,110 +1,62 @@
 import React, { useState } from 'react';
 import { Product } from '../../types';
-import { useCartStore } from '../../store/useCartStore';
+import { useCartStore, DEFAULT_CATEGORIES } from '../../store/useCartStore';
 import { ProductCard } from './ProductCard';
 import { NoProductsFound } from '../common/NoProductsFound';
-import { ChevronDown, ChevronUp, Filter, Sparkles } from 'lucide-react';
+import { ChevronDown, Filter } from 'lucide-react';
 
 interface ShopProductGridProps {
   onSelectProduct: (product: Product) => void;
   initialCategory?: string;
 }
 
-interface SubCategory {
-  id: string;
-  name: string;
-  count: number;
-}
-
-interface CategoryGroup {
-  id: string;
-  name: string;
-  count: number;
-  subcategories?: SubCategory[];
-}
-
 export const ShopProductGrid: React.FC<ShopProductGridProps> = ({
   onSelectProduct,
   initialCategory = 'all',
 }) => {
-  const { products } = useCartStore();
+  const { products, categories } = useCartStore();
   const [selectedCategory, setSelectedCategory] = useState<string>(initialCategory);
-  const [openAccordionIds, setOpenAccordionIds] = useState<string[]>(['baby', 'customised']);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
 
-  // Accordion Category Hierarchy matching lovecraftbyse.com/shop reference screenshot!
-  const categoryGroups: CategoryGroup[] = [
-    {
-      id: 'customised',
-      name: 'Customised Photos',
-      count: 217,
-      subcategories: [
-        { id: 'custom-photo-frames', name: 'Custom Photo Frames', count: 120 },
-        { id: 'acrylic-custom', name: 'Acrylic Frames', count: 97 },
-      ],
-    },
-    {
-      id: 'baby',
-      name: 'Baby Birth Frame',
-      count: 85,
-      subcategories: [
-        { id: 'birth-details', name: 'Birth Details Frames', count: 53 },
-        { id: 'first-year', name: 'First Year Photo Frames', count: 24 },
-        { id: 'twin-baby', name: 'Twin Baby Frames', count: 10 },
-      ],
-    },
-    {
-      id: 'mom-dad',
-      name: 'Gifts for Mom & Dad',
-      count: 15,
-    },
-    {
-      id: 'marriage',
-      name: 'Marriage anniversary Gift',
-      count: 40,
-    },
-    {
-      id: 'collage',
-      name: 'Photo Collage Frames',
-      count: 90,
-    },
-    {
-      id: 'siblings',
-      name: 'Gifts for Brother & Sister',
-      count: 12,
-    },
-    {
-      id: 'birthday',
-      name: 'Birthday Gifts',
-      count: 59,
-    },
-  ];
+  const activeCategories = (categories && categories.length > 0) ? categories : DEFAULT_CATEGORIES;
 
-  const toggleAccordion = (id: string) => {
-    setOpenAccordionIds((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
-    );
+  // Calculate dynamic real-time product counts for each category
+  const getCategoryCount = (categorySlug: string, categoryName: string) => {
+    return products.filter((p) => {
+      if (!p || p.isDeleted) return false;
+      const catLower = (p.category || '').toLowerCase();
+      const labelLower = (p.categoryLabel || '').toLowerCase();
+      const slugLower = categorySlug.toLowerCase();
+      const nameLower = categoryName.toLowerCase();
+      return (
+        catLower === slugLower ||
+        labelLower === nameLower ||
+        catLower.includes(slugLower) ||
+        (slugLower.includes('baby') && catLower.includes('baby'))
+      );
+    }).length;
   };
 
   const filteredProducts = products.filter((product) => {
     if (!product || product.isDeleted) return false;
     if (selectedCategory === 'all') return true;
     
-    // Category or Subcategory match logic
+    // Category match logic
     const catLower = (product.category || '').toLowerCase();
     const catLabelLower = (product.categoryLabel || '').toLowerCase();
     const selLower = selectedCategory.toLowerCase();
 
     return (
+      catLower === selLower ||
+      catLabelLower === selLower ||
       catLower.includes(selLower) ||
       catLabelLower.includes(selLower) ||
-      (selLower === 'baby' && (catLower.includes('baby') || catLower.includes('birth'))) ||
-      (selLower === 'birth-details' && (catLower.includes('birth') || catLower.includes('detail'))) ||
-      (selLower === 'first-year' && (catLower.includes('first') || catLower.includes('year') || catLower.includes('12 month'))) ||
-      (selLower === 'twin-baby' && catLower.includes('twin')) ||
-      (selLower === 'birthday' && catLower.includes('birth')) ||
-      (selLower === 'collage' && catLower.includes('collage')) ||
-      (selLower === 'customised' && catLower.includes('custom'))
+      (selLower.includes('baby') && (catLower.includes('baby') || catLower.includes('birth'))) ||
+      (selLower.includes('birthday') && (catLower.includes('birth') || catLower.includes('birthday'))) ||
+      (selLower.includes('anniversary') && (catLower.includes('marriage') || catLower.includes('anniversary'))) ||
+      (selLower.includes('collage') && catLower.includes('collage')) ||
+      (selLower.includes('family') && catLower.includes('family')) ||
+      (selLower.includes('brother') && (catLower.includes('brother') || catLower.includes('sister')))
     );
   });
 
@@ -164,80 +116,37 @@ export const ShopProductGrid: React.FC<ShopProductGridProps> = ({
               <span className="text-[11px] font-mono text-gray-400 font-bold">{products.length}</span>
             </div>
 
-            {/* Category Groups Accordion */}
-            {categoryGroups.map((group) => {
-              const isOpen = openAccordionIds.includes(group.id);
-              const isGroupSelected = selectedCategory === group.id;
+            {/* Dynamic Active Categories List */}
+            {activeCategories.map((cat) => {
+              const count = getCategoryCount(cat.slug, cat.name);
+              const isSelected = selectedCategory === cat.slug || selectedCategory === cat.id;
 
               return (
-                <div key={group.id} className="space-y-1">
-                  <div
-                    className={`p-3 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ${
-                      isGroupSelected
-                        ? 'border-[#F82BA9] bg-pink-50/50 text-[#F82BA9] font-extrabold shadow-2xs'
-                        : 'border-gray-100 bg-white text-gray-800 hover:bg-gray-50'
-                    }`}
-                  >
-                    <div
-                      onClick={() => setSelectedCategory(group.id)}
-                      className="flex items-center gap-2.5 flex-1 text-xs"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isGroupSelected}
-                        readOnly
-                        className="rounded border-gray-300 text-[#F82BA9] focus:ring-0 cursor-pointer"
-                      />
-                      <span className="font-bold">{group.name}</span>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] font-mono text-gray-400 font-bold">{group.count}</span>
-                      {group.subcategories && group.subcategories.length > 0 && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleAccordion(group.id);
-                          }}
-                          className="p-1 text-gray-400 hover:text-gray-900 rounded-lg hover:bg-gray-100"
-                        >
-                          {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                        </button>
-                      )}
-                    </div>
+                <div
+                  key={cat.id}
+                  onClick={() => setSelectedCategory(cat.slug)}
+                  className={`p-3 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ${
+                    isSelected
+                      ? 'border-[#F82BA9] bg-pink-50/60 text-[#F82BA9] font-extrabold shadow-2xs'
+                      : 'border-gray-100 bg-white text-gray-800 hover:bg-gray-50'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 flex-1 text-xs">
+                    <span className="text-base leading-none">{cat.icon || '🏷️'}</span>
+                    <span className={isSelected ? 'font-black' : 'font-medium'}>{cat.name}</span>
                   </div>
 
-                  {/* Subcategories Accordion Content */}
-                  {isOpen && group.subcategories && group.subcategories.length > 0 && (
-                    <div className="pl-6 space-y-1 py-1">
-                      {group.subcategories.map((sub) => {
-                        const isSubSelected = selectedCategory === sub.id;
-
-                        return (
-                          <div
-                            key={sub.id}
-                            onClick={() => setSelectedCategory(sub.id)}
-                            className={`p-2.5 rounded-xl border text-xs transition-all cursor-pointer flex items-center justify-between ${
-                              isSubSelected
-                                ? 'border-[#F82BA9] bg-pink-50 text-[#F82BA9] font-extrabold'
-                                : 'border-transparent text-gray-600 hover:bg-gray-50'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="checkbox"
-                                checked={isSubSelected}
-                                readOnly
-                                className="rounded border-gray-300 text-[#F82BA9] focus:ring-0 cursor-pointer"
-                              />
-                              <span>{sub.name}</span>
-                            </div>
-                            <span className="text-[10px] font-mono text-gray-400">{sub.count}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
+                  <span
+                    className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded-full ${
+                      isSelected
+                        ? 'bg-[#F82BA9] text-white'
+                        : count > 0
+                        ? 'bg-pink-50 text-[#F82BA9]'
+                        : 'text-gray-400 bg-gray-100'
+                    }`}
+                  >
+                    {count}
+                  </span>
                 </div>
               );
             })}

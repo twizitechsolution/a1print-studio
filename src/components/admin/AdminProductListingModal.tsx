@@ -22,7 +22,7 @@ export const AdminProductListingModal: React.FC<AdminProductListingModalProps> =
 
   const [title, setTitle] = useState<string>('');
   const [productId, setProductId] = useState<string>('');
-  const [category, setCategory] = useState<string>('baby-kids');
+  const [category, setCategory] = useState<string>('baby-birth-frame');
   const [price, setPrice] = useState<number>(699);
   const [originalPrice, setOriginalPrice] = useState<number>(999);
   const [stockQuantity, setStockQuantity] = useState<number>(50);
@@ -38,7 +38,7 @@ export const AdminProductListingModal: React.FC<AdminProductListingModalProps> =
     if (editingProduct) {
       setTitle(editingProduct.title || '');
       setProductId(editingProduct.productId || `PRD-${Math.floor(1000 + Math.random() * 9000)}`);
-      setCategory(editingProduct.category || 'baby-kids');
+      setCategory(editingProduct.category || 'baby-birth-frame');
       setPrice(editingProduct.sizes?.[0]?.price || 699);
       setOriginalPrice(editingProduct.sizes?.[0]?.originalPrice || 999);
       setStockQuantity(editingProduct.stockQuantity !== undefined ? editingProduct.stockQuantity : 50);
@@ -50,7 +50,7 @@ export const AdminProductListingModal: React.FC<AdminProductListingModalProps> =
     } else {
       setTitle('');
       setProductId(`PRD-${Math.floor(1000 + Math.random() * 9000)}`);
-      setCategory(categories[0]?.slug || 'baby-kids');
+      setCategory(categories[0]?.slug || 'baby-birth-frame');
       setPrice(699);
       setOriginalPrice(999);
       setStockQuantity(50);

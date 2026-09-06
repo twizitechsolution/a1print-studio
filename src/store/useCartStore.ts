@@ -6,15 +6,81 @@ import { enqueueOutboxJob, flushOutboxQueue, writeAuditLog, getStoredOutboxJobs 
 
 const STORAGE_KEY = 'a1print_store_data_v20';
 const DELETED_IDS_KEY = 'a1print_deleted_product_ids_v20';
-const CATEGORIES_KEY = 'a1print_categories_v20';
+const CATEGORIES_KEY = 'a1print_categories_v25';
 
 export const DEFAULT_CATEGORIES: Category[] = [
-  { id: 'cat-1', name: 'Baby & Kids', slug: 'baby-kids', description: 'Customized newborn birth stats & baby milestone frames', icon: '👶', createdAt: new Date().toISOString() },
-  { id: 'cat-2', name: 'Couples & Wedding', slug: 'couples', description: 'Romantic anniversary, engagement & wedding memory frames', icon: '💑', createdAt: new Date().toISOString() },
-  { id: 'cat-3', name: 'Birthday Gifts', slug: 'birthday', description: 'Personalized birthday collage & age milestone photo frames', icon: '🎂', createdAt: new Date().toISOString() },
-  { id: 'cat-4', name: 'Calendar Frames', slug: 'calendar', description: 'Interactive date & month highlight calendar photo frames', icon: '📅', createdAt: new Date().toISOString() },
-  { id: 'cat-5', name: 'Photo Collage', slug: 'collage', description: 'Multi-photo grid frames for family memories', icon: '🖼️', createdAt: new Date().toISOString() },
-  { id: 'cat-6', name: 'Corporate Office', slug: 'office', description: 'Professional desk & wall frames for corporate gifting', icon: '💼', createdAt: new Date().toISOString() },
+  {
+    id: 'cat-baby-birth-frame',
+    name: 'Baby Birth Frame',
+    slug: 'baby-birth-frame',
+    description: 'Personalized newborn baby birth details & milestone photo frames',
+    icon: '👶',
+    imageUrl: 'https://lovecraftbyse.com/wp-content/uploads/2026/08/Frame-3-8.png',
+    createdAt: '2026-09-06T00:00:00.000Z',
+  },
+  {
+    id: 'cat-birthday-gift',
+    name: 'Birthday Gift',
+    slug: 'birthday-gift',
+    description: 'Special customized birthday photo frames & collage gifts',
+    icon: '🎂',
+    imageUrl: 'https://lovecraftbyse.com/wp-content/uploads/2026/08/Frame-30-8-1.png',
+    createdAt: '2026-09-06T00:00:00.000Z',
+  },
+  {
+    id: 'cat-first-year-photo-frames',
+    name: 'First Year Photo Frames',
+    slug: 'first-year-photo-frames',
+    description: 'Cherish every 12-month baby journey with first year memory frames',
+    icon: '👶',
+    imageUrl: 'https://lovecraftbyse.com/wp-content/uploads/2026/06/Frame-2-7.png',
+    createdAt: '2026-09-06T00:00:00.000Z',
+  },
+  {
+    id: 'cat-family-frame',
+    name: 'Family Frame',
+    slug: 'family-frame',
+    description: 'Beautiful family wall collage & cherished togetherness frames',
+    icon: '🎁',
+    imageUrl: 'https://lovecraftbyse.com/wp-content/uploads/2026/08/Frame-356-2.png',
+    createdAt: '2026-09-06T00:00:00.000Z',
+  },
+  {
+    id: 'cat-marriage-anniversary-gift',
+    name: 'Marriage Anniversary Gift',
+    slug: 'marriage-anniversary-gift',
+    description: 'Heartfelt customized wedding anniversary & couple memory frames',
+    icon: '💕',
+    imageUrl: 'https://lovecraftbyse.com/wp-content/uploads/2026/08/Frame-74-1.png',
+    createdAt: '2026-09-06T00:00:00.000Z',
+  },
+  {
+    id: 'cat-photo-collage-frames',
+    name: 'Photo Collage Frames',
+    slug: 'photo-collage-frames',
+    description: 'Multi-photo mosaic grids & creative memory collages',
+    icon: '🖼️',
+    imageUrl: 'https://lovecraftbyse.com/wp-content/uploads/2026/06/Frame-17-2.png',
+    createdAt: '2026-09-06T00:00:00.000Z',
+  },
+  {
+    id: 'cat-twin-baby-frames',
+    name: 'Twin Baby Frames',
+    slug: 'twin-baby-frames',
+    description: 'Special twin baby birth announcements & milestone photo frames',
+    icon: '👶',
+    imageUrl: 'https://lovecraftbyse.com/wp-content/uploads/2026/06/Frame-165.png',
+    createdAt: '2026-09-06T00:00:00.000Z',
+  },
+  {
+    id: 'cat-gifts-for-brother-sister',
+    name: 'Gifts For Brother & Sister',
+    slug: 'gifts-for-brother-sister',
+    description: 'Memorable sibling bonds, Raksha Bandhan & special brother-sister frames',
+    icon: '❤️',
+    imageUrl: 'https://lovecraftbyse.com/wp-content/uploads/2026/07/Frame-385-1.png',
+    createdAt: '2026-09-06T00:00:00.000Z',
+  },
 ];
 
 interface StoreData {
@@ -30,6 +96,13 @@ const CURRENT_APP_VERSION = 'v25_server_truth_prio';
 
 function checkAndMigrateStaleCache() {
   try {
+    const staleCatIds = ['cat-1', 'cat-2', 'cat-3', 'cat-4', 'cat-5', 'cat-6'];
+    const storedCats = getStoredCategories();
+    if (storedCats.some((c) => staleCatIds.includes(c.id))) {
+      saveStoredCategories(DEFAULT_CATEGORIES);
+      memoryData.categories = DEFAULT_CATEGORIES;
+    }
+
     const storedVer = localStorage.getItem(APP_CACHE_VERSION_KEY);
     if (storedVer !== CURRENT_APP_VERSION) {
       const overrides = getStoredProductOverrides();
@@ -109,8 +182,12 @@ function getStoredCategories(): Category[] {
   try {
     const raw = localStorage.getItem(CATEGORIES_KEY);
     if (raw) {
-      const parsed = JSON.parse(raw);
-      if (parsed && parsed.length > 0) return parsed;
+      const parsed: Category[] = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const staleCatIds = ['cat-1', 'cat-2', 'cat-3', 'cat-4', 'cat-5', 'cat-6'];
+        const clean = parsed.filter((c) => c && c.id && !staleCatIds.includes(c.id));
+        if (clean.length > 0) return clean;
+      }
     }
   } catch (e) {}
   return DEFAULT_CATEGORIES;
@@ -483,11 +560,19 @@ async function syncFromCloud() {
 
     // 4. STRICT NON-DESTRUCTIVE UNION MERGING FOR CATEGORIES
     if (cloudCats !== null) {
+      const staleCatIds = new Set(['cat-1', 'cat-2', 'cat-3', 'cat-4', 'cat-5', 'cat-6']);
       const categoryMap = new Map<string, Category>();
 
       // Step A: Load DEFAULT + memory categories
-      DEFAULT_CATEGORIES.concat(memoryData.categories || []).forEach((cat) => {
+      DEFAULT_CATEGORIES.forEach((cat) => {
         if (cat && cat.id) categoryMap.set(cat.id, cat);
+      });
+
+      (memoryData.categories || []).forEach((cat) => {
+        if (cat && cat.id && !staleCatIds.has(cat.id)) {
+          const existing = categoryMap.get(cat.id);
+          categoryMap.set(cat.id, { ...existing, ...cat });
+        }
       });
 
       // Step B: Merge Cloud Firestore categories
@@ -495,8 +580,13 @@ async function syncFromCloud() {
       if (cloudCats.length > 0) {
         cloudCats.forEach((cc) => {
           if (cc && cc.id) {
+            if (staleCatIds.has(cc.id)) {
+              firebaseCloudDb.deleteDocument('categories', cc.id);
+              return;
+            }
             cloudCatIds.add(cc.id);
-            categoryMap.set(cc.id, cc);
+            const existing = categoryMap.get(cc.id);
+            categoryMap.set(cc.id, { ...existing, ...cc });
           }
         });
       }
@@ -672,6 +762,47 @@ async function initCloudSync() {
         notifyListeners();
       }
     });
+
+    // Real-Time WebSockets Listener for Categories!
+    onSnapshot(collection(firebaseDb, 'categories'), (snapshot) => {
+      if (snapshot.empty) return;
+      const staleCatIds = new Set(['cat-1', 'cat-2', 'cat-3', 'cat-4', 'cat-5', 'cat-6']);
+      const categoryMap = new Map<string, Category>();
+
+      // Base: DEFAULT_CATEGORIES
+      DEFAULT_CATEGORIES.forEach((cat) => {
+        if (cat && cat.id) categoryMap.set(cat.id, cat);
+      });
+
+      snapshot.forEach((docSnap) => {
+        if (staleCatIds.has(docSnap.id)) return;
+        const rawData = docSnap.data();
+        let parsed: any = {};
+        if (rawData && rawData.jsonPayload) {
+          try {
+            parsed = JSON.parse(rawData.jsonPayload);
+          } catch (e) {
+            parsed = { id: docSnap.id, ...rawData };
+          }
+        } else if (rawData) {
+          parsed = { id: docSnap.id, ...rawData };
+        }
+        if (!parsed.id) parsed.id = docSnap.id;
+        if (staleCatIds.has(parsed.id)) return;
+        if (parsed.isDeleted) {
+          categoryMap.delete(parsed.id);
+        } else {
+          const existing = categoryMap.get(parsed.id);
+          categoryMap.set(parsed.id, { ...existing, ...parsed });
+        }
+      });
+
+      const updated = Array.from(categoryMap.values());
+      memoryData.categories = updated;
+      saveStoredCategories(updated);
+      saveStoredLocalData(memoryData);
+      notifyListeners();
+    });
   } catch (e) {
     console.warn('Real-time WebSockets listener fallback:', e);
   }
@@ -697,10 +828,35 @@ export function useCartStore() {
       version: 1,
       syncStatus: 'pending',
     };
+    firebaseCloudDb.setDocument('categories', newCategory.id, newCategory);
     enqueueOutboxJob('categories', newCategory.id, 'create', newCategory);
     writeAuditLog('CREATE', 'category', newCategory.id, 'Admin User', null, newCategory);
 
     const updatedCategories = [...memoryData.categories, newCategory];
+    memoryData.categories = updatedCategories;
+    saveStoredCategories(updatedCategories);
+    saveStoredLocalData({ ...memoryData, categories: updatedCategories });
+    notifyListeners();
+    flushOutboxQueue();
+  };
+
+  const updateCategory = async (id: string, updates: Partial<Category>) => {
+    const updatedCategories = memoryData.categories.map((c) => {
+      if (c.id === id) {
+        const updatedCat = {
+          ...c,
+          ...updates,
+          updatedAt: new Date().toISOString(),
+          version: (c.version || 1) + 1,
+        };
+        firebaseCloudDb.setDocument('categories', id, updatedCat);
+        enqueueOutboxJob('categories', id, 'update', updatedCat);
+        return updatedCat;
+      }
+      return c;
+    });
+
+    memoryData.categories = updatedCategories;
     saveStoredCategories(updatedCategories);
     saveStoredLocalData({ ...memoryData, categories: updatedCategories });
     notifyListeners();
@@ -708,7 +864,9 @@ export function useCartStore() {
   };
 
   const deleteCategory = (id: string) => {
+    firebaseCloudDb.deleteDocument('categories', id);
     const updatedCategories = memoryData.categories.filter((c) => c.id !== id);
+    memoryData.categories = updatedCategories;
     saveStoredCategories(updatedCategories);
     saveStoredLocalData({ ...memoryData, categories: updatedCategories });
     notifyListeners();
@@ -1547,6 +1705,7 @@ export function useCartStore() {
     createSupportTicket,
     updateSupportTicketStatus,
     addCategory,
+    updateCategory,
     deleteCategory,
     addProduct,
     updateProduct,

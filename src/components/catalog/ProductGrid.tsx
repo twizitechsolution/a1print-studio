@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Product } from '../../types';
-import { useCartStore } from '../../store/useCartStore';
+import { useCartStore, DEFAULT_CATEGORIES } from '../../store/useCartStore';
 import { ProductCard } from './ProductCard';
 import { NoProductsFound } from '../common/NoProductsFound';
 
@@ -13,15 +13,14 @@ export const ProductGrid: React.FC<ProductGridProps> = ({
   onSelectProduct,
   initialCategory = 'all',
 }) => {
-  const { products } = useCartStore();
+  const { products, categories: storeCategories } = useCartStore();
   const [selectedCategory, setSelectedCategory] = useState<string>(initialCategory);
+
+  const activeCategories = (storeCategories && storeCategories.length > 0) ? storeCategories : DEFAULT_CATEGORIES;
 
   const categories = [
     { id: 'all', label: 'All Custom Frames' },
-    { id: 'baby', label: 'Baby Birth Frames' },
-    { id: 'couple', label: 'Couple & Anniversary' },
-    { id: 'acrylic', label: 'Acrylic Glass' },
-    { id: 'collage', label: 'Photo Collages' },
+    ...activeCategories.map((c) => ({ id: c.slug, label: `${c.icon || ''} ${c.name}`.trim() })),
   ];
 
   const filteredProducts = products.filter((product) => {

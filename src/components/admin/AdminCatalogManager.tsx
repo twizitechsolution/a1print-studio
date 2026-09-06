@@ -28,6 +28,7 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
     categories,
     isStoreLoading,
     addCategory,
+    updateCategory,
     deleteCategory,
     addProduct,
     updateProduct,
@@ -467,6 +468,7 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
         categories={categories}
         products={products}
         onAddCategory={addCategory}
+        onUpdateCategory={updateCategory}
         onDeleteCategory={deleteCategory}
       />
 

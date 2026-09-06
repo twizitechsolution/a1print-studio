@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Product } from '../types';
-import { useCartStore } from '../store/useCartStore';
+import { useCartStore, DEFAULT_CATEGORIES } from '../store/useCartStore';
 import { ProductCard } from '../components/catalog/ProductCard';
 import { ProductGrid } from '../components/catalog/ProductGrid';
 import { ProductFrameDisplay } from '../components/catalog/ProductFrameDisplay';
@@ -14,7 +14,7 @@ interface HomePageProps {
 }
 
 export const HomePage: React.FC<HomePageProps> = ({ onSelectProduct, onNavigate }) => {
-  const { products } = useCartStore();
+  const { products, categories } = useCartStore();
   const safeProducts = (products && products.length > 0) ? products.filter((p) => p && !p.isDeleted) : [];
   
   // 1. New Arrivals: 4 latest products
@@ -28,44 +28,35 @@ export const HomePage: React.FC<HomePageProps> = ({ onSelectProduct, onNavigate 
 
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
 
-  const categoriesList = [
-    {
-      id: 'baby',
-      title: 'Baby Birth Frame',
-      price: 'Rs. 699',
-      itemsCount: '85 items',
-      icon: '👶',
-      product: safeProducts[0] || null,
-      image: 'https://lovecraftbyse.com/wp-content/uploads/2025/02/welcome-baby-boy-scaled.webp',
-    },
-    {
-      id: 'birthday',
-      title: 'Birthday Gifts',
-      price: 'Rs. 699',
-      itemsCount: '59 items',
-      icon: '🎂',
-      product: safeProducts[1] || safeProducts[0] || null,
-      image: 'https://lovecraftbyse.com/wp-content/uploads/2026/03/custom-birthday-collage-photo-frame-personalized-name-date-1.jpg',
-    },
-    {
-      id: 'firstyear',
-      title: 'First Year Photo Frames',
-      price: 'Rs. 699',
-      itemsCount: '24 items',
-      icon: '👶',
-      product: safeProducts[1] || safeProducts[0] || null,
-      image: 'https://lovecraftbyse.com/wp-content/uploads/2026/03/custom-birthday-collage-photo-frame-personalized-name-date-1.jpg',
-    },
-    {
-      id: 'family',
-      title: 'Family Frame',
-      price: 'Rs. 699',
-      itemsCount: '19 items',
-      icon: '🎁',
-      product: safeProducts[2] || safeProducts[0] || null,
-      image: 'https://lovecraftbyse.com/wp-content/uploads/2026/02/personalized-dad-heartbeat-frame-multiple-photos.webp-scaled.webp',
-    },
-  ];
+  // Helper to get real-time product count for a category
+  const getCategoryProductCount = (categorySlug: string, categoryName: string) => {
+    return safeProducts.filter((p) => {
+      const catLower = (p.category || '').toLowerCase();
+      const labelLower = (p.categoryLabel || '').toLowerCase();
+      const slugLower = categorySlug.toLowerCase();
+      const nameLower = categoryName.toLowerCase();
+      return (
+        catLower === slugLower ||
+        labelLower === nameLower ||
+        catLower.includes(slugLower) ||
+        (slugLower.includes('baby') && catLower.includes('baby'))
+      );
+    }).length;
+  };
+
+  // Helper to get image for a category
+  const getCategoryImage = (cat: { imageUrl?: string; slug: string; name: string }) => {
+    if (cat.imageUrl) return cat.imageUrl;
+    const matchingProd = safeProducts.find((p) => {
+      const catLower = (p.category || '').toLowerCase();
+      const labelLower = (p.categoryLabel || '').toLowerCase();
+      return catLower === cat.slug.toLowerCase() || labelLower === cat.name.toLowerCase();
+    });
+    if (matchingProd?.baseImageUrl) return matchingProd.baseImageUrl;
+    if (matchingProd?.thumbnail) return matchingProd.thumbnail;
+    if (matchingProd?.images?.[0]) return matchingProd.images[0];
+    return 'https://lovecraftbyse.com/wp-content/uploads/2026/08/Frame-3-8.png';
+  };
 
   const faqs = [
     {
@@ -181,67 +172,76 @@ export const HomePage: React.FC<HomePageProps> = ({ onSelectProduct, onNavigate 
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {categoriesList.map((cat) => (
-              <div
-                key={cat.id}
-                onClick={() => onNavigate('catalog')}
-                className="bg-white rounded-3xl border border-pink-100 shadow-md hover:shadow-xl transition-all duration-300 p-4 group cursor-pointer space-y-4 flex flex-col justify-between"
-              >
-                {/* Card Top Image & Badges Container */}
-                <div className="relative w-full aspect-3/4 rounded-2xl overflow-hidden bg-gray-50 flex items-center justify-center p-2">
-                  
-                  {/* Top-Left Starts at Rs. 699 Badge */}
-                  <div className="absolute top-3 left-3 z-20">
-                    <span className="px-3 py-1 bg-[#F82BA9] text-white text-[11px] font-extrabold rounded-full shadow-md uppercase tracking-wider">
-                      Starts at {cat.price}
-                    </span>
-                  </div>
+            {(categories && categories.length > 0 ? categories : DEFAULT_CATEGORIES).map((cat) => {
+              const count = getCategoryProductCount(cat.slug, cat.name);
+              const catImage = getCategoryImage(cat);
 
-                  {/* Top-Right Circle Icon */}
-                  <div className="absolute top-3 right-3 z-20 w-8 h-8 rounded-full bg-gradient-to-r from-[#160E4B] to-[#3C187B] text-white flex items-center justify-center text-sm shadow-md">
-                    {cat.icon}
-                  </div>
+              return (
+                <div
+                  key={cat.id}
+                  onClick={() => onNavigate('catalog', cat.slug)}
+                  className="bg-white rounded-3xl border border-pink-100/90 shadow-xs hover:shadow-xl transition-all duration-300 p-4 group cursor-pointer space-y-4 flex flex-col justify-between"
+                >
+                  {/* Card Top Image & Badges Container */}
+                  <div className="relative w-full aspect-square rounded-2xl overflow-hidden bg-gray-50 flex items-center justify-center p-2">
+                    
+                    {/* Top-Left Starts at Rs. 699 Badge */}
+                    <div className="absolute top-3 left-3 z-20">
+                      <span className="px-3 py-1 bg-[#F82BA9] text-white text-[11px] font-extrabold rounded-full shadow-md uppercase tracking-wider">
+                        Starts at Rs. 699
+                      </span>
+                    </div>
 
-                  {/* Frame Display Image */}
-                  <div className="w-full h-full relative rounded-xl overflow-hidden">
-                    {cat.product ? (
-                      <ProductFrameDisplay product={cat.product} fontScale={0.5} />
-                    ) : (
+                    {/* Floating Emoji Badge (LovecraftbySE style) */}
+                    <div className="absolute bottom-3 right-3 z-20 w-8 h-8 rounded-full bg-white/95 backdrop-blur-xs text-black border border-pink-200/80 flex items-center justify-center text-sm shadow-md">
+                      {cat.icon || '🎁'}
+                    </div>
+
+                    {/* Category Thumbnail Image */}
+                    <div className="w-full h-full relative rounded-xl overflow-hidden">
                       <img
-                        src={cat.image}
-                        alt={cat.title}
+                        src={catImage}
+                        alt={cat.name}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        loading="lazy"
                       />
-                    )}
+                    </div>
                   </div>
-                </div>
 
-                {/* Card Title & Heart divider */}
-                <div className="text-center space-y-1">
-                  <h3 className="font-playfair text-lg font-extrabold text-[#160E4B] group-hover:text-[#F82BA9] transition-colors">
-                    {cat.title}
-                  </h3>
-                  <div className="text-[10px] text-pink-400 font-bold flex items-center justify-center gap-1">
-                    <span>•</span> <span>💖</span> <span>•</span>
+                  {/* Card Title & Heart divider */}
+                  <div className="text-center space-y-1">
+                    <h3 className="font-playfair text-lg font-extrabold text-[#160E4B] group-hover:text-[#F82BA9] transition-colors">
+                      {cat.name}
+                    </h3>
+                    <div className="text-[10px] text-pink-400 font-bold flex items-center justify-center gap-1.5">
+                      <span className="h-px w-6 bg-pink-200" />
+                      <span>💖</span>
+                      <span className="h-px w-6 bg-pink-200" />
+                    </div>
                   </div>
+
+                  {/* Card Footer: Live Database Count + Shop Now CTA */}
+                  <div className="flex items-center justify-between gap-2 pt-2 border-t border-gray-100 text-xs">
+                    <span className="px-3 py-1.5 bg-pink-50 text-[#F82BA9] font-extrabold rounded-full border border-pink-200 text-[11px] flex items-center gap-1.5">
+                      <ShoppingBag className="w-3.5 h-3.5" />
+                      {count} {count === 1 ? 'item' : 'items'}
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onNavigate('catalog', cat.slug);
+                      }}
+                      className="px-4 py-2 bg-gradient-to-r from-[#3C187B] to-[#F82BA9] text-white font-extrabold text-xs rounded-xl shadow-xs hover:from-[#2A1058] hover:to-[#D61B90] transition-colors flex items-center gap-1 cursor-pointer"
+                    >
+                      Shop Now <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
                 </div>
-
-                {/* Card Footer Pills */}
-                <div className="flex items-center justify-between gap-2 pt-2 border-t border-gray-100 text-xs">
-                  <span className="px-3 py-1.5 bg-pink-50 text-[#F82BA9] font-extrabold rounded-full border border-pink-200 text-[11px]">
-                    {cat.itemsCount}
-                  </span>
-
-                  <button
-                    type="button"
-                    className="px-4 py-2 bg-gradient-to-r from-[#3C187B] to-[#F82BA9] text-white font-extrabold text-xs rounded-xl shadow-xs hover:from-[#2A1058] hover:to-[#D61B90] transition-colors flex items-center gap-1 cursor-pointer"
-                  >
-                    Shop Now <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-
-              </div>
-            ))}
+              );
+            })}
           </div>
 
         </div>
