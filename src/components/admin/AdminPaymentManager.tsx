@@ -30,23 +30,23 @@ export const AdminPaymentManager: React.FC = () => {
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
   useEffect(() => {
-    const ACTIVE_TEST_KEY_ID = 'rzp_test_TYSPQZzQyFvo5R';
-    const ACTIVE_TEST_SECRET = 'NsYccXBCP1E6HWC7HlfNPuqZ';
+    const ACTIVE_KEY_ID = 'rzp_live_TYixCQSVrMZ1et';
+    const ACTIVE_SECRET = 'FrL6S0QU2AqHddY2NHCiV706';
 
     const savedKeyId = localStorage.getItem('razorpay_key_id');
     const savedKeySecret = localStorage.getItem('razorpay_key_secret');
-    if (savedKeyId && !savedKeyId.includes('TWrhN46NzOrFA4')) {
+    if (savedKeyId && !savedKeyId.includes('TWrhN46NzOrFA4') && !savedKeyId.includes('TYNgRtF4okt1OS') && !savedKeyId.includes('TYSPQZzQyFvo5R')) {
       setKeyId(savedKeyId);
     } else {
-      setKeyId(ACTIVE_TEST_KEY_ID);
-      localStorage.setItem('razorpay_key_id', ACTIVE_TEST_KEY_ID);
+      setKeyId(ACTIVE_KEY_ID);
+      localStorage.setItem('razorpay_key_id', ACTIVE_KEY_ID);
     }
 
-    if (savedKeySecret && !savedKeySecret.includes('1OoKv4t5vKRYfYGRRqCpv9H0')) {
+    if (savedKeySecret && !savedKeySecret.includes('1OoKv4t5vKRYfYGRRqCpv9H0') && !savedKeySecret.includes('CVrTE63SZWXHNl02pCZ0BXd6') && !savedKeySecret.includes('NsYccXBCP1E6HWC7HlfNPuqZ')) {
       setKeySecret(savedKeySecret);
     } else {
-      setKeySecret(ACTIVE_TEST_SECRET);
-      localStorage.setItem('razorpay_key_secret', ACTIVE_TEST_SECRET);
+      setKeySecret(ACTIVE_SECRET);
+      localStorage.setItem('razorpay_key_secret', ACTIVE_SECRET);
     }
 
     // Sync credentials from Cloud Firestore
@@ -55,19 +55,19 @@ export const AdminPaymentManager: React.FC = () => {
         const docs = await firebaseCloudDb.getCollection('store_settings');
         const gatewayDoc = docs?.find((d) => d.id === 'payment_gateway');
         if (gatewayDoc) {
-          if (gatewayDoc.razorpay_key_id && !gatewayDoc.razorpay_key_id.includes('TWrhN46NzOrFA4') && !gatewayDoc.razorpay_key_id.includes('TYNgRtF4okt1OS')) {
+          if (gatewayDoc.razorpay_key_id && !gatewayDoc.razorpay_key_id.includes('TWrhN46NzOrFA4') && !gatewayDoc.razorpay_key_id.includes('TYNgRtF4okt1OS') && !gatewayDoc.razorpay_key_id.includes('TYSPQZzQyFvo5R')) {
             setKeyId(gatewayDoc.razorpay_key_id);
             localStorage.setItem('razorpay_key_id', gatewayDoc.razorpay_key_id);
           } else {
-            setKeyId(ACTIVE_TEST_KEY_ID);
-            localStorage.setItem('razorpay_key_id', ACTIVE_TEST_KEY_ID);
+            setKeyId(ACTIVE_KEY_ID);
+            localStorage.setItem('razorpay_key_id', ACTIVE_KEY_ID);
           }
-          if (gatewayDoc.razorpay_key_secret && !gatewayDoc.razorpay_key_secret.includes('1OoKv4t5vKRYfYGRRqCpv9H0') && !gatewayDoc.razorpay_key_secret.includes('CVrTE63SZWXHNl02pCZ0BXd6')) {
+          if (gatewayDoc.razorpay_key_secret && !gatewayDoc.razorpay_key_secret.includes('1OoKv4t5vKRYfYGRRqCpv9H0') && !gatewayDoc.razorpay_key_secret.includes('CVrTE63SZWXHNl02pCZ0BXd6') && !gatewayDoc.razorpay_key_secret.includes('NsYccXBCP1E6HWC7HlfNPuqZ')) {
             setKeySecret(gatewayDoc.razorpay_key_secret);
             localStorage.setItem('razorpay_key_secret', gatewayDoc.razorpay_key_secret);
           } else {
-            setKeySecret(ACTIVE_TEST_SECRET);
-            localStorage.setItem('razorpay_key_secret', ACTIVE_TEST_SECRET);
+            setKeySecret(ACTIVE_SECRET);
+            localStorage.setItem('razorpay_key_secret', ACTIVE_SECRET);
           }
           if (gatewayDoc.codFee !== undefined) setCodFee(gatewayDoc.codFee);
         }

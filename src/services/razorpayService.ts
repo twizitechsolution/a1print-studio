@@ -21,7 +21,7 @@ export interface CustomerCheckoutDetails {
 
 // Dynamic Live Razorpay Key Resolver from Environment or Database
 export const getLiveRazorpayKeyId = async (): Promise<string> => {
-  const ACTIVE_KEY = 'rzp_test_TYSPQZzQyFvo5R';
+  const ACTIVE_KEY = 'rzp_live_TYixCQSVrMZ1et';
 
   const localKey = localStorage.getItem('razorpay_key_id');
   if (localKey !== ACTIVE_KEY) {
