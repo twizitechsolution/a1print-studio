@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Order, CartItem, ProcessingHistoryItem } from '../../types';
 import { LiveCustomizedFrameThumbnail } from '../customizer/LiveCustomizedFrameThumbnail';
-import { Download, Loader2, Printer, X, Calendar, Clock, User, Filter, ChevronLeft, ChevronRight, FileText, CheckCircle2, History, Tag, ShieldCheck, Search, Trash2, RotateCcw, ArrowUpDown } from 'lucide-react';
+import { Download, Loader2, Printer, X, Calendar, Clock, User, Filter, ChevronLeft, ChevronRight, FileText, CheckCircle2, History, Tag, ShieldCheck, Search, Trash2, RotateCcw, ArrowUpDown, Image as ImageIcon } from 'lucide-react';
 import { useCartStore } from '../../store/useCartStore';
 
 interface AdminOrderListProps {
@@ -318,98 +318,125 @@ export const AdminOrderList: React.FC<AdminOrderListProps> = ({
       const innerW = targetW - borderThickness * 2;
       const innerH = targetH - borderThickness * 2;
 
-      const printSrc =
-        (item.product?.baseImageUrl && !item.product.baseImageUrl.includes('[COMPRESSED_FIRESTORE_PREVIEW]') ? item.product.baseImageUrl : null) ||
-        (item.product?.thumbnail && !item.product.thumbnail.includes('[COMPRESSED_FIRESTORE_PREVIEW]') ? item.product.thumbnail : null) ||
-        (item.product?.image && !item.product.image.includes('[COMPRESSED_FIRESTORE_PREVIEW]') ? item.product.image : null) ||
-        'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80';
+      // 1. Check if complete high-res composite customized preview exists from customer session
+      const compositeUrl = item.customizedFramePreviewUrl;
+      const hasComposite =
+        Boolean(compositeUrl) &&
+        (compositeUrl!.startsWith('http') || compositeUrl!.startsWith('data:image')) &&
+        !compositeUrl!.includes('[COMPRESSED') &&
+        compositeUrl !== item.product?.thumbnail &&
+        compositeUrl !== item.product?.baseImageUrl;
 
-      const baseDataUri = await urlToBase64DataUri(printSrc);
-      const baseImg = await loadBase64Image(baseDataUri, 4000);
-
-      if (baseImg) {
-        const imgRatio = baseImg.width / baseImg.height;
-        const targetRatio = innerW / innerH;
-        let sx = 0, sy = 0, sWidth = baseImg.width, sHeight = baseImg.height;
-
-        if (imgRatio > targetRatio) {
-          sWidth = baseImg.height * targetRatio;
-          sx = (baseImg.width - sWidth) / 2;
-        } else {
-          sHeight = baseImg.width / targetRatio;
-          sy = (baseImg.height - sHeight) / 2;
+      let drawnFromComposite = false;
+      if (hasComposite) {
+        try {
+          const compDataUri = await urlToBase64DataUri(compositeUrl!);
+          const compImg = await loadBase64Image(compDataUri, 5000);
+          if (compImg && compImg.width > 200) {
+            ctx.drawImage(compImg, 0, 0, targetW, targetH);
+            drawnFromComposite = true;
+          }
+        } catch (e) {
+          console.warn('Composite preview load fallback:', e);
         }
-
-        ctx.drawImage(baseImg, sx, sy, sWidth, sHeight, innerX, innerY, innerW, innerH);
-      } else {
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(innerX, innerY, innerW, innerH);
       }
 
-      const photoSlots = item.product?.photoSlots || [];
-      const textZones = item.product?.textZones || [];
+      if (!drawnFromComposite) {
+        const printSrc =
+          (item.product?.baseImageUrl && !item.product.baseImageUrl.includes('[COMPRESSED_FIRESTORE_PREVIEW]') ? item.product.baseImageUrl : null) ||
+          (item.product?.thumbnail && !item.product.thumbnail.includes('[COMPRESSED_FIRESTORE_PREVIEW]') ? item.product.thumbnail : null) ||
+          (item.product?.image && !item.product.image.includes('[COMPRESSED_FIRESTORE_PREVIEW]') ? item.product.image : null) ||
+          'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80';
 
-      for (const slot of photoSlots) {
-        const photoUrl =
-          item.customTextValues?.[slot.id] ||
-          (slot.id === 'photo-1' || slot.id === 'babyPhoto' ? item.uploadedPhotoUrl : '') ||
-          (Object.values(item.customTextValues || {}).find((val) => typeof val === 'string' && val.startsWith('data:image')) as string || '');
-        if (!photoUrl) continue;
+        const baseDataUri = await urlToBase64DataUri(printSrc);
+        const baseImg = await loadBase64Image(baseDataUri, 4000);
 
-        const photoDataUri = await urlToBase64DataUri(photoUrl);
-        const photoImg = await loadBase64Image(photoDataUri, 4000);
-
-        if (photoImg) {
-          const centerX = innerX + (slot.x / 100) * innerW;
-          const centerY = innerY + (slot.y / 100) * innerH;
-          const slotW = (slot.width / 100) * innerW;
-          const slotH = (slot.height / 100) * innerH;
-          const leftX = centerX - slotW / 2;
-          const topY = centerY - slotH / 2;
-
-          ctx.save();
-          ctx.beginPath();
-          if (slot.shape === 'circle') {
-            ctx.arc(centerX, centerY, slotW / 2, 0, Math.PI * 2);
-          } else {
-            ctx.rect(leftX, topY, slotW, slotH);
-          }
-          ctx.clip();
-
-          const imgRatio = photoImg.width / photoImg.height;
-          const targetRatio = slotW / slotH;
-          let sx = 0, sy = 0, sWidth = photoImg.width, sHeight = photoImg.height;
+        if (baseImg) {
+          const imgRatio = baseImg.width / baseImg.height;
+          const targetRatio = innerW / innerH;
+          let sx = 0, sy = 0, sWidth = baseImg.width, sHeight = baseImg.height;
 
           if (imgRatio > targetRatio) {
-            sWidth = photoImg.height * targetRatio;
-            sx = (photoImg.width - sWidth) / 2;
+            sWidth = baseImg.height * targetRatio;
+            sx = (baseImg.width - sWidth) / 2;
           } else {
-            sHeight = photoImg.width / targetRatio;
-            sy = (photoImg.height - sHeight) / 2;
+            sHeight = baseImg.width / targetRatio;
+            sy = (baseImg.height - sHeight) / 2;
           }
 
-          ctx.drawImage(photoImg, sx, sy, sWidth, sHeight, leftX, topY, slotW, slotH);
-          ctx.restore();
+          ctx.drawImage(baseImg, sx, sy, sWidth, sHeight, innerX, innerY, innerW, innerH);
+        } else {
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(innerX, innerY, innerW, innerH);
         }
-      }
 
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
+        const photoSlots = item.product?.photoSlots || [];
+        const textZones = item.product?.textZones || [];
 
-      for (const zone of textZones) {
-        const val = item.customTextValues[zone.id] || zone.defaultValue;
-        if (val && typeof val === 'string' && !val.startsWith('data:image')) {
-          ctx.fillStyle = zone.color || '#000000';
-          ctx.font = `bold ${zone.fontSize * 1.6}px sans-serif`;
-          const textX = innerX + (zone.x / 100) * innerW;
-          const textY = innerY + (zone.y / 100) * innerH;
-          ctx.fillText(val, textX, textY);
+        for (const slot of photoSlots) {
+          const photoUrl =
+            item.customTextValues?.[slot.id] ||
+            (slot.id === 'photo-1' || slot.id === 'babyPhoto' ? item.uploadedPhotoUrl : '') ||
+            (Object.values(item.customTextValues || {}).find(
+              (val) => typeof val === 'string' && (val.startsWith('data:image') || val.startsWith('http://') || val.startsWith('https://'))
+            ) as string || '');
+          if (!photoUrl) continue;
+
+          const photoDataUri = await urlToBase64DataUri(photoUrl);
+          const photoImg = await loadBase64Image(photoDataUri, 4000);
+
+          if (photoImg) {
+            const centerX = innerX + (slot.x / 100) * innerW;
+            const centerY = innerY + (slot.y / 100) * innerH;
+            const slotW = (slot.width / 100) * innerW;
+            const slotH = (slot.height / 100) * innerH;
+            const leftX = centerX - slotW / 2;
+            const topY = centerY - slotH / 2;
+
+            ctx.save();
+            ctx.beginPath();
+            if (slot.shape === 'circle') {
+              ctx.arc(centerX, centerY, slotW / 2, 0, Math.PI * 2);
+            } else {
+              ctx.rect(leftX, topY, slotW, slotH);
+            }
+            ctx.clip();
+
+            const imgRatio = photoImg.width / photoImg.height;
+            const targetRatio = slotW / slotH;
+            let sx = 0, sy = 0, sWidth = photoImg.width, sHeight = photoImg.height;
+
+            if (imgRatio > targetRatio) {
+              sWidth = photoImg.height * targetRatio;
+              sx = (photoImg.width - sWidth) / 2;
+            } else {
+              sHeight = photoImg.width / targetRatio;
+              sy = (photoImg.height - sHeight) / 2;
+            }
+
+            ctx.drawImage(photoImg, sx, sy, sWidth, sHeight, leftX, topY, slotW, slotH);
+            ctx.restore();
+          }
         }
-      }
 
-      ctx.strokeStyle = '#000000';
-      ctx.lineWidth = borderThickness * 2;
-      ctx.strokeRect(0, 0, targetW, targetH);
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        for (const zone of textZones) {
+          const val = item.customTextValues[zone.id] || zone.defaultValue;
+          if (val && typeof val === 'string' && !val.startsWith('data:image')) {
+            ctx.fillStyle = zone.color || '#000000';
+            ctx.font = `bold ${zone.fontSize * 1.6}px sans-serif`;
+            const textX = innerX + (zone.x / 100) * innerW;
+            const textY = innerY + (zone.y / 100) * innerH;
+            ctx.fillText(val, textX, textY);
+          }
+        }
+
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = borderThickness * 2;
+        ctx.strokeRect(0, 0, targetW, targetH);
+      }
 
       const highResDataUri = canvas.toDataURL('image/png', 1.0);
       const link = document.createElement('a');
@@ -423,6 +450,46 @@ export const AdminOrderList: React.FC<AdminOrderListProps> = ({
     } catch (e) {
       console.error('Print download error:', e);
       setDownloadingOrderId(null);
+    }
+  };
+
+  // Direct Downloader for Customer Uploaded Raw Photos
+  const handleDownloadCustomerUploadedPhotos = async (order: Order, itemIndex: number) => {
+    const item = order.items[itemIndex];
+    if (!item) return;
+
+    const photos: { name: string; url: string }[] = [];
+    if (item.uploadedPhotoUrl && (item.uploadedPhotoUrl.startsWith('http') || item.uploadedPhotoUrl.startsWith('data:image'))) {
+      photos.push({ name: `${order.id}-item${itemIndex + 1}-main-photo.png`, url: item.uploadedPhotoUrl });
+    }
+
+    Object.entries(item.customTextValues || {}).forEach(([key, val]) => {
+      if (typeof val === 'string' && (val.startsWith('http') || val.startsWith('data:image')) && !photos.some(p => p.url === val)) {
+        photos.push({ name: `${order.id}-item${itemIndex + 1}-${key}.png`, url: val });
+      }
+    });
+
+    if (item.customizedFramePreviewUrl && (item.customizedFramePreviewUrl.startsWith('http') || item.customizedFramePreviewUrl.startsWith('data:image')) && !photos.some(p => p.url === item.customizedFramePreviewUrl)) {
+      photos.push({ name: `${order.id}-item${itemIndex + 1}-customized-preview.png`, url: item.customizedFramePreviewUrl });
+    }
+
+    if (photos.length === 0) {
+      alert('No customer uploaded photos found for this item.');
+      return;
+    }
+
+    for (const p of photos) {
+      try {
+        const dataUri = await urlToBase64DataUri(p.url);
+        const link = document.createElement('a');
+        link.download = p.name;
+        link.href = dataUri;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } catch (err) {
+        console.warn('Failed to download photo:', err);
+      }
     }
   };
 
@@ -941,9 +1008,18 @@ export const AdminOrderList: React.FC<AdminOrderListProps> = ({
                                 </>
                               ) : (
                                 <>
-                                  <Download className="w-3.5 h-3.5" /> Download Customer Print File
+                                  <Download className="w-3.5 h-3.5" /> Download Print File
                                 </>
                               )}
+                            </button>
+
+                            {/* Direct Customer Uploaded Raw Photos Download Button */}
+                            <button
+                              onClick={() => handleDownloadCustomerUploadedPhotos(order, idx)}
+                              className="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs rounded-lg shadow-xs transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer"
+                              title="Download original uploaded photos"
+                            >
+                              <ImageIcon className="w-3.5 h-3.5" /> Photos
                             </button>
 
                             {/* Print Preview Modal Button */}

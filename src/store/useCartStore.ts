@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { CartItem, Order, Product, Category, StockLogItem } from '../types';
 import { PRODUCTS as INITIAL_PRODUCTS } from '../data/products';
-import { firebaseCloudDb, firebaseDb, collection, onSnapshot } from '../config/firebase';
+import { firebaseCloudDb, firebaseDb, collection, onSnapshot, uploadOrderArtwork } from '../config/firebase';
 import { enqueueOutboxJob, flushOutboxQueue, writeAuditLog, getStoredOutboxJobs } from '../services/outboxService';
+import { sendOrderConfirmationEmail, sendOrderShippedEmail, sendOrderDeliveredEmail } from '../services/emailService';
 
 const STORAGE_KEY = 'a1print_store_data_v20';
 const DELETED_IDS_KEY = 'a1print_deleted_product_ids_v20';
@@ -367,14 +368,17 @@ function getStoredLocalData(): StoreData {
 let memoryData: StoreData = getStoredLocalData();
 
 function optimizeDataForLocalStorage(data: StoreData): StoreData {
-  // Only sanitize transient cart items customizedFramePreviewUrl (not master catalog product images!)
   return {
     ...data,
     items: (data.items || []).map((item) => ({
       ...item,
-      customizedFramePreviewUrl: item.customizedFramePreviewUrl && item.customizedFramePreviewUrl.length > 50000
-        ? item.customizedFramePreviewUrl.substring(0, 15000) + '...[COMPRESSED_PREVIEW]'
-        : item.customizedFramePreviewUrl,
+      // Only clear if raw uncompressed Base64 > 250KB to protect localStorage quota. Permanent CDN URLs remain untouched.
+      customizedFramePreviewUrl:
+        item.customizedFramePreviewUrl &&
+        item.customizedFramePreviewUrl.startsWith('data:image') &&
+        item.customizedFramePreviewUrl.length > 250000
+          ? ''
+          : item.customizedFramePreviewUrl,
     })),
   };
 }
@@ -1400,10 +1404,63 @@ export function useCartStore() {
       orderStatus = 'Received';
     }
 
+    const orderId = `ORD-${Math.floor(100000 + Math.random() * 900000)}`;
+
+    // Upload custom artwork & customer photos to Cloudinary to preserve permanently
+    let processedOrderItems: CartItem[] = orderItems;
+    try {
+      processedOrderItems = await Promise.all(
+        orderItems.map(async (item, itemIdx) => {
+          let previewUrl = item.customizedFramePreviewUrl || '';
+          let photoUrl = item.uploadedPhotoUrl || '';
+          const customTexts: Record<string, string> = { ...(item.customTextValues || {}) };
+
+          // 1. Upload composite customized frame preview if it's Base64
+          if (previewUrl && previewUrl.startsWith('data:image')) {
+            try {
+              previewUrl = await uploadOrderArtwork(orderId, previewUrl, `frame-preview-${itemIdx}.png`);
+            } catch (err) {
+              console.warn(`Failed to upload preview for item ${itemIdx}:`, err);
+            }
+          }
+
+          // 2. Upload main customer photo if Base64
+          if (photoUrl && photoUrl.startsWith('data:image')) {
+            try {
+              photoUrl = await uploadOrderArtwork(orderId, photoUrl, `photo-main-${itemIdx}.png`);
+            } catch (err) {
+              console.warn(`Failed to upload main photo for item ${itemIdx}:`, err);
+            }
+          }
+
+          // 3. Upload slot photos in customTextValues (e.g. photo-1, photo-2, babyPhoto)
+          for (const [key, val] of Object.entries(customTexts)) {
+            if (typeof val === 'string' && val.startsWith('data:image')) {
+              try {
+                customTexts[key] = await uploadOrderArtwork(orderId, val, `${key}-${itemIdx}.png`);
+              } catch (err) {
+                console.warn(`Failed to upload ${key} for item ${itemIdx}:`, err);
+              }
+            }
+          }
+
+          return {
+            ...item,
+            customizedFramePreviewUrl: previewUrl,
+            uploadedPhotoUrl: photoUrl,
+            customTextValues: customTexts,
+          };
+        })
+      );
+    } catch (e) {
+      console.warn('Artwork upload fallback:', e);
+      processedOrderItems = orderItems;
+    }
+
     const newOrder: Order = {
-      id: `ORD-${Math.floor(100000 + Math.random() * 900000)}`,
+      id: orderId,
       customer,
-      items: orderItems,
+      items: processedOrderItems,
       subtotal: orderSubtotal,
       discount: 0,
       shipping: 0,
@@ -1460,6 +1517,11 @@ export function useCartStore() {
       console.warn('Direct order write error, queued in outbox for retry:', e);
     }
 
+    // Trigger automated Order Confirmation Email asynchronously
+    sendOrderConfirmationEmail(newOrder).catch((err) => {
+      console.warn('Order confirmation email trigger warning:', err);
+    });
+
     return newOrder;
   };
 
@@ -1498,6 +1560,18 @@ export function useCartStore() {
         };
 
         firebaseCloudDb.setDocument('orders', updated.id, updated);
+
+        // Trigger automated transactional status emails
+        if (status === 'Shipped') {
+          sendOrderShippedEmail(updated, updated.trackingNumber, updated.courierPartner).catch((err) => {
+            console.warn('Order shipped email trigger warning:', err);
+          });
+        } else if (status === 'Delivered') {
+          sendOrderDeliveredEmail(updated).catch((err) => {
+            console.warn('Order delivered email trigger warning:', err);
+          });
+        }
+
         return updated;
       }
       return ord;

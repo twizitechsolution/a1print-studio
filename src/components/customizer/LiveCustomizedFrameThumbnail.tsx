@@ -18,14 +18,16 @@ export const LiveCustomizedFrameThumbnail: React.FC<LiveCustomizedFrameThumbnail
   const product = item?.product || {};
 
   const rawCustomizedUrl = item?.customizedFramePreviewUrl || '';
-  const isCompiledBase64 =
-    rawCustomizedUrl.startsWith('data:image') &&
+  const isCompiledPreview =
+    Boolean(rawCustomizedUrl) &&
+    (rawCustomizedUrl.startsWith('data:image') || rawCustomizedUrl.startsWith('http://') || rawCustomizedUrl.startsWith('https://')) &&
     !rawCustomizedUrl.includes('[COMPRESSED_FIRESTORE_PREVIEW]') &&
+    !rawCustomizedUrl.includes('[COMPRESSED_PREVIEW]') &&
     rawCustomizedUrl !== product?.thumbnail &&
     rawCustomizedUrl !== product?.baseImageUrl;
 
-  // IF A VALID COMPILED DATA URI preview EXISTS, RENDER IT DIRECTLY!
-  if (isCompiledBase64) {
+  // IF A VALID COMPILED PREVIEW (Base64 OR Cloudinary URL) EXISTS, RENDER IT DIRECTLY!
+  if (isCompiledPreview) {
     return (
       <div
         className={`relative w-full aspect-[3/4.4] rounded-xs border-2 sm:border-4 border-black shadow-lg bg-white overflow-hidden ${className}`}
@@ -76,7 +78,9 @@ export const LiveCustomizedFrameThumbnail: React.FC<LiveCustomizedFrameThumbnail
         const photoSrc =
           customText[slot.id] ||
           (slot.id === 'photo-1' || slot.id === 'babyPhoto' ? item.uploadedPhotoUrl : '') ||
-          (Object.values(customText).find((val) => val && typeof val === 'string' && val.startsWith('data:image')) as string || '');
+          (Object.values(customText).find(
+            (val) => val && typeof val === 'string' && (val.startsWith('data:image') || val.startsWith('http://') || val.startsWith('https://'))
+          ) as string || '');
         if (!photoSrc) return null;
         const shapeStyles = getFrameShapeStyles(slot.shape);
 

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { firebaseCloudDb } from '../config/firebase';
+import { sendWelcomeEmail } from '../services/emailService';
 
 export interface SavedAddress {
   id: string;
@@ -208,6 +209,11 @@ export function useAuthStore() {
     globalAuthState.isAuthenticated = true;
     globalAuthState.isAuthModalOpen = false;
     notifyAuthListeners();
+
+    if (newUser.email && newUser.email.includes('@') && !newUser.email.endsWith('@a1printstudio.com')) {
+      sendWelcomeEmail(newUser).catch((err) => console.warn('Welcome email trigger warning:', err));
+    }
+
     return true;
   };
 

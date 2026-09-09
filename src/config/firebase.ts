@@ -206,8 +206,57 @@ export async function uploadAllProductImages(
   };
 }
 
-// Helper: Sanitize payload — strip any Base64 image data before writing to Firestore.
-// Images should be Firebase Storage URLs by now; this is a safety net.
+/**
+ * Upload an order artwork or customer photo to Cloudinary under folder a1print/orders/{orderId}.
+ * Accepts either a Base64 string or a Blob.
+ * If already an HTTP/HTTPS URL, returns it directly.
+ */
+export async function uploadOrderArtwork(
+  orderId: string,
+  imageBlobOrBase64: Blob | string,
+  fileName: string
+): Promise<string> {
+  if (!imageBlobOrBase64) return '';
+  if (typeof imageBlobOrBase64 === 'string') {
+    if (imageBlobOrBase64.startsWith('http://') || imageBlobOrBase64.startsWith('https://')) {
+      return imageBlobOrBase64;
+    }
+  }
+
+  const cloudName = CLOUDINARY_CONFIG.cloudName?.trim() || 'dcnnn0ogm';
+  const uploadPreset = CLOUDINARY_CONFIG.uploadPreset?.trim() || 'a1print_products';
+
+  const formData = new FormData();
+  if (typeof imageBlobOrBase64 === 'string') {
+    const blob = base64ToBlob(imageBlobOrBase64);
+    formData.append('file', blob, fileName);
+  } else {
+    formData.append('file', imageBlobOrBase64, fileName);
+  }
+
+  formData.append('upload_preset', uploadPreset);
+  formData.append('folder', `a1print/orders/${orderId}`);
+
+  const endpoint = `https://api.cloudinary.com/v1_1/${encodeURIComponent(cloudName)}/image/upload`;
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    body: formData,
+  });
+
+  const data = await response.json();
+  if (!response.ok || data.error) {
+    const errorMsg = data.error?.message || `Cloudinary order upload failed (HTTP ${response.status})`;
+    console.warn('Cloudinary order upload error:', data);
+    throw new Error(errorMsg);
+  }
+
+  return data.secure_url || data.url;
+}
+
+// Helper: Sanitize payload before writing to Firestore.
+// Preserves permanent Cloudinary/Storage HTTPS URLs.
+// For raw Base64 data, strips only if larger than 150KB to protect Firestore document size limit (1MB),
+// while preserving compact previews and never stripping legitimate HTTPS URLs!
 function sanitizePayloadForFirestore(obj: any): any {
   if (!obj || typeof obj !== 'object') return obj;
   if (Array.isArray(obj)) {
@@ -217,9 +266,15 @@ function sanitizePayloadForFirestore(obj: any): any {
   const sanitized: Record<string, any> = {};
   for (const [key, val] of Object.entries(obj)) {
     if (typeof val === 'string') {
-      // SAFETY NET: Strip any Base64 image data that shouldn't be in Firestore
-      if (val.startsWith('data:image')) {
-        sanitized[key] = ''; // Images must be Storage URLs, not Base64
+      if (val.startsWith('http://') || val.startsWith('https://')) {
+        sanitized[key] = val; // Permanent CDN URLs are 100% safe!
+      } else if (val.startsWith('data:image')) {
+        // Strip only if exceedingly large (> 150KB) to prevent Firestore 1MB document quota error
+        if (val.length < 150000) {
+          sanitized[key] = val;
+        } else {
+          sanitized[key] = '';
+        }
       } else {
         sanitized[key] = val;
       }
