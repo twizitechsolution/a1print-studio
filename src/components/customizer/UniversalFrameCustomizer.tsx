@@ -7,6 +7,7 @@ import { InteractiveCalendarZone } from './InteractiveCalendarZone';
 import { getRandomBirthdayMessage } from '../../data/messageBank';
 import { DeliveryPincodeChecker } from '../cart/DeliveryPincodeChecker';
 import { getFrameShapeStyles } from '../../utils/shapeStyles';
+import { resolveVisibility } from '../../admin/template-studio/utils/templateDefaults';
 
 interface UniversalFrameCustomizerProps {
   template: UniversalFrameTemplate;
@@ -296,13 +297,27 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
   const [activeSlotId, setActiveSlotId] = useState<string | null>(null);
   const [tempUploadedImage, setTempUploadedImage] = useState<string | null>(null);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const rawPhotoSlots = template.photoSlots || [];
+  const rawTextZones = template.textZones || [];
 
-  const photoSlots = template.photoSlots || [];
-  const textZones = template.textZones || [];
+  // Phase 4: Enforce LayerVisibility
+  // Admin layers with userVisible === false are hidden from the customer's customization controls
+  const visiblePhotoSlots = useMemo(
+    () => rawPhotoSlots.filter((slot) => resolveVisibility(slot.visibility).userVisible),
+    [rawPhotoSlots]
+  );
+
+  const visibleTextZones = useMemo(
+    () => rawTextZones.filter((zone) => resolveVisibility(zone.visibility).userVisible),
+    [rawTextZones]
+  );
 
   // Handle Photo Select -> Opens Crop Modal
   const handleOpenCropModal = (slotId: string) => {
+    const slot = rawPhotoSlots.find((s) => s.id === slotId);
+    if (slot && !resolveVisibility(slot.visibility).userEditable) {
+      return; // Non-editable slot
+    }
     setActiveSlotId(slotId);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -336,19 +351,31 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
     setActiveSlotId(null);
   };
 
-  // Proceed with High-Res Export -> Checkout (Strict Mandatory Field Validation!)
+  // Proceed with High-Res Export -> Checkout (Strict Validation on REQUIRED Visible Fields Only!)
   const handleProceedWithExport = async () => {
-    // 1. Mandatory Text Fields Validation
-    const missingText = (template.textZones || []).filter((z) => !textValues[z.id] || textValues[z.id].trim() === '');
+    // 1. Mandatory Text Fields Validation (only for visible & required text zones)
+    const missingText = visibleTextZones.filter((z) => {
+      const vis = resolveVisibility(z.visibility);
+      if (!vis.required) return false;
+      return !textValues[z.id] || textValues[z.id].trim() === '';
+    });
+
     if (missingText.length > 0) {
-      setValidationError(`⚠️ All customization fields are required! Please complete: ${missingText.map(t => t.label).join(', ')}`);
+      const missingLabels = missingText.map((t) => resolveVisibility(t.visibility).userLabel || t.label).join(', ');
+      setValidationError(`⚠️ Required customization field(s) missing! Please complete: ${missingLabels}`);
       return;
     }
 
-    // 2. Mandatory Photo Slots Validation
-    const missingPhotos = (template.photoSlots || []).filter((s) => !photoValues[s.id]);
+    // 2. Mandatory Photo Slots Validation (only for visible & required photo slots)
+    const missingPhotos = visiblePhotoSlots.filter((s) => {
+      const vis = resolveVisibility(s.visibility);
+      if (!vis.required) return false;
+      return !photoValues[s.id];
+    });
+
     if (missingPhotos.length > 0) {
-      setValidationError(`⚠️ All photo slots are required! Please upload photos for: ${missingPhotos.map(p => p.label).join(', ')}`);
+      const missingLabels = missingPhotos.map((p) => resolveVisibility(p.visibility).userLabel || p.label).join(', ');
+      setValidationError(`⚠️ Required photo(s) missing! Please upload photos for: ${missingLabels}`);
       return;
     }
 
@@ -643,11 +670,11 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
         </div>
 
         {/* Scrollable Customization Box (Contains Photo Uploads & Text Inputs cleanly!) */}
-        {(photoSlots.length > 0 || textZones.length > 0) && (
+        {(visiblePhotoSlots.length > 0 || visibleTextZones.length > 0) && (
           <div className="p-4 sm:p-5 bg-purple-50/40 rounded-2xl border border-purple-100 max-h-[420px] overflow-y-auto space-y-5 scrollbar-thin">
             
-            {/* Dynamic Photo Slot Upload Buttons - Renders ONLY IF photoSlots exist! */}
-            {photoSlots.length > 0 && (
+            {/* Dynamic Photo Slot Upload Buttons - Renders ONLY IF visiblePhotoSlots exist! */}
+            {visiblePhotoSlots.length > 0 && (
               <div className="space-y-4">
                 <h4 className="font-extrabold text-xs text-[#160E4B] uppercase tracking-wider flex items-center gap-1.5">
                   <ImageIcon className="w-4 h-4 text-[#F82BA9]" /> Photo Uploads
@@ -662,43 +689,58 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                 )}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {photoSlots.map((slot) => (
-                    <div key={slot.id} className="p-3 bg-white rounded-xl border border-purple-100 flex items-center justify-between gap-3 shadow-2xs">
-                      <div className="space-y-0.5">
-                        <span className="text-xs font-bold text-gray-900 block">{slot.label}</span>
-                        <span className="text-[10px] text-gray-400">Shape: {slot.shape}</span>
-                      </div>
+                  {visiblePhotoSlots.map((slot) => {
+                    const vis = resolveVisibility(slot.visibility);
+                    const displayLabel = vis.userLabel || slot.label;
+                    const isEditable = vis.userEditable;
 
-                      <div className="flex items-center gap-2">
-                        {photoValues[slot.id] && (
-                          <div className="w-10 h-10 rounded-lg border border-gray-300 overflow-hidden shrink-0">
-                            <img src={photoValues[slot.id]} alt={slot.label} className="w-full h-full object-cover" />
-                          </div>
-                        )}
+                    return (
+                      <div key={slot.id} className="p-3 bg-white rounded-xl border border-purple-100 flex items-center justify-between gap-3 shadow-2xs">
+                        <div className="space-y-0.5">
+                          <span className="text-xs font-bold text-gray-900 block flex items-center gap-1">
+                            {displayLabel}
+                            {vis.required && <span className="text-rose-500 font-extrabold">*</span>}
+                          </span>
+                          <span className="text-[10px] text-gray-400">Shape: {slot.shape}</span>
+                        </div>
 
-                        <button
-                          type="button"
-                          onClick={() => handleOpenCropModal(slot.id)}
-                          className="px-2.5 py-1.5 bg-[#F82BA9] hover:bg-[#D61B90] text-white text-[11px] font-extrabold rounded-xl shadow-xs transition-colors flex items-center gap-1 cursor-pointer shrink-0"
-                        >
-                          <ImageIcon className="w-3 h-3" /> {photoValues[slot.id] ? 'Change' : 'Upload'}
-                        </button>
+                        <div className="flex items-center gap-2">
+                          {photoValues[slot.id] && (
+                            <div className="w-10 h-10 rounded-lg border border-gray-300 overflow-hidden shrink-0">
+                              <img src={photoValues[slot.id]} alt={displayLabel} className="w-full h-full object-cover" />
+                            </div>
+                          )}
+
+                          {isEditable ? (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenCropModal(slot.id)}
+                              className="px-2.5 py-1.5 bg-[#F82BA9] hover:bg-[#D61B90] text-white text-[11px] font-extrabold rounded-xl shadow-xs transition-colors flex items-center gap-1 cursor-pointer shrink-0"
+                            >
+                              <ImageIcon className="w-3 h-3" /> {photoValues[slot.id] ? 'Change' : 'Upload'}
+                            </button>
+                          ) : (
+                            <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded-lg">
+                              Fixed
+                            </span>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
 
             {/* Dynamic Text Input Fields & Dropdown Date/Time Pickers */}
-            {textZones.length > 0 && (
+            {visibleTextZones.length > 0 && (
               <div className="space-y-4 pt-2 border-t border-purple-100">
                 <h4 className="font-extrabold text-xs text-[#160E4B] uppercase tracking-wider flex items-center gap-1.5">
                   <Sparkles className="w-4 h-4 text-[#F82BA9]" /> Custom Text Details
                 </h4>
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {!textZones.some((z) => {
+                  {!visibleTextZones.some((z) => {
                     const l = (z.label || '').toLowerCase();
                     const i = (z.id || '').toLowerCase();
                     return z.isCalendar || z.type === 'calendar' || z.type === 'date' || l.includes('date') || l.includes('dob') || i.includes('date');
@@ -710,7 +752,11 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                     />
                   )}
 
-                  {textZones.map((zone) => {
+                  {visibleTextZones.map((zone) => {
+                    const vis = resolveVisibility(zone.visibility);
+                    const displayLabel = vis.userLabel || zone.label;
+                    const isEditable = vis.userEditable;
+
                     const labelLower = (zone.label || '').toLowerCase();
                     const idLower = (zone.id || '').toLowerCase();
                     
@@ -720,23 +766,25 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
 
                     if (isDateField) {
                       return (
-                        <DatePickerControl
-                          key={zone.id}
-                          label={zone.label}
-                          value={textValues[zone.id] || ''}
-                          onChange={(val) => setTextValues({ ...textValues, [zone.id]: val })}
-                        />
+                        <div key={zone.id} className={!isEditable ? 'pointer-events-none opacity-80' : ''}>
+                          <DatePickerControl
+                            label={`${displayLabel}${vis.required ? ' *' : ''}`}
+                            value={textValues[zone.id] || ''}
+                            onChange={(val) => isEditable && setTextValues({ ...textValues, [zone.id]: val })}
+                          />
+                        </div>
                       );
                     }
 
                     if (isTimeField) {
                       return (
-                        <TimePickerControl
-                          key={zone.id}
-                          label={zone.label}
-                          value={textValues[zone.id] || ''}
-                          onChange={(val) => setTextValues({ ...textValues, [zone.id]: val })}
-                        />
+                        <div key={zone.id} className={!isEditable ? 'pointer-events-none opacity-80' : ''}>
+                          <TimePickerControl
+                            label={`${displayLabel}${vis.required ? ' *' : ''}`}
+                            value={textValues[zone.id] || ''}
+                            onChange={(val) => isEditable && setTextValues({ ...textValues, [zone.id]: val })}
+                          />
+                        </div>
                       );
                     }
 
@@ -745,26 +793,31 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                       return (
                         <div key={zone.id} className="space-y-1.5 sm:col-span-2">
                           <div className="flex items-center justify-between">
-                            <label className="text-xs font-bold text-gray-800">{zone.label} :</label>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const newMsg = getRandomBirthdayMessage(textValues[zone.id] || zone.defaultValue);
-                                setTextValues({ ...textValues, [zone.id]: newMsg });
-                                setGeneratedZones((prev) => ({ ...prev, [zone.id]: true }));
-                              }}
-                              className="text-[11px] font-extrabold text-[#F82BA9] hover:text-pink-700 bg-pink-50 hover:bg-pink-100 px-3 py-1 rounded-xl border border-pink-200 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                              title="Click to generate or regenerate custom message"
-                            >
-                              {hasBeenGenerated ? '🔄 Regenerate' : '✨ Generate'}
-                            </button>
+                            <label className="text-xs font-bold text-gray-800">
+                              {displayLabel} {vis.required && <span className="text-rose-500 font-extrabold">*</span>} :
+                            </label>
+                            {isEditable && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const newMsg = getRandomBirthdayMessage(textValues[zone.id] || zone.defaultValue);
+                                  setTextValues({ ...textValues, [zone.id]: newMsg });
+                                  setGeneratedZones((prev) => ({ ...prev, [zone.id]: true }));
+                                }}
+                                className="text-[11px] font-extrabold text-[#F82BA9] hover:text-pink-700 bg-pink-50 hover:bg-pink-100 px-3 py-1 rounded-xl border border-pink-200 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                                title="Click to generate or regenerate custom message"
+                              >
+                                {hasBeenGenerated ? '🔄 Regenerate' : '✨ Generate'}
+                              </button>
+                            )}
                           </div>
                           <textarea
                             rows={2}
+                            disabled={!isEditable}
                             value={textValues[zone.id] || ''}
                             onChange={(e) => setTextValues({ ...textValues, [zone.id]: e.target.value })}
-                            className="w-full px-3 py-2 text-xs bg-white border border-gray-300 rounded-xl focus:outline-hidden focus:border-[#F82BA9] font-medium"
-                            placeholder="Type custom message or click Generate Message button..."
+                            className="w-full px-3 py-2 text-xs bg-white border border-gray-300 rounded-xl focus:outline-hidden focus:border-[#F82BA9] font-medium disabled:bg-slate-100"
+                            placeholder={isEditable ? `Type ${displayLabel}...` : zone.defaultValue}
                           />
                         </div>
                       );
@@ -772,13 +825,16 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
 
                     return (
                       <div key={zone.id} className="space-y-1 sm:col-span-1">
-                        <label className="text-xs font-bold text-gray-800 block">{zone.label} :</label>
+                        <label className="text-xs font-bold text-gray-800 block">
+                          {displayLabel} {vis.required && <span className="text-rose-500 font-extrabold">*</span>} :
+                        </label>
                         <input
                           type="text"
+                          disabled={!isEditable}
                           value={textValues[zone.id] || ''}
                           onChange={(e) => setTextValues({ ...textValues, [zone.id]: e.target.value })}
-                          className="w-full px-3 py-2 text-xs bg-white border border-gray-300 rounded-xl focus:outline-hidden focus:border-[#F82BA9] font-medium"
-                          placeholder={`Enter ${zone.label}...`}
+                          className="w-full px-3 py-2 text-xs bg-white border border-gray-300 rounded-xl focus:outline-hidden focus:border-[#F82BA9] font-medium disabled:bg-slate-100"
+                          placeholder={isEditable ? `Enter ${displayLabel}...` : zone.defaultValue}
                         />
                       </div>
                     );

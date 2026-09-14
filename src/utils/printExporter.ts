@@ -1,4 +1,5 @@
 import { UniversalFrameTemplate } from '../types/template';
+import { resolveVisibility } from '../admin/template-studio/utils/templateDefaults';
 
 const drawImageCover = (
   ctx: CanvasRenderingContext2D,
@@ -70,8 +71,19 @@ export async function generateHighResPrintFile(
         drawImageCover(ctx, baseImg, 0, 0, targetWidth, targetHeight);
 
         // 3. Draw photo slots using drawImageCover (object-fit: cover)
+        // Hidden / non-userVisible layers are STILL rendered into the final print file!
         for (const slot of template.photoSlots) {
-          const photoSrc = photoValues[slot.id];
+          const vis = resolveVisibility(slot.visibility);
+          let photoSrc = photoValues[slot.id];
+
+          if (!photoSrc) {
+            if (vis.emptyBehavior === 'hideLayer') {
+              continue; // Admin explicitly set layer to disappear if left unprovided
+            }
+            // By default or 'keepDefault', retain the slot's default sample artwork
+            photoSrc = slot.defaultPhotoUrl || '';
+          }
+
           if (photoSrc) {
             try {
               const photoImg = await loadImage(photoSrc);
@@ -139,7 +151,14 @@ export async function generateHighResPrintFile(
 
         // 4. Draw dynamic text zones & calendar grids
         for (const zone of template.textZones) {
-          const val = textValues[zone.id] || zone.defaultValue;
+          const vis = resolveVisibility(zone.visibility);
+          const rawVal = textValues[zone.id];
+          
+          if (!rawVal && vis.emptyBehavior === 'hideLayer') {
+            continue; // Layer intentionally omitted when empty
+          }
+
+          const val = rawVal || zone.defaultValue;
           if (val && !val.startsWith('data:image')) {
             const textX = (zone.x / 100) * targetWidth;
             const textY = (zone.y / 100) * targetHeight;
