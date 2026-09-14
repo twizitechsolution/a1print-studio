@@ -24,6 +24,7 @@ import { AdminUserRoleManager } from '../../components/admin/AdminUserRoleManage
 import { AdminThemeProvider, useAdminTheme } from '../../context/AdminThemeContext';
 import { AdminThemeSwitch } from '../../components/admin/AdminThemeSwitch';
 import { AdminSupportDesk } from '../../components/admin/AdminSupportDesk';
+import { TemplateStudio } from '../../admin/template-studio/TemplateStudio';
 
 import {
   LayoutDashboard,
@@ -48,6 +49,7 @@ import {
   ExternalLink,
   User as UserIcon,
   Sparkles,
+  Wand2,
 } from 'lucide-react';
 
 interface AdminDashboardProps {
@@ -59,6 +61,7 @@ const ADMIN_AUTH_KEY = 'a1print_admin_authenticated';
 export type AdminTab =
   | 'dashboard'
   | 'catalog'
+  | 'template_studio'
   | 'custom_fields'
   | 'orders'
   | 'customers'
@@ -148,6 +151,7 @@ const AdminDashboardInner: React.FC<AdminDashboardProps> = ({ orders: initialOrd
       ? [
           'dashboard',
           'catalog',
+          'template_studio',
           'custom_fields',
           'orders',
           'customers',
@@ -179,6 +183,7 @@ const AdminDashboardInner: React.FC<AdminDashboardProps> = ({ orders: initialOrd
       group: 'Products & Customization',
       items: [
         { id: 'catalog' as AdminTab, label: 'Frame Catalog', icon: Layers },
+        { id: 'template_studio' as AdminTab, label: 'Smart Template Studio', icon: Wand2 },
         { id: 'custom_fields' as AdminTab, label: 'Customization Fields', icon: Settings },
       ],
     },
@@ -452,6 +457,18 @@ const AdminDashboardInner: React.FC<AdminDashboardProps> = ({ orders: initialOrd
                 />
               )}
             </>
+          )}
+
+          {/* Module: Smart Layer Template Studio */}
+          {activeTab === 'template_studio' && (
+            <div className="rounded-2xl overflow-hidden border dark:border-zinc-800 border-slate-200 shadow-xl">
+              <TemplateStudio
+                onExit={() => setActiveTab('catalog')}
+                onSaveSuccess={() => {
+                  setActiveTab('catalog');
+                }}
+              />
+            </div>
           )}
 
           {/* Module 3: Customization Fields */}

@@ -1,0 +1,22 @@
+import { PhotoSlotConfig, TextZoneConfig, UniversalFrameTemplate } from '../../types/template';
+
+export type LayerType = 'slot' | 'zone';
+
+export interface SelectedLayer {
+  type: LayerType;
+  id: string;
+}
+
+export type ResizeHandle = 'tl' | 'tc' | 'tr' | 'ml' | 'mr' | 'bl' | 'bc' | 'br' | 'move';
+
+export interface StudioCanvasState {
+  zoom: number;
+  panX: number;
+  panY: number;
+}
+
+export interface StudioHistoryState {
+  past: UniversalFrameTemplate[];
+  present: UniversalFrameTemplate;
+  future: UniversalFrameTemplate[];
+}
