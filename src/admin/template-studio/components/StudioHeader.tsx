@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { UniversalFrameTemplate } from '../../types/template';
-import { Save, ZoomIn, ZoomOut, RotateCcw, Upload, Image as ImageIcon, Loader2, Check, ArrowLeft, Sparkles } from 'lucide-react';
+import { Save, ZoomIn, ZoomOut, RotateCcw, Upload, Image as ImageIcon, Loader2, Check, ArrowLeft, Sparkles, FileCode } from 'lucide-react';
 import { uploadCategoryImage } from '../../config/firebase';
 
 interface StudioHeaderProps {
@@ -16,6 +16,7 @@ interface StudioHeaderProps {
   onZoomChange: (zoom: number) => void;
   onExit?: () => void;
   onOpenAIImport?: () => void;
+  onOpenPSDImport?: () => void;
 }
 
 const CATEGORIES = [
@@ -157,16 +158,27 @@ export const StudioHeader: React.FC<StudioHeaderProps> = ({
         </button>
       </div>
 
-      {/* Right: AI Import + Base Poster Uploader + Save Button */}
+      {/* Right: AI Import + PSD Import + Base Poster Uploader + Save Button */}
       <div className="flex items-center gap-2.5 w-full lg:w-auto justify-end">
         {onOpenAIImport && (
           <button
             onClick={onOpenAIImport}
-            className="px-3.5 py-2 rounded-xl text-xs font-extrabold bg-gradient-to-r from-purple-600/90 to-pink-600/90 hover:from-purple-500 hover:to-pink-500 text-white border border-pink-400/40 shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+            className="px-3 py-2 rounded-xl text-xs font-extrabold bg-gradient-to-r from-purple-600/90 to-pink-600/90 hover:from-purple-500 hover:to-pink-500 text-white border border-pink-400/40 shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
             title="Automatically detect photo slots and text zones from JPG/PNG image"
           >
-            <Sparkles className="w-4 h-4 text-pink-200" />
-            <span>AI Import (JPG/PNG)</span>
+            <Sparkles className="w-3.5 h-3.5 text-pink-200" />
+            <span>AI Import</span>
+          </button>
+        )}
+
+        {onOpenPSDImport && (
+          <button
+            onClick={onOpenPSDImport}
+            className="px-3 py-2 rounded-xl text-xs font-extrabold bg-gradient-to-r from-blue-600/90 to-indigo-600/90 hover:from-blue-500 hover:to-indigo-500 text-white border border-blue-400/40 shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+            title="Extract photo apertures and text layers directly from Photoshop .PSD file"
+          >
+            <FileCode className="w-3.5 h-3.5 text-blue-200" />
+            <span>PSD Import</span>
           </button>
         )}
 

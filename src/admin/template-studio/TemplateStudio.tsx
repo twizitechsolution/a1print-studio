@@ -6,6 +6,7 @@ import { StudioLayerPanel } from './components/StudioLayerPanel';
 import { StudioInteractiveCanvas } from './components/StudioInteractiveCanvas';
 import { StudioPropertiesPanel } from './components/StudioPropertiesPanel';
 import { StudioAIImportModal } from './components/StudioAIImportModal';
+import { StudioPSDImportModal } from './components/StudioPSDImportModal';
 import { createNewTemplate, createDefaultSlot, createDefaultTextZone, resolveVisibility } from './utils/templateDefaults';
 import { firebaseCloudDb } from '../../config/firebase';
 import { CheckCircle2, AlertCircle } from 'lucide-react';
@@ -38,8 +39,9 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [saveMessage, setSaveMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
-  // AI Import Modal
+  // Import Modals
   const [isAIImportOpen, setIsAIImportOpen] = useState<boolean>(false);
+  const [isPSDImportOpen, setIsPSDImportOpen] = useState<boolean>(false);
 
   // Record history snapshot helper
   const pushHistory = useCallback((current: UniversalFrameTemplate) => {
@@ -73,6 +75,34 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
     setSelectedLayer(photoSlots.length > 0 ? { type: 'slot', id: photoSlots[0].id } : null);
     setSaveMessage({
       text: `AI successfully detected & loaded ${photoSlots.length} photo slot(s) and ${textZones.length} text/calendar zone(s)!`,
+      type: 'success',
+    });
+    setTimeout(() => setSaveMessage(null), 5000);
+  };
+
+  const handleApplyPSDLayers = ({
+    photoSlots,
+    textZones,
+    baseImageUrl,
+    originalUploadUrl,
+  }: {
+    photoSlots: PhotoSlotConfig[];
+    textZones: TextZoneConfig[];
+    baseImageUrl?: string;
+    originalUploadUrl?: string;
+  }) => {
+    pushHistory(template);
+    setTemplate((prev) => ({
+      ...prev,
+      ...(baseImageUrl ? { baseImageUrl } : {}),
+      originalUploadUrl: originalUploadUrl || prev.originalUploadUrl,
+      importSource: 'psd',
+      photoSlots,
+      textZones,
+    }));
+    setSelectedLayer(photoSlots.length > 0 ? { type: 'slot', id: photoSlots[0].id } : null);
+    setSaveMessage({
+      text: `PSD successfully imported ${photoSlots.length} photo slot(s) and ${textZones.length} text/calendar zone(s)!`,
       type: 'success',
     });
     setTimeout(() => setSaveMessage(null), 5000);
@@ -264,6 +294,7 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
         onZoomChange={setZoom}
         onExit={onExit}
         onOpenAIImport={() => setIsAIImportOpen(true)}
+        onOpenPSDImport={() => setIsPSDImportOpen(true)}
       />
 
       {/* Save feedback banner */}
@@ -324,6 +355,14 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
         onClose={() => setIsAIImportOpen(false)}
         category={template.category}
         onApplyCandidates={handleApplyAICandidates}
+      />
+
+      {/* PSD Import Modal */}
+      <StudioPSDImportModal
+        isOpen={isPSDImportOpen}
+        onClose={() => setIsPSDImportOpen(false)}
+        category={template.category}
+        onApplyPSDLayers={handleApplyPSDLayers}
       />
 
     </div>
