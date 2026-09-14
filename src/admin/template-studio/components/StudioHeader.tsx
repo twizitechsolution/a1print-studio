@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { UniversalFrameTemplate } from '../../types/template';
-import { Save, ZoomIn, ZoomOut, RotateCcw, Upload, Image as ImageIcon, Loader2, Check, ArrowLeft } from 'lucide-react';
+import { Save, ZoomIn, ZoomOut, RotateCcw, Upload, Image as ImageIcon, Loader2, Check, ArrowLeft, Sparkles } from 'lucide-react';
 import { uploadCategoryImage } from '../../config/firebase';
 
 interface StudioHeaderProps {
@@ -15,6 +15,7 @@ interface StudioHeaderProps {
   zoom: number;
   onZoomChange: (zoom: number) => void;
   onExit?: () => void;
+  onOpenAIImport?: () => void;
 }
 
 const CATEGORIES = [
@@ -40,6 +41,7 @@ export const StudioHeader: React.FC<StudioHeaderProps> = ({
   zoom,
   onZoomChange,
   onExit,
+  onOpenAIImport,
 }) => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [isUploadingBase, setIsUploadingBase] = useState(false);
@@ -155,8 +157,19 @@ export const StudioHeader: React.FC<StudioHeaderProps> = ({
         </button>
       </div>
 
-      {/* Right: Base Poster Uploader + Save Button */}
-      <div className="flex items-center gap-3 w-full lg:w-auto justify-end">
+      {/* Right: AI Import + Base Poster Uploader + Save Button */}
+      <div className="flex items-center gap-2.5 w-full lg:w-auto justify-end">
+        {onOpenAIImport && (
+          <button
+            onClick={onOpenAIImport}
+            className="px-3.5 py-2 rounded-xl text-xs font-extrabold bg-gradient-to-r from-purple-600/90 to-pink-600/90 hover:from-purple-500 hover:to-pink-500 text-white border border-pink-400/40 shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+            title="Automatically detect photo slots and text zones from JPG/PNG image"
+          >
+            <Sparkles className="w-4 h-4 text-pink-200" />
+            <span>AI Import (JPG/PNG)</span>
+          </button>
+        )}
+
         <input
           type="file"
           ref={fileInputRef}

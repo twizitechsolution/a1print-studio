@@ -5,6 +5,7 @@ import { StudioHeader } from './components/StudioHeader';
 import { StudioLayerPanel } from './components/StudioLayerPanel';
 import { StudioInteractiveCanvas } from './components/StudioInteractiveCanvas';
 import { StudioPropertiesPanel } from './components/StudioPropertiesPanel';
+import { StudioAIImportModal } from './components/StudioAIImportModal';
 import { createNewTemplate, createDefaultSlot, createDefaultTextZone, resolveVisibility } from './utils/templateDefaults';
 import { firebaseCloudDb } from '../../config/firebase';
 import { CheckCircle2, AlertCircle } from 'lucide-react';
@@ -37,11 +38,45 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [saveMessage, setSaveMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
+  // AI Import Modal
+  const [isAIImportOpen, setIsAIImportOpen] = useState<boolean>(false);
+
   // Record history snapshot helper
   const pushHistory = useCallback((current: UniversalFrameTemplate) => {
     setHistory((prev) => [...prev.slice(-15), current]);
     setFuture([]);
   }, []);
+
+  const handleApplyAICandidates = ({
+    baseImageUrl,
+    photoSlots,
+    textZones,
+    originalUploadUrl,
+    aiConfidenceRecord,
+  }: {
+    baseImageUrl: string;
+    photoSlots: PhotoSlotConfig[];
+    textZones: TextZoneConfig[];
+    originalUploadUrl?: string;
+    aiConfidenceRecord: Record<string, number>;
+  }) => {
+    pushHistory(template);
+    setTemplate((prev) => ({
+      ...prev,
+      baseImageUrl,
+      originalUploadUrl,
+      importSource: 'ai-image',
+      photoSlots,
+      textZones,
+      aiDetectionConfidence: aiConfidenceRecord,
+    }));
+    setSelectedLayer(photoSlots.length > 0 ? { type: 'slot', id: photoSlots[0].id } : null);
+    setSaveMessage({
+      text: `AI successfully detected & loaded ${photoSlots.length} photo slot(s) and ${textZones.length} text/calendar zone(s)!`,
+      type: 'success',
+    });
+    setTimeout(() => setSaveMessage(null), 5000);
+  };
 
   const handleUndo = () => {
     if (history.length === 0) return;
@@ -228,6 +263,7 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
         zoom={zoom}
         onZoomChange={setZoom}
         onExit={onExit}
+        onOpenAIImport={() => setIsAIImportOpen(true)}
       />
 
       {/* Save feedback banner */}
@@ -281,6 +317,14 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
         />
 
       </div>
+
+      {/* AI Import Modal */}
+      <StudioAIImportModal
+        isOpen={isAIImportOpen}
+        onClose={() => setIsAIImportOpen(false)}
+        category={template.category}
+        onApplyCandidates={handleApplyAICandidates}
+      />
 
     </div>
   );
