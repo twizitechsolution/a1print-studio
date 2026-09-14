@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Product } from '../../types';
 import { useCartStore } from '../../store/useCartStore';
-import { Tag, Plus, Edit2, Trash2, Flame, Sliders, FolderPlus, History, RotateCcw, Package, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
+import { Tag, Plus, Edit2, Trash2, Flame, Sliders, FolderPlus, History, RotateCcw, Package, ChevronLeft, ChevronRight, RefreshCw, Wand2 } from 'lucide-react';
 import { AdminProductListingModal } from './AdminProductListingModal';
 import { AdminCategoryManager } from './AdminCategoryManager';
 import { AdminRecycleBinModal } from './AdminRecycleBinModal';
@@ -13,6 +13,7 @@ interface AdminCatalogManagerProps {
   onOpenVisualEditor?: (product: Product) => void;
   onEditTemplate?: (product: Product) => void;
   onEditProductFullPage?: (product: Product | null) => void;
+  onOpenTemplateStudio?: () => void;
   products?: Product[];
 }
 
@@ -21,6 +22,7 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
   onOpenVisualEditor,
   onEditTemplate,
   onEditProductFullPage,
+  onOpenTemplateStudio,
 }) => {
   const {
     products,
@@ -38,6 +40,7 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
     permanentDeleteProduct,
     updateStockQuantity,
     clearStaleLocalSyncData,
+    fetchProducts,
   } = useCartStore();
 
   const [viewMode, setViewMode] = useState<'active' | 'recycleBin'>('active');
@@ -184,6 +187,18 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
               />
               <span className="absolute left-2.5 top-2.5 text-gray-400 text-xs">🔍</span>
             </div>
+
+            {/* Smart Template Studio Direct Launch Button */}
+            {onOpenTemplateStudio && (
+              <button
+                type="button"
+                onClick={onOpenTemplateStudio}
+                className="px-3.5 py-2 bg-gradient-to-r from-[#F82BA9] to-purple-600 hover:brightness-110 text-white font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                title="Open Smart Layer Template Studio with AI/PSD Import"
+              >
+                <Wand2 className="w-3.5 h-3.5" /> Smart Template Studio
+              </button>
+            )}
 
             {/* Bulk Restore All Soft-Deleted Frames Button (Shows when deleted products exist) */}
             {deletedProducts.length > 0 && (

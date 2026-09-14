@@ -454,6 +454,7 @@ const AdminDashboardInner: React.FC<AdminDashboardProps> = ({ orders: initialOrd
                   onOpenTemplateEditor={(product) => setEditingTemplateProduct(product)}
                   onOpenVisualEditor={(product) => setEditingTemplateProduct(product)}
                   onEditProductFullPage={(product) => setEditingProductFullPage({ active: true, product })}
+                  onOpenTemplateStudio={() => setActiveTab('template_studio')}
                 />
               )}
             </>
