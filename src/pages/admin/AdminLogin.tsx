@@ -17,6 +17,7 @@ export const SUPER_ADMIN_USER: AdminUser = {
   allowedTabs: [
     'dashboard',
     'catalog',
+    'template_studio',
     'custom_fields',
     'orders',
     'customers',

@@ -83,7 +83,18 @@ const AdminDashboardInner: React.FC<AdminDashboardProps> = ({ orders: initialOrd
 
   const [currentAdminUser, setCurrentAdminUser] = useState<AdminUser>(() => {
     const saved = localStorage.getItem('a1print_admin_user');
-    return saved ? JSON.parse(saved) : SUPER_ADMIN_USER;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed && Array.isArray(parsed.allowedTabs)) {
+          if (!parsed.allowedTabs.includes('template_studio')) {
+            parsed.allowedTabs.push('template_studio');
+          }
+          return parsed;
+        }
+      } catch (e) {}
+    }
+    return SUPER_ADMIN_USER;
   });
 
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
@@ -297,7 +308,7 @@ const AdminDashboardInner: React.FC<AdminDashboardProps> = ({ orders: initialOrd
           <div className="hidden md:flex items-center gap-2 px-2.5 py-1 rounded-full dark:bg-emerald-950/30 bg-emerald-50 border dark:border-emerald-800/40 border-emerald-200 dark:text-emerald-400 text-emerald-700 text-[11px] font-medium">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
             <span>Cloud Sync: Live</span>
-            <span className="text-[10px] font-bold px-1.5 py-0.5 bg-emerald-600 text-white rounded-full">v2.6.0 (Admin Remark Callback Fixed)</span>
+            <span className="text-[10px] font-bold px-1.5 py-0.5 bg-gradient-to-r from-[#F82BA9] to-purple-600 text-white rounded-full">v3.0.0 (Smart Layer Template Engine)</span>
           </div>
 
           <a

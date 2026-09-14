@@ -6,6 +6,7 @@ import { Shield, Plus, Trash2, CheckCircle2, Lock, Key, User, Mail, Phone, Check
 const MODULE_OPTIONS = [
   { id: 'dashboard', label: 'Dashboard Overview' },
   { id: 'catalog', label: 'Frame Catalog & Editor' },
+  { id: 'template_studio', label: 'Smart Template Studio' },
   { id: 'custom_fields', label: 'Customization Fields' },
   { id: 'orders', label: 'Orders & Print Queue' },
   { id: 'customers', label: 'Customers Directory' },
