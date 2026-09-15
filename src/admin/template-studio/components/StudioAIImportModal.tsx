@@ -69,12 +69,16 @@ export const StudioAIImportModal: React.FC<StudioAIImportModalProps> = ({
 
   // Optional Gemini API Key
   const [apiKey, setApiKey] = useState<string>(() => {
-    return typeof window !== 'undefined' ? localStorage.getItem('A1PRINT_GEMINI_API_KEY') || '' : '';
+    const envKey = (import.meta.env.VITE_GEMINI_API_KEY as string) || '';
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('A1PRINT_GEMINI_API_KEY') || envKey;
+    }
+    return envKey;
   });
   const [showKeyInput, setShowKeyInput] = useState<boolean>(false);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && apiKey) {
       localStorage.setItem('A1PRINT_GEMINI_API_KEY', apiKey);
     }
   }, [apiKey]);

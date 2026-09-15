@@ -104,18 +104,45 @@ export async function runGeminiVisionDetection(
     },
   };
 
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
+  const candidateModels = [
+    'gemini-3.5-flash',
+    'gemini-3.6-flash',
+    'gemini-flash-latest',
+    'gemini-3.5-flash-lite',
+    'gemini-1.5-flash',
+  ];
 
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`Gemini Vision API error (${response.status}): ${errText}`);
+  let lastError: Error | null = null;
+  let json: any = null;
+
+  for (const model of candidateModels) {
+    try {
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey.trim())}`;
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        lastError = new Error(`Gemini Vision API (${model}) error (${response.status}): ${errText}`);
+        continue;
+      }
+
+      json = await response.json();
+      if (json?.candidates?.[0]?.content?.parts?.[0]?.text) {
+        break;
+      }
+    } catch (e: any) {
+      lastError = e;
+    }
   }
 
-  const json = await response.json();
+  if (!json?.candidates?.[0]?.content?.parts?.[0]?.text) {
+    throw lastError || new Error('Gemini Vision API failed across all candidate models.');
+  }
+
   const textContent = json?.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
   const cleanJson = textContent.replace(/```json/g, '').replace(/```/g, '').trim();
   const parsed = JSON.parse(cleanJson);
@@ -472,7 +499,7 @@ export async function runClientVisionDetection(
 
 /**
  * Universal Unified AI Detection Entry Point:
- * Automatically uses Gemini 1.5 Flash Vision if an API key is available (or in localStorage),
+ * Automatically uses Gemini Vision if an API key is available (in env, params, or localStorage),
  * otherwise runs high-accuracy client-side Computer Vision.
  */
 export async function runAIDetectionOnImage(
@@ -480,8 +507,9 @@ export async function runAIDetectionOnImage(
   categoryHint?: string,
   apiKeyOverride?: string
 ): Promise<AIDetectionResult> {
+  const envKey = (import.meta.env.VITE_GEMINI_API_KEY as string) || '';
   const storedKey = typeof window !== 'undefined' ? localStorage.getItem('A1PRINT_GEMINI_API_KEY') || '' : '';
-  const effectiveKey = (apiKeyOverride || storedKey).trim();
+  const effectiveKey = (apiKeyOverride || storedKey || envKey).trim();
 
   if (effectiveKey) {
     try {
