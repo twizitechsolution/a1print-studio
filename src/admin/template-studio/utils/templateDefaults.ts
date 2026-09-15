@@ -1,4 +1,4 @@
-import { PhotoSlotConfig, TextZoneConfig, UniversalFrameTemplate, LayerVisibility, FrameCutoutShape } from '../../types/template';
+import { PhotoSlotConfig, TextZoneConfig, UniversalFrameTemplate, LayerVisibility, FrameCutoutShape } from '../../../types/template';
 
 export const DEFAULT_VISIBILITY: LayerVisibility = {
   userVisible: true,

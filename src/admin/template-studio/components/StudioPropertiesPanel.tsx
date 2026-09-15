@@ -1,9 +1,9 @@
 import React, { useRef } from 'react';
-import { PhotoSlotConfig, TextZoneConfig, FrameCutoutShape } from '../../types/template';
+import { PhotoSlotConfig, TextZoneConfig, FrameCutoutShape } from '../../../types/template';
 import { SelectedLayer } from '../types';
 import { StudioVisibilityInspector } from './StudioVisibilityInspector';
 import { Sliders, Shapes, Type, Palette, AlignLeft, AlignCenter, AlignRight, Image as ImageIcon, Upload } from 'lucide-react';
-import { uploadCategoryImage } from '../../config/firebase';
+import { uploadCategoryImage } from '../../../config/firebase';
 
 interface StudioPropertiesPanelProps {
   selectedLayer: SelectedLayer | null;

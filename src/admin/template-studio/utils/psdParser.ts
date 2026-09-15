@@ -1,4 +1,4 @@
-import { PhotoSlotConfig, TextZoneConfig, FrameCutoutShape } from '../../types/template';
+import { PhotoSlotConfig, TextZoneConfig, FrameCutoutShape } from '../../../types/template';
 import { DEFAULT_VISIBILITY } from './templateDefaults';
 
 export interface PSDParsedLayer {

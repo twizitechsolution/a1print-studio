@@ -1,5 +1,5 @@
 import React from 'react';
-import { UniversalFrameTemplate, PhotoSlotConfig, TextZoneConfig, FrameCutoutShape } from '../../types/template';
+import { UniversalFrameTemplate, PhotoSlotConfig, TextZoneConfig, FrameCutoutShape } from '../../../types/template';
 import { SelectedLayer } from '../types';
 import { Plus, Eye, EyeOff, Lock, Unlock, Trash2, Image as ImageIcon, Type, Calendar, Sparkles } from 'lucide-react';
 import { resolveVisibility } from '../utils/templateDefaults';

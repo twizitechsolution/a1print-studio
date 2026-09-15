@@ -1,4 +1,4 @@
-import { PhotoSlotConfig, TextZoneConfig } from '../../types/template';
+import { PhotoSlotConfig, TextZoneConfig } from '../../../types/template';
 import { ResizeHandle } from '../types';
 
 export interface BoundingBox {

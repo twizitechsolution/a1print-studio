@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayerVisibility } from '../../types/template';
+import { LayerVisibility } from '../../../types/template';
 import { Eye, ShieldAlert, CheckCircle2, Sliders, Info } from 'lucide-react';
 import { resolveVisibility } from '../utils/templateDefaults';
 

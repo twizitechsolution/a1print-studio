@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
-import { UniversalFrameTemplate } from '../../types/template';
+import { UniversalFrameTemplate } from '../../../types/template';
 import { Save, ZoomIn, ZoomOut, RotateCcw, Upload, Image as ImageIcon, Loader2, Check, ArrowLeft, Sparkles, FileCode } from 'lucide-react';
-import { uploadCategoryImage } from '../../config/firebase';
+import { uploadCategoryImage } from '../../../config/firebase';
 
 interface StudioHeaderProps {
   template: UniversalFrameTemplate;

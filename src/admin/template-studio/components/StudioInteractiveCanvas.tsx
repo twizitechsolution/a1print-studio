@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { UniversalFrameTemplate, PhotoSlotConfig, TextZoneConfig } from '../../types/template';
+import { UniversalFrameTemplate, PhotoSlotConfig, TextZoneConfig } from '../../../types/template';
 import { SelectedLayer, ResizeHandle } from '../types';
 import { getSlotBoundingBox, getTextZoneBoundingBox, hitTestHandles, clamp } from '../utils/canvasTransformMath';
 
