@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { UniversalFrameTemplate } from '../../../types/template';
-import { Save, ZoomIn, ZoomOut, RotateCcw, Upload, Image as ImageIcon, Loader2, Check, ArrowLeft, Sparkles, FileCode } from 'lucide-react';
+import { Save, ZoomIn, ZoomOut, RotateCcw, Upload, Image as ImageIcon, Loader2, Check, ArrowLeft, Sparkles, FileCode, Eye, Play } from 'lucide-react';
 import { uploadCategoryImage } from '../../../config/firebase';
 
 interface StudioHeaderProps {
@@ -17,6 +17,9 @@ interface StudioHeaderProps {
   onExit?: () => void;
   onOpenAIImport?: () => void;
   onOpenPSDImport?: () => void;
+  previewMode?: 'cutout' | 'sample';
+  onTogglePreviewMode?: () => void;
+  onTestCustomizer?: () => void;
 }
 
 const CATEGORIES = [
@@ -44,6 +47,9 @@ export const StudioHeader: React.FC<StudioHeaderProps> = ({
   onExit,
   onOpenAIImport,
   onOpenPSDImport,
+  previewMode = 'cutout',
+  onTogglePreviewMode,
+  onTestCustomizer,
 }) => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [isUploadingBase, setIsUploadingBase] = useState(false);
@@ -157,6 +163,24 @@ export const StudioHeader: React.FC<StudioHeaderProps> = ({
         >
           <ZoomIn className="w-4 h-4" />
         </button>
+
+        {onTogglePreviewMode && (
+          <>
+            <div className="h-4 w-px bg-slate-800 mx-1" />
+            <button
+              onClick={onTogglePreviewMode}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all flex items-center gap-1.5 cursor-pointer ${
+                previewMode === 'cutout'
+                  ? 'bg-cyan-950/40 border-cyan-500/50 text-cyan-300 hover:bg-cyan-900/40'
+                  : 'bg-pink-950/40 border-pink-500/50 text-pink-300 hover:bg-pink-900/40'
+              }`}
+              title={previewMode === 'cutout' ? 'Switch to Sample Photo Preview' : 'Switch to Clean Cutout Guide Mode'}
+            >
+              <Eye className="w-3.5 h-3.5" />
+              <span>{previewMode === 'cutout' ? 'Cutouts (Clear)' : 'Sample Photos'}</span>
+            </button>
+          </>
+        )}
       </div>
 
       {/* Right: AI Import + PSD Import + Base Poster Uploader + Save Button */}
@@ -203,6 +227,17 @@ export const StudioHeader: React.FC<StudioHeaderProps> = ({
           )}
           <span>{isUploadingBase ? 'Uploading Poster...' : 'Upload Base Artwork'}</span>
         </button>
+
+        {onTestCustomizer && (
+          <button
+            onClick={onTestCustomizer}
+            className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 text-white font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
+            title="Test this template in the customer-facing live visualizer"
+          >
+            <Play className="w-3.5 h-3.5 fill-current" />
+            <span>Test Live</span>
+          </button>
+        )}
 
         <button
           onClick={onSave}

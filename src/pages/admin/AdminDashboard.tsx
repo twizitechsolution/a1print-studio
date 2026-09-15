@@ -25,6 +25,7 @@ import { AdminThemeProvider, useAdminTheme } from '../../context/AdminThemeConte
 import { AdminThemeSwitch } from '../../components/admin/AdminThemeSwitch';
 import { AdminSupportDesk } from '../../components/admin/AdminSupportDesk';
 import { TemplateStudio } from '../../admin/template-studio/TemplateStudio';
+import { UniversalFrameTemplate } from '../../types/template';
 
 import {
   LayoutDashboard,
@@ -104,6 +105,7 @@ const AdminDashboardInner: React.FC<AdminDashboardProps> = ({ orders: initialOrd
 
   const [editingTemplateProduct, setEditingTemplateProduct] = useState<Product | null>(null);
   const [editingProductFullPage, setEditingProductFullPage] = useState<{ active: boolean; product: Product | null } | null>(null);
+  const [studioInitialTemplate, setStudioInitialTemplate] = useState<UniversalFrameTemplate | undefined>(undefined);
 
   // Live Registered Customers List state from Firestore & Local Storage
   const [registeredCustomers, setRegisteredCustomers] = useState<CustomerUser[]>([]);
@@ -465,7 +467,25 @@ const AdminDashboardInner: React.FC<AdminDashboardProps> = ({ orders: initialOrd
                   onOpenTemplateEditor={(product) => setEditingTemplateProduct(product)}
                   onOpenVisualEditor={(product) => setEditingTemplateProduct(product)}
                   onEditProductFullPage={(product) => setEditingProductFullPage({ active: true, product })}
-                  onOpenTemplateStudio={() => setActiveTab('template_studio')}
+                  onOpenTemplateStudio={(product) => {
+                    if (product) {
+                      setStudioInitialTemplate({
+                        id: `tmpl-${product.id}`,
+                        productId: product.id,
+                        title: product.title,
+                        category: product.category || 'all',
+                        basePrice: product.sizes?.[0]?.price || 699,
+                        originalPrice: product.sizes?.[0]?.originalPrice || 999,
+                        baseImageUrl: product.baseImageUrl || product.thumbnail || product.images?.[0] || '',
+                        photoSlots: product.photoSlots || [],
+                        textZones: product.textZones || [],
+                        createdAt: new Date().toISOString(),
+                      });
+                    } else {
+                      setStudioInitialTemplate(undefined);
+                    }
+                    setActiveTab('template_studio');
+                  }}
                 />
               )}
             </>
@@ -475,8 +495,13 @@ const AdminDashboardInner: React.FC<AdminDashboardProps> = ({ orders: initialOrd
           {activeTab === 'template_studio' && (
             <div className="rounded-2xl overflow-hidden border dark:border-zinc-800 border-slate-200 shadow-xl">
               <TemplateStudio
-                onExit={() => setActiveTab('catalog')}
+                initialTemplate={studioInitialTemplate}
+                onExit={() => {
+                  setStudioInitialTemplate(undefined);
+                  setActiveTab('catalog');
+                }}
                 onSaveSuccess={() => {
+                  setStudioInitialTemplate(undefined);
                   setActiveTab('catalog');
                 }}
               />

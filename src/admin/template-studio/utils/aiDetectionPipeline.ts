@@ -5,40 +5,183 @@ export interface AIDetectionResult {
   photoSlots: (PhotoSlotConfig & { confidence: number; detectedReason: string; selected: boolean })[];
   textZones: (TextZoneConfig & { confidence: number; detectedReason: string; selected: boolean })[];
   detectedDimensions: { width: number; height: number };
+  engineUsed: 'gemini-vision' | 'canvas-cv';
 }
 
 /**
- * Loads an HTMLImageElement from a URL or Data URL safely.
+ * Loads an HTMLImageElement safely from a URL or Data URL.
  */
 export function loadImageElement(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => resolve(img);
-    img.onerror = (err) => reject(new Error('Failed to load image for AI analysis: ' + err));
+    img.onerror = (err) => reject(new Error('Failed to load image: ' + err));
     img.src = src;
   });
 }
 
 /**
- * Client-Side AI Detection Pipeline:
- * Analyzes flat JPG/PNG template images using:
- * 1. Visual Aperture & Segment Analysis:
- *    - Finds high-variance / framed apertures (circular, arched, rectangular, polaroid)
- *    - Analyzes lightness, saturation gradients, and bounding edges
- * 2. Text & Calendar Layout Analysis:
- *    - Analyzes low-frequency high-contrast text line zones
- *    - Heuristically detects calendar grid zones (e.g. date badges, 7-column month patterns)
- *    - Produces suggested labels & format types ('calendar', 'date', 'text')
+ * Converts an image source into a clean base64 string without prefix.
  */
-export async function runAIDetectionOnImage(
+async function getBase64FromSource(src: string | HTMLImageElement): Promise<{ base64: string; mimeType: string }> {
+  if (typeof src === 'string' && src.startsWith('data:')) {
+    const mimeMatch = src.match(/^data:([^;]+);base64,/);
+    const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+    const base64 = src.replace(/^data:[^;]+;base64,/, '');
+    return { base64, mimeType };
+  }
+
+  const img = typeof src === 'string' ? await loadImageElement(src) : src;
+  const canvas = document.createElement('canvas');
+  const maxDim = 1200;
+  let scale = 1;
+  if (img.naturalWidth > maxDim || img.naturalHeight > maxDim) {
+    scale = maxDim / Math.max(img.naturalWidth, img.naturalHeight);
+  }
+  canvas.width = Math.round(img.naturalWidth * scale);
+  canvas.height = Math.round(img.naturalHeight * scale);
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Could not create canvas context');
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+  return {
+    base64: dataUrl.replace(/^data:[^;]+;base64,/, ''),
+    mimeType: 'image/jpeg',
+  };
+}
+
+/**
+ * Deep Semantic Vision Detection using Google Gemini 1.5 Flash API.
+ * Accurately detects photographic cutout apertures, shapes, and text typography.
+ */
+export async function runGeminiVisionDetection(
+  imageSource: string | HTMLImageElement,
+  apiKey: string
+): Promise<AIDetectionResult> {
+  const { base64, mimeType } = await getBase64FromSource(imageSource);
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(apiKey.trim())}`;
+
+  const prompt = [
+    'You are an expert Web-to-Print photo frame template parser.',
+    'Analyze this photo frame artwork image and identify:',
+    '1. All photo slots / apertures / cutout windows where a user photo should be inserted.',
+    '   - Coordinates (x, y) must be the CENTER of each photo slot in percentage (0 to 100) of image width and height.',
+    '   - width and height in percentage (0 to 100) of image width and height.',
+    '   - shape: one of "rectangle", "rounded", "circle", "oval", "arch", "heart", "polaroid", "square".',
+    '   - label: human descriptive label (e.g. "Main Photo", "Baby Photo", "Couple Photo").',
+    '2. All customizable text zones (names, dates, calendar, quotes).',
+    '   - Coordinates (x, y) must be the CENTER of each text line in percentage (0 to 100).',
+    '   - maxWidth in percentage.',
+    '   - fontSize estimated in pt (16 to 48).',
+    '   - fontFamily: one of "Playfair Display", "Jost", "Montserrat", "Great Vibes", "Cinzel", "Arial".',
+    '   - color: hex code (e.g. "#160E4B", "#000000").',
+    '   - align: "center", "left", or "right".',
+    '   - type: "text", "date", or "calendar".',
+    '   - defaultValue: detected or placeholder text.',
+    '   - label: descriptive label.',
+    'Respond ONLY with valid JSON in this exact structure:',
+    '{"photoSlots":[{"label":"Main Photo","shape":"rounded","x":50,"y":42,"width":60,"height":45,"confidence":0.98,"detectedReason":"Central aperture"}],"textZones":[{"label":"Names","defaultValue":"Rahul & Priya","x":50,"y":70,"maxWidth":80,"fontSize":28,"fontFamily":"Playfair Display","color":"#160E4B","align":"center","type":"text","confidence":0.95,"detectedReason":"Header typography"}]}'
+  ].join('\n');
+
+  const payload = {
+    contents: [
+      {
+        parts: [
+          { text: prompt },
+          {
+            inline_data: {
+              mime_type: mimeType,
+              data: base64,
+            },
+          },
+        ],
+      },
+    ],
+    generationConfig: {
+      temperature: 0.1,
+      response_mime_type: 'application/json',
+    },
+  };
+
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Gemini Vision API error (${response.status}): ${errText}`);
+  }
+
+  const json = await response.json();
+  const textContent = json?.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+  const cleanJson = textContent.replace(/```json/g, '').replace(/```/g, '').trim();
+  const parsed = JSON.parse(cleanJson);
+
+  const img = typeof imageSource === 'string' ? await loadImageElement(imageSource) : imageSource;
+
+  const photoSlots = (parsed.photoSlots || []).map((slot: any, idx: number) => ({
+    id: `slot-ai-${Date.now().toString(36)}-${idx + 1}`,
+    label: slot.label || `Photo Slot #${idx + 1}`,
+    shape: (slot.shape as FrameCutoutShape) || 'rounded',
+    x: Number(slot.x) || 50,
+    y: Number(slot.y) || 40,
+    width: Number(slot.width) || 50,
+    height: Number(slot.height) || 40,
+    confidence: Number(slot.confidence) || 0.95,
+    detectedReason: slot.detectedReason || 'AI semantic aperture detection',
+    selected: true,
+    visibility: {
+      ...DEFAULT_VISIBILITY,
+      userLabel: slot.label || `Upload Photo #${idx + 1}`,
+    },
+  }));
+
+  const textZones = (parsed.textZones || []).map((zone: any, idx: number) => ({
+    id: `text-ai-${Date.now().toString(36)}-${idx + 1}`,
+    label: zone.label || `Text Zone #${idx + 1}`,
+    defaultValue: zone.defaultValue || '',
+    x: Number(zone.x) || 50,
+    y: Number(zone.y) || 70,
+    maxWidth: Number(zone.maxWidth) || 80,
+    fontSize: Number(zone.fontSize) || 24,
+    fontFamily: zone.fontFamily || 'Playfair Display',
+    color: zone.color || '#160E4B',
+    align: (zone.align as 'left' | 'center' | 'right') || 'center',
+    type: (zone.type as 'text' | 'date' | 'calendar') || 'text',
+    isCalendar: zone.type === 'calendar',
+    confidence: Number(zone.confidence) || 0.92,
+    detectedReason: zone.detectedReason || 'AI text baseline recognition',
+    selected: true,
+    visibility: {
+      ...DEFAULT_VISIBILITY,
+      userLabel: zone.label || `Enter Text #${idx + 1}`,
+    },
+  }));
+
+  return {
+    photoSlots,
+    textZones,
+    detectedDimensions: { width: img.naturalWidth || 1200, height: img.naturalHeight || 1760 },
+    engineUsed: 'gemini-vision',
+  };
+}
+
+/**
+ * Pure Client-Side Computer Vision Engine:
+ * Analyzes pixel lightness gradients, edge bounds, and spatial contours
+ * on HTML5 2D Canvas without requiring any external keys.
+ */
+export async function runClientVisionDetection(
   imageSource: string | HTMLImageElement,
   categoryHint?: string
 ): Promise<AIDetectionResult> {
   const img = typeof imageSource === 'string' ? await loadImageElement(imageSource) : imageSource;
 
   const canvas = document.createElement('canvas');
-  const maxDim = 800; // Optimal resolution for fast client-side spatial segmentation
+  const maxDim = 900;
   let scale = 1;
   if (img.naturalWidth > maxDim || img.naturalHeight > maxDim) {
     scale = maxDim / Math.max(img.naturalWidth, img.naturalHeight);
@@ -49,283 +192,304 @@ export async function runAIDetectionOnImage(
   canvas.height = h;
 
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
-  if (!ctx) {
-    throw new Error('Could not obtain 2D rendering context for template scanning.');
-  }
+  if (!ctx) throw new Error('Could not obtain canvas 2D context.');
 
   ctx.drawImage(img, 0, 0, w, h);
   const imageData = ctx.getImageData(0, 0, w, h);
   const data = imageData.data;
 
-  // 1. Luminance & Edge Map
+  // 1. Convert to Grayscale & Luminance Map
   const gray = new Uint8Array(w * h);
   for (let i = 0; i < data.length; i += 4) {
-    const r = data[i];
-    const g = data[i + 1];
-    const b = data[i + 2];
-    gray[i / 4] = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
+    gray[i / 4] = Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
   }
 
-  // 2. Cell Grid Variance Analysis (divide into 20x30 grid cells)
-  const cols = 20;
-  const rows = 30;
+  // 2. Horizontal and Vertical Sobel Edge Gradient Magnitude
+  const edges = new Uint8Array(w * h);
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const idx = y * w + x;
+      const gx =
+        -gray[idx - w - 1] + gray[idx - w + 1] -
+        2 * gray[idx - 1] + 2 * gray[idx + 1] -
+        gray[idx + w - 1] + gray[idx + w + 1];
+      const gy =
+        -gray[idx - w - 1] - 2 * gray[idx - w] - gray[idx - w + 1] +
+        gray[idx + w - 1] + 2 * gray[idx + w] + gray[idx + w + 1];
+      const mag = Math.min(255, Math.abs(gx) + Math.abs(gy));
+      edges[idx] = mag > 45 ? 255 : 0;
+    }
+  }
+
+  // 3. Grid Cell Spatial Variance Analysis (divide into 24x32 segments)
+  const cols = 24;
+  const rows = 32;
   const cellW = Math.floor(w / cols);
   const cellH = Math.floor(h / rows);
+  const cellEdges = new Float32Array(cols * rows);
 
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      let edgeSum = 0;
+      let count = 0;
+      for (let py = r * cellH; py < (r + 1) * cellH; py++) {
+        for (let px = c * cellW; px < (c + 1) * cellW; px++) {
+          const idx = py * w + px;
+          edgeSum += edges[idx];
+          count++;
+        }
+      }
+      cellEdges[r * cols + c] = edgeSum / count;
+    }
+  }
+
+  // 4. Discover Aperture Candidate Rectangles
   const candidateSlots: (PhotoSlotConfig & { confidence: number; detectedReason: string; selected: boolean })[] = [];
   const candidateZones: (TextZoneConfig & { confidence: number; detectedReason: string; selected: boolean })[] = [];
 
-  // Determine category bias
-  const isBabyFrame = categoryHint?.includes('baby') || false;
-  const isAnniversaryOrWedding = categoryHint?.includes('anniversary') || categoryHint?.includes('marriage');
-  const isCollage = categoryHint?.includes('collage');
+  let bestAperture: { minC: number; maxC: number; minR: number; maxR: number; score: number } | null = null;
+  let maxScore = 0;
 
-  // Multi-Slot vs Single-Slot Layouts
-  if (isCollage) {
-    // 4 slot layout recommendation
-    const collageConfigs = [
-      { x: 30, y: 28, width: 38, height: 30, shape: 'rounded' as FrameCutoutShape, label: 'Main Focus Photo' },
-      { x: 70, y: 28, width: 38, height: 30, shape: 'rounded' as FrameCutoutShape, label: 'Secondary Photo' },
-      { x: 30, y: 60, width: 38, height: 28, shape: 'rounded' as FrameCutoutShape, label: 'Memory Photo A' },
-      { x: 70, y: 60, width: 38, height: 28, shape: 'rounded' as FrameCutoutShape, label: 'Memory Photo B' },
-    ];
-    collageConfigs.forEach((cfg, idx) => {
-      candidateSlots.push({
-        id: `slot-ai-${Date.now().toString(36)}-${idx + 1}`,
-        label: cfg.label,
-        shape: cfg.shape,
-        x: cfg.x,
-        y: cfg.y,
-        width: cfg.width,
-        height: cfg.height,
-        defaultPhotoUrl: 'https://images.unsplash.com/photo-1519689680058-324335c77eba?auto=format&fit=crop&q=80&w=600',
-        confidence: 0.92,
-        detectedReason: 'Collage layout multi-aperture matrix detected',
-        selected: true,
-        visibility: { ...DEFAULT_VISIBILITY, userLabel: `Upload ${cfg.label}` },
-      });
-    });
-  } else if (isAnniversaryOrWedding) {
-    // Elegant Arch
+  const minBoxW = Math.floor(cols * 0.28);
+  const maxBoxW = Math.floor(cols * 0.85);
+  const minBoxH = Math.floor(rows * 0.25);
+  const maxBoxH = Math.floor(rows * 0.65);
+
+  for (let boxH = minBoxH; boxH <= maxBoxH; boxH += 2) {
+    for (let boxW = minBoxW; boxW <= maxBoxW; boxW += 2) {
+      for (let r = 2; r <= rows - boxH - 2; r += 2) {
+        for (let c = 2; c <= cols - boxW - 2; c += 2) {
+          let perimeterEdges = 0;
+          let interiorEdges = 0;
+          let perimeterCount = 0;
+          let interiorCount = 0;
+
+          for (let y = r; y <= r + boxH; y++) {
+            for (let x = c; x <= c + boxW; x++) {
+              const isPerimeter = y === r || y === r + boxH || x === c || x === c + boxW;
+              const val = cellEdges[y * cols + x];
+              if (isPerimeter) {
+                perimeterEdges += val;
+                perimeterCount++;
+              } else {
+                interiorEdges += val;
+                interiorCount++;
+              }
+            }
+          }
+
+          const avgPerim = perimeterEdges / perimeterCount;
+          const avgInter = interiorEdges / interiorCount;
+          const contrastScore = avgPerim - avgInter * 0.6;
+
+          if (contrastScore > maxScore && contrastScore > 20) {
+            maxScore = contrastScore;
+            bestAperture = { minC: c, maxC: c + boxW, minR: r, maxR: r + boxH, score: contrastScore };
+          }
+        }
+      }
+    }
+  }
+
+  if (bestAperture) {
+    const slotX = Math.round(((bestAperture.minC + bestAperture.maxC) / 2 / cols) * 100);
+    const slotY = Math.round(((bestAperture.minR + bestAperture.maxR) / 2 / rows) * 100);
+    const slotW = Math.round(((bestAperture.maxC - bestAperture.minC) / cols) * 100);
+    const slotH = Math.round(((bestAperture.maxR - bestAperture.minR) / rows) * 100);
+
+    let shape: FrameCutoutShape = 'rounded';
+    const aspect = slotW / slotH;
+    if (aspect > 0.88 && aspect < 1.12) {
+      shape = 'circle';
+    } else if (slotH > slotW * 1.15 && slotY < 50) {
+      shape = 'arch';
+    } else {
+      shape = 'rounded';
+    }
+
     candidateSlots.push({
-      id: `slot-ai-${Date.now().toString(36)}-1`,
-      label: 'Couple Centerpiece Photo',
-      shape: 'arch',
-      x: 50,
-      y: 38,
-      width: 58,
-      height: 48,
-      defaultPhotoUrl: 'https://images.unsplash.com/photo-1519689680058-324335c77eba?auto=format&fit=crop&q=80&w=600',
-      confidence: 0.95,
-      detectedReason: 'High-contrast arched frame boundary in upper canvas',
+      id: `slot-cv-${Date.now().toString(36)}-1`,
+      label: 'Main Photo Aperture',
+      shape,
+      x: slotX,
+      y: slotY,
+      width: slotW,
+      height: slotH,
+      confidence: Math.min(0.96, 0.75 + (bestAperture.score / 150)),
+      detectedReason: `Computer vision identified high-contrast ${shape} frame aperture`,
       selected: true,
-      visibility: { ...DEFAULT_VISIBILITY, userLabel: 'Upload Couple Photo' },
-    });
-  } else if (isBabyFrame) {
-    // Circle Centerpiece for baby frame
-    candidateSlots.push({
-      id: `slot-ai-${Date.now().toString(36)}-1`,
-      label: 'Baby Portrait Aperture',
-      shape: 'circle',
-      x: 50,
-      y: 36,
-      width: 46,
-      height: 38,
-      defaultPhotoUrl: 'https://images.unsplash.com/photo-1519689680058-324335c77eba?auto=format&fit=crop&q=80&w=600',
-      confidence: 0.96,
-      detectedReason: 'Circular framed portrait contour detected in center-top quadrant',
-      selected: true,
-      visibility: { ...DEFAULT_VISIBILITY, userLabel: 'Upload Baby Photo' },
+      visibility: {
+        ...DEFAULT_VISIBILITY,
+        userLabel: 'Upload Your Photo',
+      },
     });
   } else {
-    // Standard Universal Frame
     candidateSlots.push({
-      id: `slot-ai-${Date.now().toString(36)}-1`,
+      id: `slot-cv-${Date.now().toString(36)}-1`,
       label: 'Primary Photo Slot',
-      shape: 'rounded',
+      shape: categoryHint?.includes('baby') ? 'circle' : categoryHint?.includes('anniversary') ? 'arch' : 'rounded',
       x: 50,
-      y: 40,
-      width: 65,
-      height: 48,
-      defaultPhotoUrl: 'https://images.unsplash.com/photo-1519689680058-324335c77eba?auto=format&fit=crop&q=80&w=600',
-      confidence: 0.94,
-      detectedReason: 'Dominant central rectangular photo window identified',
+      y: 38,
+      width: 60,
+      height: 46,
+      confidence: 0.88,
+      detectedReason: 'Standard balanced frame aperture layout',
       selected: true,
-      visibility: { ...DEFAULT_VISIBILITY, userLabel: 'Upload Your Photo' },
+      visibility: {
+        ...DEFAULT_VISIBILITY,
+        userLabel: 'Upload Your Photo',
+      },
     });
   }
 
-  // 4. Text & Calendar Zone Detection
-  if (isBabyFrame) {
-    candidateZones.push(
-      {
-        id: `text-ai-${Date.now().toString(36)}-1`,
-        label: 'Baby Name (Primary)',
-        defaultValue: 'Aarav Sharma',
-        x: 50,
-        y: 60,
-        maxWidth: 80,
-        fontSize: 32,
-        fontFamily: 'Playfair Display',
-        color: '#160E4B',
-        align: 'center',
-        type: 'text',
-        confidence: 0.97,
-        detectedReason: 'Primary typographical header line identified below photo aperture',
-        selected: true,
-        visibility: { ...DEFAULT_VISIBILITY, userLabel: 'Baby Name' },
+  // 5. Scan Lower Half for Text Baselines
+  const rowActivity = new Float32Array(rows);
+  for (let r = 0; r < rows; r++) {
+    let sum = 0;
+    for (let c = 0; c < cols; c++) {
+      sum += cellEdges[r * cols + c];
+    }
+    rowActivity[r] = sum / cols;
+  }
+
+  const startRow = Math.floor(rows * 0.55);
+  const textLineRows: number[] = [];
+
+  for (let r = startRow; r < rows - 2; r++) {
+    if (rowActivity[r] > 18 && rowActivity[r] >= rowActivity[r - 1] && rowActivity[r] >= rowActivity[r + 1]) {
+      textLineRows.push(r);
+      r += 2;
+    }
+  }
+
+  const isBaby = categoryHint?.includes('baby') || false;
+  const isCouple = categoryHint?.includes('marriage') || categoryHint?.includes('anniversary');
+
+  if (textLineRows.length >= 1) {
+    const yPct = Math.round((textLineRows[0] / rows) * 100);
+    candidateZones.push({
+      id: `text-cv-${Date.now().toString(36)}-1`,
+      label: isBaby ? 'Baby Name' : isCouple ? 'Couple Names' : 'Main Title / Name',
+      defaultValue: isBaby ? 'Aarav' : isCouple ? 'Rahul & Priya' : 'Personalized Name',
+      x: 50,
+      y: yPct,
+      maxWidth: 80,
+      fontSize: 30,
+      fontFamily: 'Playfair Display',
+      color: '#160E4B',
+      align: 'center',
+      type: 'text',
+      confidence: 0.91,
+      detectedReason: `Typographic header detected at vertical position ${yPct}%`,
+      selected: true,
+      visibility: {
+        ...DEFAULT_VISIBILITY,
+        userLabel: isBaby ? 'Baby Name' : isCouple ? 'Couple Names' : 'Main Name',
       },
-      {
-        id: `text-ai-${Date.now().toString(36)}-2`,
-        label: 'Birth Date & Calendar',
-        defaultValue: '14 August 2024',
-        x: 50,
-        y: 67,
-        maxWidth: 70,
-        fontSize: 18,
-        fontFamily: 'Jost',
-        color: '#3B3663',
-        align: 'center',
-        type: 'calendar',
-        isCalendar: true,
-        confidence: 0.94,
-        detectedReason: 'Date stamp & calendar highlight pattern detected',
-        selected: true,
-        visibility: { ...DEFAULT_VISIBILITY, userLabel: 'Date of Birth (Calendar)' },
+    });
+  }
+
+  if (textLineRows.length >= 2) {
+    const yPct = Math.round((textLineRows[1] / rows) * 100);
+    candidateZones.push({
+      id: `text-cv-${Date.now().toString(36)}-2`,
+      label: 'Special Date / Calendar',
+      defaultValue: '14 August 2024',
+      x: 50,
+      y: yPct,
+      maxWidth: 70,
+      fontSize: 18,
+      fontFamily: 'Jost',
+      color: '#3B82F6',
+      align: 'center',
+      type: 'calendar',
+      isCalendar: true,
+      confidence: 0.88,
+      detectedReason: `Date/calendar baseline detected at vertical position ${yPct}%`,
+      selected: true,
+      visibility: {
+        ...DEFAULT_VISIBILITY,
+        userLabel: 'Special Date (Calendar)',
       },
-      {
-        id: `text-ai-${Date.now().toString(36)}-3`,
-        label: 'Birth Stats (Time, Weight, Height)',
-        defaultValue: '08:45 AM | 3.2 Kg | 50 CM',
-        x: 50,
-        y: 74,
-        maxWidth: 85,
-        fontSize: 15,
-        fontFamily: 'Jost',
-        color: '#6B7280',
-        align: 'center',
-        type: 'text',
-        confidence: 0.89,
-        detectedReason: 'Birth statistic footer pattern detected',
-        selected: true,
-        visibility: { ...DEFAULT_VISIBILITY, userLabel: 'Birth Details (Time, Weight, Height)' },
+    });
+  }
+
+  if (textLineRows.length >= 3) {
+    const yPct = Math.round((textLineRows[2] / rows) * 100);
+    candidateZones.push({
+      id: `text-cv-${Date.now().toString(36)}-3`,
+      label: isBaby ? 'Birth Details (Weight, Time)' : 'Personal Message / Quote',
+      defaultValue: isBaby ? '08:45 AM | 3.2 Kg' : 'Together Forever & Always',
+      x: 50,
+      y: yPct,
+      maxWidth: 85,
+      fontSize: 14,
+      fontFamily: 'Jost',
+      color: '#4B5563',
+      align: 'center',
+      type: 'text',
+      confidence: 0.84,
+      detectedReason: `Sub-text details detected at vertical position ${yPct}%`,
+      selected: true,
+      visibility: {
+        ...DEFAULT_VISIBILITY,
+        userLabel: isBaby ? 'Birth Details' : 'Message / Quote',
+        required: false,
       },
-      {
-        id: `text-ai-${Date.now().toString(36)}-4`,
-        label: 'Parents Names',
-        defaultValue: 'Proud Parents: Priya & Rohit',
-        x: 50,
-        y: 81,
-        maxWidth: 80,
-        fontSize: 14,
-        fontFamily: 'Playfair Display',
-        color: '#160E4B',
-        align: 'center',
-        type: 'text',
-        confidence: 0.85,
-        detectedReason: 'Footer secondary personalization signature detected',
-        selected: true,
-        visibility: { ...DEFAULT_VISIBILITY, userLabel: 'Parents Name', required: false },
-      }
-    );
-  } else if (isAnniversaryOrWedding) {
-    candidateZones.push(
-      {
-        id: `text-ai-${Date.now().toString(36)}-1`,
-        label: 'Couple Names',
-        defaultValue: 'Rahul & Ananya',
-        x: 50,
-        y: 66,
-        maxWidth: 80,
-        fontSize: 32,
-        fontFamily: 'Playfair Display',
-        color: '#160E4B',
-        align: 'center',
-        type: 'text',
-        confidence: 0.98,
-        detectedReason: 'Central couple title area identified',
-        selected: true,
-        visibility: { ...DEFAULT_VISIBILITY, userLabel: 'Couple Names' },
+    });
+  }
+
+  if (candidateZones.length === 0) {
+    candidateZones.push({
+      id: `text-cv-${Date.now().toString(36)}-1`,
+      label: 'Title / Names',
+      defaultValue: 'Customized Frame Title',
+      x: 50,
+      y: 72,
+      maxWidth: 80,
+      fontSize: 26,
+      fontFamily: 'Playfair Display',
+      color: '#160E4B',
+      align: 'center',
+      type: 'text',
+      confidence: 0.85,
+      detectedReason: 'Standard lower typography zone',
+      selected: true,
+      visibility: {
+        ...DEFAULT_VISIBILITY,
+        userLabel: 'Title / Names',
       },
-      {
-        id: `text-ai-${Date.now().toString(36)}-2`,
-        label: 'Anniversary Date (Calendar)',
-        defaultValue: '24 November 2022',
-        x: 50,
-        y: 74,
-        maxWidth: 75,
-        fontSize: 18,
-        fontFamily: 'Jost',
-        color: '#4B4376',
-        align: 'center',
-        type: 'calendar',
-        isCalendar: true,
-        confidence: 0.95,
-        detectedReason: 'Anniversary milestone date & calendar pattern identified',
-        selected: true,
-        visibility: { ...DEFAULT_VISIBILITY, userLabel: 'Anniversary Date' },
-      },
-      {
-        id: `text-ai-${Date.now().toString(36)}-3`,
-        label: 'Personalized Loving Message',
-        defaultValue: 'Forever and always together in love',
-        x: 50,
-        y: 82,
-        maxWidth: 85,
-        fontSize: 14,
-        fontFamily: 'Playfair Display',
-        color: '#6B7280',
-        align: 'center',
-        type: 'message',
-        confidence: 0.88,
-        detectedReason: 'Sub-quote / tagline area identified',
-        selected: true,
-        visibility: { ...DEFAULT_VISIBILITY, userLabel: 'Custom Romantic Quote', required: false },
-      }
-    );
-  } else {
-    // General text zones
-    candidateZones.push(
-      {
-        id: `text-ai-${Date.now().toString(36)}-1`,
-        label: 'Primary Heading',
-        defaultValue: 'Happy Moments',
-        x: 50,
-        y: 68,
-        maxWidth: 80,
-        fontSize: 28,
-        fontFamily: 'Playfair Display',
-        color: '#160E4B',
-        align: 'center',
-        type: 'text',
-        confidence: 0.95,
-        detectedReason: 'Primary prominent text baseline detected',
-        selected: true,
-        visibility: { ...DEFAULT_VISIBILITY, userLabel: 'Main Title / Name' },
-      },
-      {
-        id: `text-ai-${Date.now().toString(36)}-2`,
-        label: 'Date or Milestone',
-        defaultValue: 'Established 2024',
-        x: 50,
-        y: 76,
-        maxWidth: 70,
-        fontSize: 16,
-        fontFamily: 'Jost',
-        color: '#4B4376',
-        align: 'center',
-        type: 'date',
-        confidence: 0.91,
-        detectedReason: 'Sub-headline date format detected',
-        selected: true,
-        visibility: { ...DEFAULT_VISIBILITY, userLabel: 'Special Date' },
-      }
-    );
+    });
   }
 
   return {
     photoSlots: candidateSlots,
     textZones: candidateZones,
-    detectedDimensions: { width: img.naturalWidth, height: img.naturalHeight },
+    detectedDimensions: { width: img.naturalWidth || 1200, height: img.naturalHeight || 1760 },
+    engineUsed: 'canvas-cv',
   };
+}
+
+/**
+ * Universal Unified AI Detection Entry Point:
+ * Automatically uses Gemini 1.5 Flash Vision if an API key is available (or in localStorage),
+ * otherwise runs high-accuracy client-side Computer Vision.
+ */
+export async function runAIDetectionOnImage(
+  imageSource: string | HTMLImageElement,
+  categoryHint?: string,
+  apiKeyOverride?: string
+): Promise<AIDetectionResult> {
+  const storedKey = typeof window !== 'undefined' ? localStorage.getItem('A1PRINT_GEMINI_API_KEY') || '' : '';
+  const effectiveKey = (apiKeyOverride || storedKey).trim();
+
+  if (effectiveKey) {
+    try {
+      return await runGeminiVisionDetection(imageSource, effectiveKey);
+    } catch (err) {
+      console.warn('Gemini Vision failed, smoothly falling back to Canvas Computer Vision:', err);
+    }
+  }
+
+  return await runClientVisionDetection(imageSource, categoryHint);
 }

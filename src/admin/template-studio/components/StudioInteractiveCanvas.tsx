@@ -10,10 +10,8 @@ interface StudioInteractiveCanvasProps {
   onUpdateSlot: (updatedSlot: PhotoSlotConfig) => void;
   onUpdateZone: (updatedZone: TextZoneConfig) => void;
   zoom: number;
+  previewMode?: 'cutout' | 'sample';
 }
-
-const CANVAS_WIDTH = 1200;
-const CANVAS_HEIGHT = 1760;
 
 // Helper to draw shape clip paths on 2D context
 function clipShapePath(ctx: CanvasRenderingContext2D, shape: string, leftX: number, topY: number, slotW: number, slotH: number) {
@@ -25,7 +23,7 @@ function clipShapePath(ctx: CanvasRenderingContext2D, shape: string, leftX: numb
   if (shapeLower === 'circle') {
     ctx.arc(centerX, centerY, Math.min(slotW, slotH) / 2, 0, Math.PI * 2);
   } else if (shapeLower === 'rounded') {
-    const r = Math.min(slotW, slotH) * 0.15;
+    const r = Math.min(slotW, slotH) * 0.14;
     ctx.roundRect(leftX, topY, slotW, slotH, r);
   } else if (shapeLower === 'oval') {
     ctx.ellipse(centerX, centerY, slotW / 2, slotH / 2, 0, 0, Math.PI * 2);
@@ -56,6 +54,10 @@ function clipShapePath(ctx: CanvasRenderingContext2D, shape: string, leftX: numb
       rot += step;
     }
     ctx.closePath();
+  } else if (shapeLower === 'polaroid') {
+    const border = Math.min(slotW, slotH) * 0.08;
+    const bottomBorder = border * 3.2;
+    ctx.rect(leftX + border, topY + border, slotW - border * 2, slotH - border - bottomBorder);
   } else {
     ctx.rect(leftX, topY, slotW, slotH);
   }
@@ -68,12 +70,16 @@ export const StudioInteractiveCanvas: React.FC<StudioInteractiveCanvasProps> = (
   onUpdateSlot,
   onUpdateZone,
   zoom,
+  previewMode = 'cutout',
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   // Cached images map
   const [cachedImages, setCachedImages] = useState<Record<string, HTMLImageElement>>({});
+
+  // Dynamic canvas dimensions based on base image aspect ratio
+  const [canvasDimensions, setCanvasDimensions] = useState({ width: 1200, height: 1600 });
 
   // Interaction State
   const [activeDrag, setActiveDrag] = useState<{
@@ -98,10 +104,18 @@ export const StudioInteractiveCanvas: React.FC<StudioInteractiveCanvasProps> = (
       img.crossOrigin = 'anonymous';
       img.onload = () => {
         setCachedImages((prev) => ({ ...prev, [url]: img }));
+        if (url === template.baseImageUrl && img.naturalWidth && img.naturalHeight) {
+          const aspect = img.naturalWidth / img.naturalHeight;
+          const targetHeight = 1600;
+          const targetWidth = Math.round(targetHeight * aspect);
+          setCanvasDimensions({ width: targetWidth, height: targetHeight });
+        }
       };
       img.src = url;
     });
   }, [template.baseImageUrl, template.photoSlots, cachedImages]);
+
+  const { width: CANVAS_WIDTH, height: CANVAS_HEIGHT } = canvasDimensions;
 
   // Main Render Loop
   const draw = useCallback(() => {
@@ -113,7 +127,7 @@ export const StudioInteractiveCanvas: React.FC<StudioInteractiveCanvasProps> = (
     ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
     // 1. Background Fill
-    ctx.fillStyle = '#F8FAFC';
+    ctx.fillStyle = '#1E293B';
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
     // 2. Draw Base Poster Artwork
@@ -121,46 +135,78 @@ export const StudioInteractiveCanvas: React.FC<StudioInteractiveCanvasProps> = (
     if (baseImg) {
       ctx.drawImage(baseImg, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
     } else {
-      // Placeholder base
-      ctx.fillStyle = '#E2E8F0';
+      // Sleek placeholder base
+      ctx.fillStyle = '#0F172A';
       ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-      ctx.fillStyle = '#94A3B8';
-      ctx.font = 'bold 36px sans-serif';
+      ctx.fillStyle = '#64748B';
+      ctx.font = 'bold 32px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('Loading Base Artwork Poster...', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
+      ctx.fillText('Artwork Poster Preview', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
     }
 
     // 3. Draw Photo Slots
-    template.photoSlots.forEach((slot) => {
+    template.photoSlots.forEach((slot, idx) => {
       const box = getSlotBoundingBox(slot, CANVAS_WIDTH, CANVAS_HEIGHT);
+      const isSelected = selectedLayer?.type === 'slot' && selectedLayer.id === slot.id;
 
-      ctx.save();
-      clipShapePath(ctx, slot.shape, box.left, box.top, box.width, box.height);
-      ctx.clip();
+      if (previewMode === 'sample') {
+        // Sample photo preview mode
+        ctx.save();
+        clipShapePath(ctx, slot.shape, box.left, box.top, box.width, box.height);
+        ctx.clip();
 
-      const sampleImg = slot.defaultPhotoUrl ? cachedImages[slot.defaultPhotoUrl] : null;
-      if (sampleImg) {
-        ctx.drawImage(sampleImg, box.left, box.top, box.width, box.height);
+        const sampleImg = slot.defaultPhotoUrl ? cachedImages[slot.defaultPhotoUrl] : null;
+        if (sampleImg) {
+          ctx.drawImage(sampleImg, box.left, box.top, box.width, box.height);
+        } else {
+          ctx.fillStyle = 'rgba(248, 43, 169, 0.25)';
+          ctx.fillRect(box.left, box.top, box.width, box.height);
+        }
+        ctx.restore();
       } else {
-        ctx.fillStyle = '#CBD5E1';
-        ctx.fillRect(box.left, box.top, box.width, box.height);
-      }
-      ctx.restore();
+        // Cutout Guide Mode: Translucent glass tint so base poster artwork remains clearly visible!
+        ctx.save();
+        clipShapePath(ctx, slot.shape, box.left, box.top, box.width, box.height);
+        ctx.fillStyle = isSelected ? 'rgba(248, 43, 169, 0.18)' : 'rgba(6, 182, 212, 0.12)';
+        ctx.fill();
 
-      // Subtle slot border outline
-      ctx.save();
-      clipShapePath(ctx, slot.shape, box.left, box.top, box.width, box.height);
-      ctx.strokeStyle = '#94A3B8';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      ctx.restore();
+        ctx.strokeStyle = isSelected ? '#F82BA9' : '#06B6D4';
+        ctx.lineWidth = isSelected ? 3.5 : 2;
+        ctx.setLineDash(isSelected ? [8, 6] : [6, 4]);
+        ctx.stroke();
+        ctx.restore();
+
+        // Centered Aperture Badge
+        ctx.save();
+        const badgeText = `📷 #${idx + 1} ${slot.label || 'Photo'}`;
+        ctx.font = 'bold 18px sans-serif';
+        const textMetrics = ctx.measureText(badgeText);
+        const badgeW = textMetrics.width + 24;
+        const badgeH = 34;
+
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+        ctx.beginPath();
+        ctx.roundRect(box.centerX - badgeW / 2, box.centerY - badgeH / 2, badgeW, badgeH, 17);
+        ctx.fill();
+        ctx.strokeStyle = isSelected ? '#F82BA9' : 'rgba(6, 182, 212, 0.6)';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([]);
+        ctx.stroke();
+
+        ctx.fillStyle = isSelected ? '#FFFFFF' : '#67E8F9';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(badgeText, box.centerX, box.centerY);
+        ctx.restore();
+      }
     });
 
     // 4. Draw Text Zones
     template.textZones.forEach((zone) => {
       const cx = (zone.x / 100) * CANVAS_WIDTH;
       const cy = (zone.y / 100) * CANVAS_HEIGHT;
-      const scaledSize = Math.round((zone.fontSize || 20) * 2.8);
+      const scaledSize = Math.round((zone.fontSize || 22) * 2.4);
+      const isSelected = selectedLayer?.type === 'zone' && selectedLayer.id === zone.id;
 
       ctx.save();
       ctx.fillStyle = zone.color || '#160E4B';
@@ -168,10 +214,24 @@ export const StudioInteractiveCanvas: React.FC<StudioInteractiveCanvasProps> = (
       ctx.textAlign = (zone.align as CanvasTextAlign) || 'center';
       ctx.textBaseline = 'middle';
 
-      if (zone.type === 'calendar' || zone.isCalendar) {
-        ctx.fillText(`🗓️ [Calendar: ${zone.defaultValue}]`, cx, cy);
-      } else {
-        ctx.fillText(zone.defaultValue || zone.label, cx, cy);
+      const displayText = zone.type === 'calendar' || zone.isCalendar
+        ? `🗓️ [${zone.defaultValue || '14 Aug 2024'}]`
+        : zone.defaultValue || zone.label;
+
+      ctx.fillText(displayText, cx, cy);
+
+      if (isSelected) {
+        const textMetrics = ctx.measureText(displayText);
+        const pad = 12;
+        const left = zone.align === 'center' ? cx - textMetrics.width / 2 - pad : cx - pad;
+        const width = textMetrics.width + pad * 2;
+        const height = scaledSize + pad * 1.5;
+        const top = cy - height / 2;
+
+        ctx.strokeStyle = '#A855F7';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 4]);
+        ctx.strokeRect(left, top, width, height);
       }
       ctx.restore();
     });
@@ -190,8 +250,8 @@ export const StudioInteractiveCanvas: React.FC<StudioInteractiveCanvasProps> = (
       if (box) {
         // Selection bounding rectangle
         ctx.save();
-        ctx.strokeStyle = '#F82BA9'; // Signature A1print magenta
-        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#F82BA9';
+        ctx.lineWidth = 2.5;
         ctx.setLineDash([8, 6]);
         ctx.strokeRect(box.left, box.top, box.width, box.height);
         ctx.restore();
@@ -210,39 +270,23 @@ export const StudioInteractiveCanvas: React.FC<StudioInteractiveCanvasProps> = (
 
         ctx.fillStyle = '#FFFFFF';
         ctx.strokeStyle = '#F82BA9';
-        ctx.lineWidth = 3;
+        ctx.lineWidth = 2.5;
         const hSize = 14;
 
         handles.forEach((h) => {
           ctx.fillRect(h.x - hSize / 2, h.y - hSize / 2, hSize, hSize);
           ctx.strokeRect(h.x - hSize / 2, h.y - hSize / 2, hSize, hSize);
         });
-
-        // Layer ID badge
-        ctx.fillStyle = '#160E4B';
-        ctx.font = 'bold 18px sans-serif';
-        const labelText = `📍 ${selectedLayer.id}`;
-        const textMetrics = ctx.measureText(labelText);
-        ctx.fillRect(box.left, box.top - 32, textMetrics.width + 16, 26);
-        ctx.fillStyle = '#FFFFFF';
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(labelText, box.left + 8, box.top - 19);
       }
     }
-
-    // Outer Frame Border Overlay (indicates physical print edge)
-    ctx.strokeStyle = '#1E293B';
-    ctx.lineWidth = 24;
-    ctx.strokeRect(12, 12, CANVAS_WIDTH - 24, CANVAS_HEIGHT - 24);
-  }, [template, selectedLayer, cachedImages]);
+  }, [template, selectedLayer, cachedImages, CANVAS_WIDTH, CANVAS_HEIGHT, previewMode]);
 
   useEffect(() => {
     draw();
   }, [draw]);
 
-  // Convert Pointer event to Canvas Coordinates
-  const getCanvasCoords = (e: React.PointerEvent<HTMLCanvasElement>) => {
+  // Coordinate Conversion Helper (Screen to Canvas Space)
+  const getCanvasCoordinates = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
     const rect = canvas.getBoundingClientRect();
@@ -254,45 +298,49 @@ export const StudioInteractiveCanvas: React.FC<StudioInteractiveCanvasProps> = (
     };
   };
 
-  const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    const { x, y } = getCanvasCoords(e);
+  // Mouse Down Event
+  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const { x, y } = getCanvasCoordinates(e);
 
-    // 1. Check if clicking on an active handle of current selection
     if (selectedLayer) {
       let box: any = null;
-      let layerObj: any = null;
+      let activeItem: PhotoSlotConfig | TextZoneConfig | null = null;
 
       if (selectedLayer.type === 'slot') {
-        layerObj = template.photoSlots.find((s) => s.id === selectedLayer.id);
-        if (layerObj) box = getSlotBoundingBox(layerObj, CANVAS_WIDTH, CANVAS_HEIGHT);
+        const slot = template.photoSlots.find((s) => s.id === selectedLayer.id);
+        if (slot) {
+          box = getSlotBoundingBox(slot, CANVAS_WIDTH, CANVAS_HEIGHT);
+          activeItem = slot;
+        }
       } else {
-        layerObj = template.textZones.find((z) => z.id === selectedLayer.id);
-        if (layerObj) box = getTextZoneBoundingBox(layerObj, CANVAS_WIDTH, CANVAS_HEIGHT);
+        const zone = template.textZones.find((z) => z.id === selectedLayer.id);
+        if (zone) {
+          box = getTextZoneBoundingBox(zone, CANVAS_WIDTH, CANVAS_HEIGHT);
+          activeItem = zone;
+        }
       }
 
-      if (box && layerObj && !layerObj.locked) {
-        const handle = hitTestHandles(x, y, box, 24);
-        if (handle) {
-          (e.target as HTMLElement).setPointerCapture(e.pointerId);
+      if (box && activeItem && !activeItem.locked) {
+        const hitHandle = hitTestHandles(x, y, box, 18);
+        if (hitHandle) {
           setActiveDrag({
-            handle,
+            handle: hitHandle,
             startX: x,
             startY: y,
-            initialLayer: { ...layerObj },
+            initialLayer: { ...activeItem },
           });
           return;
         }
       }
     }
 
-    // 2. Hit test photo slots from top to bottom
+    // Hit-test photo slots (reverse order for top-most)
     for (let i = template.photoSlots.length - 1; i >= 0; i--) {
       const slot = template.photoSlots[i];
       const box = getSlotBoundingBox(slot, CANVAS_WIDTH, CANVAS_HEIGHT);
       if (x >= box.left && x <= box.right && y >= box.top && y <= box.bottom) {
         onSelectLayer({ type: 'slot', id: slot.id });
         if (!slot.locked) {
-          (e.target as HTMLElement).setPointerCapture(e.pointerId);
           setActiveDrag({
             handle: 'move',
             startX: x,
@@ -304,14 +352,13 @@ export const StudioInteractiveCanvas: React.FC<StudioInteractiveCanvasProps> = (
       }
     }
 
-    // 3. Hit test text zones
+    // Hit-test text zones
     for (let i = template.textZones.length - 1; i >= 0; i--) {
       const zone = template.textZones[i];
       const box = getTextZoneBoundingBox(zone, CANVAS_WIDTH, CANVAS_HEIGHT);
       if (x >= box.left && x <= box.right && y >= box.top && y <= box.bottom) {
         onSelectLayer({ type: 'zone', id: zone.id });
         if (!zone.locked) {
-          (e.target as HTMLElement).setPointerCapture(e.pointerId);
           setActiveDrag({
             handle: 'move',
             startX: x,
@@ -323,57 +370,79 @@ export const StudioInteractiveCanvas: React.FC<StudioInteractiveCanvasProps> = (
       }
     }
 
-    // Clicked empty area -> Deselect
+    // Deselect if clicked empty background
     onSelectLayer(null);
   };
 
-  const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    const { x, y } = getCanvasCoords(e);
+  // Mouse Move Event
+  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const { x, y } = getCanvasCoordinates(e);
 
-    // If actively dragging or resizing
-    if (activeDrag) {
-      const deltaX = x - activeDrag.startX;
-      const deltaY = y - activeDrag.startY;
+    if (activeDrag && selectedLayer) {
+      const dx = x - activeDrag.startX;
+      const dy = y - activeDrag.startY;
+      const dxPct = (dx / CANVAS_WIDTH) * 100;
+      const dyPct = (dy / CANVAS_HEIGHT) * 100;
 
-      const deltaXPercent = (deltaX / CANVAS_WIDTH) * 100;
-      const deltaYPercent = (deltaY / CANVAS_HEIGHT) * 100;
-
-      const initial = activeDrag.initialLayer;
-
-      if (activeDrag.handle === 'move') {
-        const newX = clamp(initial.x + deltaXPercent, 0, 100);
-        const newY = clamp(initial.y + deltaYPercent, 0, 100);
-
-        if ('shape' in initial) {
-          onUpdateSlot({ ...initial, x: Math.round(newX * 10) / 10, y: Math.round(newY * 10) / 10 });
+      if (selectedLayer.type === 'slot') {
+        const initial = activeDrag.initialLayer as PhotoSlotConfig;
+        if (activeDrag.handle === 'move') {
+          onUpdateSlot({
+            ...initial,
+            x: clamp(Math.round(initial.x + dxPct), 5, 95),
+            y: clamp(Math.round(initial.y + dyPct), 5, 95),
+          });
         } else {
-          onUpdateZone({ ...initial, x: Math.round(newX * 10) / 10, y: Math.round(newY * 10) / 10 });
+          let newW = initial.width;
+          let newH = initial.height;
+          let newX = initial.x;
+          let newY = initial.y;
+
+          if (activeDrag.handle.includes('e')) {
+            newW = Math.max(5, initial.width + dxPct);
+            newX = initial.x + dxPct / 2;
+          }
+          if (activeDrag.handle.includes('w')) {
+            newW = Math.max(5, initial.width - dxPct);
+            newX = initial.x + dxPct / 2;
+          }
+          if (activeDrag.handle.includes('s')) {
+            newH = Math.max(5, initial.height + dyPct);
+            newY = initial.y + dyPct / 2;
+          }
+          if (activeDrag.handle.includes('n')) {
+            newH = Math.max(5, initial.height - dyPct);
+            newY = initial.y + dyPct / 2;
+          }
+
+          onUpdateSlot({
+            ...initial,
+            x: clamp(Math.round(newX), 5, 95),
+            y: clamp(Math.round(newY), 5, 95),
+            width: clamp(Math.round(newW), 5, 95),
+            height: clamp(Math.round(newH), 5, 95),
+          });
         }
-      } else if ('shape' in initial) {
-        // Resizing a photo slot
-        let newW = initial.width;
-        let newH = initial.height;
-        let newX = initial.x;
-        let newY = initial.y;
-
-        const h = activeDrag.handle;
-        if (h === 'br' || h === 'mr') newW = clamp(initial.width + deltaXPercent * 2, 5, 95);
-        if (h === 'bl' || h === 'ml') newW = clamp(initial.width - deltaXPercent * 2, 5, 95);
-        if (h === 'br' || h === 'bc') newH = clamp(initial.height + deltaYPercent * 2, 5, 95);
-        if (h === 'tr' || h === 'tc') newH = clamp(initial.height - deltaYPercent * 2, 5, 95);
-
-        onUpdateSlot({
-          ...initial,
-          x: Math.round(newX * 10) / 10,
-          y: Math.round(newY * 10) / 10,
-          width: Math.round(newW * 10) / 10,
-          height: Math.round(newH * 10) / 10,
-        });
+      } else {
+        const initial = activeDrag.initialLayer as TextZoneConfig;
+        if (activeDrag.handle === 'move') {
+          onUpdateZone({
+            ...initial,
+            x: clamp(Math.round(initial.x + dxPct), 5, 95),
+            y: clamp(Math.round(initial.y + dyPct), 5, 95),
+          });
+        } else if (activeDrag.handle === 'e' || activeDrag.handle === 'w') {
+          const newMaxW = Math.max(10, initial.maxWidth + Math.abs(dxPct));
+          onUpdateZone({
+            ...initial,
+            maxWidth: clamp(Math.round(newMaxW), 10, 95),
+          });
+        }
       }
       return;
     }
 
-    // Hover Cursor Detection
+    // Hover Cursor Management
     if (selectedLayer) {
       let box: any = null;
       if (selectedLayer.type === 'slot') {
@@ -385,50 +454,67 @@ export const StudioInteractiveCanvas: React.FC<StudioInteractiveCanvasProps> = (
       }
 
       if (box) {
-        const handle = hitTestHandles(x, y, box, 24);
-        if (handle === 'tl' || handle === 'br') setCursor('nwse-resize');
-        else if (handle === 'tr' || handle === 'bl') setCursor('nesw-resize');
-        else if (handle === 'tc' || handle === 'bc') setCursor('ns-resize');
-        else if (handle === 'ml' || handle === 'mr') setCursor('ew-resize');
-        else if (handle === 'move') setCursor('move');
-        else setCursor('default');
-        return;
+        const handle = hitTestHandles(x, y, box, 18);
+        if (handle) {
+          switch (handle) {
+            case 'nw':
+            case 'se':
+              setCursor('nwse-resize');
+              return;
+            case 'ne':
+            case 'sw':
+              setCursor('nesw-resize');
+              return;
+            case 'n':
+            case 's':
+              setCursor('ns-resize');
+              return;
+            case 'w':
+            case 'e':
+              setCursor('ew-resize');
+              return;
+            case 'move':
+              setCursor('move');
+              return;
+          }
+        }
       }
     }
+
     setCursor('default');
   };
 
-  const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (activeDrag) {
-      try {
-        (e.target as HTMLElement).releasePointerCapture(e.pointerId);
-      } catch (err) {}
-      setActiveDrag(null);
-    }
+  const handleMouseUp = () => {
+    setActiveDrag(null);
   };
 
   return (
     <div
       ref={containerRef}
-      className="relative flex items-center justify-center p-6 overflow-hidden select-none bg-slate-950/60 rounded-3xl border border-slate-800 shadow-2xl"
+      className="flex-1 flex items-center justify-center p-6 sm:p-10 bg-slate-950/70 overflow-auto relative select-none"
     >
       <div
         style={{
           transform: `scale(${zoom})`,
           transformOrigin: 'center center',
-          transition: 'transform 0.15s ease-out',
+          transition: activeDrag ? 'none' : 'transform 0.15s ease-out',
         }}
-        className="relative shadow-2xl rounded-xs overflow-hidden"
+        className="shadow-2xl rounded-2xl overflow-hidden border-2 border-slate-800 shrink-0"
       >
         <canvas
           ref={canvasRef}
           width={CANVAS_WIDTH}
           height={CANVAS_HEIGHT}
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          style={{ cursor }}
-          className="w-[340px] sm:w-[420px] md:w-[480px] lg:w-[520px] aspect-[3/4.4] block bg-white"
+          style={{
+            width: `${CANVAS_WIDTH * 0.46}px`,
+            height: `${CANVAS_HEIGHT * 0.46}px`,
+            cursor,
+          }}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+          className="block bg-slate-900 shadow-inner"
         />
       </div>
     </div>

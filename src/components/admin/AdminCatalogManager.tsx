@@ -13,7 +13,7 @@ interface AdminCatalogManagerProps {
   onOpenVisualEditor?: (product: Product) => void;
   onEditTemplate?: (product: Product) => void;
   onEditProductFullPage?: (product: Product | null) => void;
-  onOpenTemplateStudio?: () => void;
+  onOpenTemplateStudio?: (product?: Product) => void;
   products?: Product[];
 }
 
@@ -408,6 +408,16 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
                             >
                               {copiedAdLinkId === product.id ? 'Copied ✓' : 'Copy 🔗'}
                             </button>
+
+                            {onOpenTemplateStudio && (
+                              <button
+                                onClick={() => onOpenTemplateStudio(product)}
+                                className="px-3.5 py-2 bg-gradient-to-r from-[#F82BA9] to-purple-600 hover:brightness-110 text-white font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
+                                title="Open this product in Smart Layer Template Studio"
+                              >
+                                <Wand2 className="w-3.5 h-3.5" /> Smart Studio
+                              </button>
+                            )}
 
                             <button
                               onClick={() => handleVisualWorkspaceClick(product)}
