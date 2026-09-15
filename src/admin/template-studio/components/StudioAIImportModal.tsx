@@ -108,7 +108,11 @@ export const StudioAIImportModal: React.FC<StudioAIImportModalProps> = ({
     setIsScanning(true);
     setError(null);
     try {
-      const activeKey = apiKey || getActiveGeminiApiKey();
+      let activeKey = apiKey || getActiveGeminiApiKey();
+      if (!activeKey) {
+        activeKey = await fetchCloudGeminiApiKey();
+        if (activeKey) setApiKey(activeKey);
+      }
       const result = await runAIDetectionOnImage(imgUrl, category, activeKey);
       setDetectionResult(result);
       if (result.photoSlots.length > 0) {
