@@ -47,10 +47,15 @@ export const AdminStoreSettings: React.FC = () => {
     return 'https://linkedin.com';
   });
 
+  // Google Gemini AI Key (Synced across all admin devices via Firebase)
+  const [geminiApiKey, setGeminiApiKey] = useState<string>(() => {
+    return localStorage.getItem('A1PRINT_GEMINI_API_KEY') || '';
+  });
+
   const [savedMsg, setSavedMsg] = useState(false);
 
   useEffect(() => {
-    // Load social settings from Firestore on mount
+    // Load social & AI settings from Firestore on mount
     const loadFromCloud = async () => {
       const docs = await firebaseCloudDb.getCollection('store_settings');
       const socialDoc = docs.find((d) => d.id === 'social');
@@ -59,6 +64,12 @@ export const AdminStoreSettings: React.FC = () => {
         if (socialDoc.instagramUrl) setInstagramUrl(socialDoc.instagramUrl);
         if (socialDoc.twitterUrl) setTwitterUrl(socialDoc.twitterUrl);
         if (socialDoc.linkedinUrl) setLinkedinUrl(socialDoc.linkedinUrl);
+      }
+
+      const aiDoc = docs.find((d) => d.id === 'ai_config');
+      if (aiDoc && aiDoc.geminiApiKey) {
+        setGeminiApiKey(aiDoc.geminiApiKey);
+        localStorage.setItem('A1PRINT_GEMINI_API_KEY', aiDoc.geminiApiKey);
       }
     };
     loadFromCloud();
@@ -76,6 +87,14 @@ export const AdminStoreSettings: React.FC = () => {
     const socialPayload = { facebookUrl, instagramUrl, twitterUrl, linkedinUrl };
     localStorage.setItem('a1print_social_settings', JSON.stringify(socialPayload));
     await firebaseCloudDb.setDocument('store_settings', 'social', socialPayload);
+
+    if (geminiApiKey.trim()) {
+      localStorage.setItem('A1PRINT_GEMINI_API_KEY', geminiApiKey.trim());
+      await firebaseCloudDb.setDocument('store_settings', 'ai_config', {
+        geminiApiKey: geminiApiKey.trim(),
+        updatedAt: new Date().toISOString(),
+      });
+    }
 
     setSavedMsg(true);
     setTimeout(() => setSavedMsg(false), 3000);
@@ -261,6 +280,28 @@ export const AdminStoreSettings: React.FC = () => {
               value={announcementMsg}
               onChange={(e) => setAnnouncementMsg(e.target.value)}
               className="w-full p-3 bg-[#1A2035] border border-gray-600 rounded-xl text-xs text-white leading-relaxed focus:outline-hidden"
+            />
+          </div>
+
+          {/* Google Gemini Vision API Key (Cloud Firestore Persistence) */}
+          <div className="space-y-3 pt-4 border-t border-[#262E4A]">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-base text-white flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-pink-400" /> Google Gemini Vision API Key
+              </h3>
+              <span className="text-[11px] text-emerald-400 font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+                Synced to Cloud Firestore
+              </span>
+            </div>
+            <p className="text-xs text-gray-400">
+              Stored securely in Firebase (<code className="text-pink-400">store_settings/ai_config</code>). Any admin editing frames from any computer, phone, or laptop automatically shares this key for AI frame detection.
+            </p>
+            <input
+              type="text"
+              placeholder="Paste free Gemini API key (e.g. AIzaSy...)"
+              value={geminiApiKey}
+              onChange={(e) => setGeminiApiKey(e.target.value)}
+              className="w-full p-3 bg-[#1A2035] border border-gray-600 rounded-xl text-xs text-white font-mono focus:outline-hidden focus:border-pink-500"
             />
           </div>
 

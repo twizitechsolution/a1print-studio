@@ -16,7 +16,7 @@ import {
   Heart,
   Image as ImageIcon
 } from 'lucide-react';
-import { runAIDetectionOnImage, AIDetectionResult, getActiveGeminiApiKey } from '../utils/aiDetectionPipeline';
+import { runAIDetectionOnImage, AIDetectionResult, getActiveGeminiApiKey, fetchCloudGeminiApiKey, saveCloudGeminiApiKey } from '../utils/aiDetectionPipeline';
 import { uploadCategoryImage } from '../../../config/firebase';
 import { PhotoSlotConfig, TextZoneConfig, FrameCutoutShape } from '../../../types/template';
 
@@ -28,7 +28,8 @@ interface StudioAIImportModalProps {
     baseImageUrl: string;
     photoSlots: PhotoSlotConfig[];
     textZones: TextZoneConfig[];
-    dimensions?: { width: number; height: number };
+    originalUploadUrl?: string;
+    aiConfidenceRecord: Record<string, number>;
   }) => void;
 }
 
@@ -66,17 +67,38 @@ export const StudioAIImportModal: React.FC<StudioAIImportModalProps> = ({
   const [drawStart, setDrawStart] = useState<{ xPct: number; yPct: number } | null>(null);
   const [currentDraw, setCurrentDraw] = useState<{ xPct: number; yPct: number } | null>(null);
 
-  // Gemini API Key (Defaults to guaranteed working key)
+  // Gemini API Key (Loaded directly from Firebase Cloud Firestore)
   const [apiKey, setApiKey] = useState<string>(() => {
     return getActiveGeminiApiKey();
   });
   const [showKeyInput, setShowKeyInput] = useState<boolean>(false);
+  const [isSavingKey, setIsSavingKey] = useState<boolean>(false);
+  const [keySavedNotice, setKeySavedNotice] = useState<string | null>(null);
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && apiKey) {
-      localStorage.setItem('A1PRINT_GEMINI_API_KEY', apiKey);
+    if (isOpen) {
+      fetchCloudGeminiApiKey().then((cloudKey) => {
+        if (cloudKey) {
+          setApiKey(cloudKey);
+        }
+      });
     }
-  }, [apiKey]);
+  }, [isOpen]);
+
+  const handleSaveApiKeyToCloud = async () => {
+    if (!apiKey.trim()) return;
+    setIsSavingKey(true);
+    setKeySavedNotice(null);
+    try {
+      await saveCloudGeminiApiKey(apiKey);
+      setKeySavedNotice('Saved to Firebase Cloud! Synced across all devices & sessions.');
+      setTimeout(() => setKeySavedNotice(null), 4000);
+    } catch (err: any) {
+      setError('Failed to save API key to Firebase: ' + (err?.message || err));
+    } finally {
+      setIsSavingKey(false);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -570,18 +592,34 @@ export const StudioAIImportModal: React.FC<StudioAIImportModalProps> = ({
           </div>
         </div>
 
-        {/* Optional Gemini API Key Drawer */}
+        {/* Gemini API Key Drawer with Firebase Cloud Firestore Persistence */}
         {showKeyInput && (
-          <div className="p-3 bg-slate-950 border-b border-slate-800 flex flex-col sm:flex-row items-center gap-3 text-xs">
-            <input
-              type="password"
-              placeholder="Paste free Gemini API key (AIzaSy...) for deep semantic AI scanning"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              className="flex-1 w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-pink-500 font-mono"
-            />
-            <span className="text-[11px] text-slate-400 shrink-0">
-              Free from Google AI Studio. Stored securely in your browser.
+          <div className="p-3 bg-slate-950 border-b border-slate-800 flex flex-col gap-2 text-xs">
+            <div className="flex flex-col sm:flex-row items-center gap-2">
+              <input
+                type="text"
+                placeholder="Paste Gemini API key (AIzaSy...) to save permanently to Firebase Cloud Firestore"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                className="flex-1 w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-pink-500 font-mono"
+              />
+              <button
+                type="button"
+                onClick={handleSaveApiKeyToCloud}
+                disabled={isSavingKey || !apiKey.trim()}
+                className="px-4 py-2 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center gap-1.5 shrink-0 cursor-pointer disabled:opacity-50"
+              >
+                {isSavingKey ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                <span>Save to Firebase</span>
+              </button>
+            </div>
+            {keySavedNotice && (
+              <span className="text-[11px] text-emerald-400 font-bold flex items-center gap-1">
+                <Check className="w-3 h-3 text-emerald-400" /> {keySavedNotice}
+              </span>
+            )}
+            <span className="text-[11px] text-slate-400">
+              ☁️ Stored in Firebase Firestore (<code className="text-pink-400">store_settings/ai_config</code>). Any admin logging in from any laptop, home PC, or mobile device will automatically share this key!
             </span>
           </div>
         )}

@@ -1,5 +1,6 @@
 import { PhotoSlotConfig, TextZoneConfig, FrameCutoutShape } from '../../../types/template';
 import { DEFAULT_VISIBILITY } from './templateDefaults';
+import { firebaseCloudDb } from '../../../config/firebase';
 
 export interface AIDetectionResult {
   photoSlots: (PhotoSlotConfig & { confidence: number; detectedReason: string; selected: boolean })[];
@@ -45,13 +46,59 @@ async function getBase64FromSource(src: string | HTMLImageElement): Promise<{ ba
   };
 }
 
-export const DEFAULT_GEMINI_API_KEY = 'AIzaSyDTk2d7lrz6lNJNqTFXq9fg6_jiRnXV8ic';
+let cachedCloudApiKey: string | null = null;
 
-export function getActiveGeminiApiKey(): string {
+/**
+ * Loads the active Gemini API key from Cloud Firestore (store_settings/ai_config).
+ * Synced automatically across all admin devices (phone, laptop, desktop).
+ */
+export async function fetchCloudGeminiApiKey(): Promise<string> {
+  if (cachedCloudApiKey) return cachedCloudApiKey;
+  try {
+    const doc = await firebaseCloudDb.getDocument<{ geminiApiKey?: string }>('store_settings', 'ai_config');
+    if (doc?.geminiApiKey && doc.geminiApiKey.trim()) {
+      cachedCloudApiKey = doc.geminiApiKey.trim();
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('A1PRINT_GEMINI_API_KEY', cachedCloudApiKey);
+      }
+      return cachedCloudApiKey;
+    }
+  } catch (err) {
+    console.warn('Failed to fetch Gemini API key from Firebase Firestore:', err);
+  }
   const envKey = (import.meta.env.VITE_GEMINI_API_KEY as string) || '';
   const storedKey = typeof window !== 'undefined' ? localStorage.getItem('A1PRINT_GEMINI_API_KEY') || '' : '';
-  return (storedKey || envKey || DEFAULT_GEMINI_API_KEY).trim();
+  return (storedKey || envKey).trim();
 }
+
+/**
+ * Permanently saves the Gemini API key into Firebase Cloud Firestore (store_settings/ai_config).
+ * This immediately updates all devices, phones, and admin sessions in real time!
+ */
+export async function saveCloudGeminiApiKey(newKey: string): Promise<boolean> {
+  const cleanKey = newKey.trim();
+  cachedCloudApiKey = cleanKey;
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('A1PRINT_GEMINI_API_KEY', cleanKey);
+  }
+  try {
+    return await firebaseCloudDb.setDocument('store_settings', 'ai_config', {
+      geminiApiKey: cleanKey,
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.warn('Failed to save Gemini API key to Firebase Firestore:', err);
+    return false;
+  }
+}
+
+export function getActiveGeminiApiKey(): string {
+  if (cachedCloudApiKey) return cachedCloudApiKey;
+  const envKey = (import.meta.env.VITE_GEMINI_API_KEY as string) || '';
+  const storedKey = typeof window !== 'undefined' ? localStorage.getItem('A1PRINT_GEMINI_API_KEY') || '' : '';
+  return (storedKey || envKey).trim();
+}
+
 
 /**
  * Deep Semantic Vision Detection using Google Gemini Vision API.
@@ -108,11 +155,9 @@ export async function runGeminiVisionDetection(
   };
 
   const candidateModels = [
-    'gemini-3.5-flash',
-    'gemini-3.6-flash',
-    'gemini-flash-latest',
-    'gemini-3.5-flash-lite',
+    'gemini-2.0-flash',
     'gemini-1.5-flash',
+    'gemini-1.5-pro',
   ];
 
   let lastError: Error | null = null;
@@ -535,14 +580,13 @@ export async function runAIDetectionOnImage(
   categoryHint?: string,
   apiKeyOverride?: string
 ): Promise<AIDetectionResult> {
-  const effectiveKey = (apiKeyOverride || getActiveGeminiApiKey()).trim();
+  let effectiveKey = (apiKeyOverride || getActiveGeminiApiKey()).trim();
+  if (!effectiveKey) {
+    effectiveKey = await fetchCloudGeminiApiKey();
+  }
 
   if (effectiveKey) {
-    try {
-      return await runGeminiVisionDetection(imageSource, effectiveKey);
-    } catch (err) {
-      console.warn('Gemini Vision failed, smoothly falling back to Canvas Computer Vision:', err);
-    }
+    return await runGeminiVisionDetection(imageSource, effectiveKey);
   }
 
   return await runClientVisionDetection(imageSource, categoryHint);
