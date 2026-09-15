@@ -43,6 +43,7 @@ export const StudioHeader: React.FC<StudioHeaderProps> = ({
   onZoomChange,
   onExit,
   onOpenAIImport,
+  onOpenPSDImport,
 }) => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [isUploadingBase, setIsUploadingBase] = useState(false);
