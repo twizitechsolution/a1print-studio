@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Product, PhotoSlot, TextZone, SizeOption, FrameOption } from '../../types';
+import { UniversalFrameTemplate } from '../../types/template';
 import { firebaseCloudDb, uploadAllProductImages } from '../../config/firebase';
-import { ArrowLeft, Save, Plus, Trash2, Upload, Image as ImageIcon, Sparkles, Star, CheckCircle2, ShieldCheck, CreditCard, DollarSign, Layers, Eye, RefreshCw, Loader2 } from 'lucide-react';
+import { ArrowLeft, Save, Plus, Trash2, Upload, Image as ImageIcon, Sparkles, Star, CheckCircle2, ShieldCheck, CreditCard, DollarSign, Layers, Eye, RefreshCw, Loader2, Link2, Unlink } from 'lucide-react';
 
 interface AdminProductPageEditorProps {
   product: Product | null;
@@ -22,6 +23,28 @@ export const AdminProductPageEditor: React.FC<AdminProductPageEditorProps> = ({
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState('');
+
+  // Template Linking State
+  const [linkedFrameTemplateId, setLinkedFrameTemplateId] = useState<string>(product?.linkedFrameTemplateId || '');
+  const [availableTemplates, setAvailableTemplates] = useState<UniversalFrameTemplate[]>([]);
+  const [isLoadingTemplates, setIsLoadingTemplates] = useState<boolean>(false);
+
+  useEffect(() => {
+    const fetchTemplates = async () => {
+      setIsLoadingTemplates(true);
+      try {
+        const tmpls = await firebaseCloudDb.getCollection<UniversalFrameTemplate>('universal_templates');
+        if (Array.isArray(tmpls)) {
+          setAvailableTemplates(tmpls.filter((t) => (t.status || 'published') === 'published'));
+        }
+      } catch (err) {
+        console.warn('Failed to fetch universal templates:', err);
+      } finally {
+        setIsLoadingTemplates(false);
+      }
+    };
+    fetchTemplates();
+  }, []);
 
   // 1. Basic Info
   const [id, setId] = useState<string>(product?.id || `prod-${Date.now()}`);
@@ -199,8 +222,24 @@ export const AdminProductPageEditor: React.FC<AdminProductPageEditorProps> = ({
       return copy;
     });
   };
-  const handleRemoveReview = (index: number) => {
-    setReviews((prev) => prev.filter((_, idx) => idx !== index));
+  const handleSelectTemplate = (templateId: string) => {
+    setLinkedFrameTemplateId(templateId);
+    if (!templateId) return;
+    const selected = availableTemplates.find((t) => t.id === templateId);
+    if (!selected) return;
+
+    if (selected.cleanBaseImageUrl || selected.baseImageUrl) {
+      setBaseImageUrl(selected.cleanBaseImageUrl || selected.baseImageUrl);
+    }
+    if (selected.photoSlots && selected.photoSlots.length > 0) {
+      setPhotoSlots(selected.photoSlots);
+    }
+    if (selected.textZones && selected.textZones.length > 0) {
+      setTextZones(selected.textZones);
+    }
+    if (!title && selected.title) {
+      setTitle(selected.title);
+    }
   };
 
   // Final Form Submission — uploads images to Firebase Storage first, then saves product
@@ -303,6 +342,7 @@ export const AdminProductPageEditor: React.FC<AdminProductPageEditorProps> = ({
         features,
         photoSlots,
         textZones,
+        linkedFrameTemplateId: linkedFrameTemplateId || undefined,
         sizes: updatedSizes,
         frames: updatedFrames,
         isDeleted: false,
@@ -437,6 +477,88 @@ export const AdminProductPageEditor: React.FC<AdminProductPageEditorProps> = ({
         {/* Left Column: Product Information & Media (8 Cols) */}
         <div className="lg:col-span-8 space-y-8">
           
+          {/* Card 0: Smart Frame Template Linking (Template Studio v2) */}
+          <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white p-6 sm:p-8 rounded-3xl border border-indigo-500/30 shadow-xl space-y-6">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-pink-500/20 text-pink-400 border border-pink-500/30 flex items-center justify-center font-extrabold text-sm">
+                  <Sparkles className="w-5 h-5 text-pink-400" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-lg text-white">Smart Frame Template Engine (v2)</h3>
+                  <p className="text-xs text-slate-400">Link this product to an AI-analyzed template for seamless overlap-free customization</p>
+                </div>
+              </div>
+
+              {linkedFrameTemplateId && (
+                <button
+                  type="button"
+                  onClick={() => setLinkedFrameTemplateId('')}
+                  className="px-3 py-1.5 bg-red-950/60 hover:bg-red-900/60 border border-red-500/40 text-red-300 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Unlink className="w-3.5 h-3.5" />
+                  <span>Unlink</span>
+                </button>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              <label className="text-xs font-bold text-slate-300 flex items-center justify-between">
+                <span>Select Frame Template :</span>
+                {isLoadingTemplates && <span className="text-[11px] text-pink-400 font-normal">Loading templates...</span>}
+              </label>
+
+              <select
+                value={linkedFrameTemplateId}
+                onChange={(e) => handleSelectTemplate(e.target.value)}
+                className="w-full px-4 py-3 bg-slate-800/90 border border-slate-700 hover:border-pink-500/60 rounded-2xl text-xs font-bold text-white focus:outline-hidden focus:border-pink-500 transition-colors cursor-pointer"
+              >
+                <option value="">-- No Linked Template (Manual Upload / Legacy Mode) --</option>
+                {availableTemplates.map((tmpl) => (
+                  <option key={tmpl.id} value={tmpl.id}>
+                    {tmpl.title} ({tmpl.category || 'General'}) — {tmpl.photoSlots?.length || 0} Slots, {tmpl.textZones?.length || 0} Text Zones
+                  </option>
+                ))}
+              </select>
+
+              {linkedFrameTemplateId ? (
+                (() => {
+                  const linkedTmpl = availableTemplates.find((t) => t.id === linkedFrameTemplateId);
+                  if (!linkedTmpl) return null;
+                  return (
+                    <div className="p-4 bg-slate-800/60 rounded-2xl border border-slate-700/80 flex items-center gap-4">
+                      <div className="w-16 h-20 rounded-xl overflow-hidden bg-slate-900 shrink-0 border border-slate-700">
+                        <img
+                          src={linkedTmpl.cleanBaseImageUrl || linkedTmpl.baseImageUrl}
+                          alt={linkedTmpl.title}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div className="space-y-1 min-w-0 text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="font-extrabold text-white truncate">{linkedTmpl.title}</span>
+                          <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 text-[10px] font-bold rounded-md border border-emerald-500/30">
+                            Linked Active
+                          </span>
+                        </div>
+                        <p className="text-slate-400 text-[11px]">
+                          {linkedTmpl.photoSlots?.length || 0} Photo Cutout Apertures • {linkedTmpl.textZones?.length || 0} Dynamic Typography Zones
+                        </p>
+                        <p className="text-emerald-400 text-[11px] font-mono">
+                          Clean Base Image: {linkedTmpl.cleanBaseImageUrl ? 'Active (Inpainted, Zero-Overlap)' : 'Original Base Poster'}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })()
+              ) : (
+                <p className="text-[11px] text-slate-400">
+                  Tip: Selecting a published template automatically populates the clean base poster artwork, photo slots, and typography zones for 100% accurate storefront preview.
+                </p>
+              )}
+            </div>
+          </div>
+
           {/* Card 1: Basic Information */}
           <div className="bg-white p-6 sm:p-8 rounded-3xl border border-purple-100 shadow-md space-y-6">
             <div className="flex items-center gap-3 border-b border-gray-100 pb-4">

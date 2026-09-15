@@ -93,10 +93,12 @@ export const StudioInteractiveCanvas: React.FC<StudioInteractiveCanvasProps> = (
 
   // Pre-load images into state
   useEffect(() => {
+    const activeBase = template.cleanBaseImageUrl || template.baseImageUrl;
     const urlsToLoad = [
+      activeBase,
       template.baseImageUrl,
       ...template.photoSlots.map((s) => s.defaultPhotoUrl).filter(Boolean) as string[],
-    ];
+    ].filter(Boolean);
 
     urlsToLoad.forEach((url) => {
       if (!url || cachedImages[url]) return;
@@ -104,7 +106,7 @@ export const StudioInteractiveCanvas: React.FC<StudioInteractiveCanvasProps> = (
       img.crossOrigin = 'anonymous';
       img.onload = () => {
         setCachedImages((prev) => ({ ...prev, [url]: img }));
-        if (url === template.baseImageUrl && img.naturalWidth && img.naturalHeight) {
+        if ((url === activeBase || url === template.baseImageUrl) && img.naturalWidth && img.naturalHeight) {
           const aspect = img.naturalWidth / img.naturalHeight;
           const targetHeight = 1600;
           const targetWidth = Math.round(targetHeight * aspect);
@@ -113,7 +115,7 @@ export const StudioInteractiveCanvas: React.FC<StudioInteractiveCanvasProps> = (
       };
       img.src = url;
     });
-  }, [template.baseImageUrl, template.photoSlots, cachedImages]);
+  }, [template.cleanBaseImageUrl, template.baseImageUrl, template.photoSlots, cachedImages]);
 
   const { width: CANVAS_WIDTH, height: CANVAS_HEIGHT } = canvasDimensions;
 
@@ -131,7 +133,8 @@ export const StudioInteractiveCanvas: React.FC<StudioInteractiveCanvasProps> = (
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
     // 2. Draw Base Poster Artwork
-    const baseImg = cachedImages[template.baseImageUrl];
+    const activeBaseUrl = template.cleanBaseImageUrl || template.baseImageUrl;
+    const baseImg = cachedImages[activeBaseUrl] || cachedImages[template.baseImageUrl];
     if (baseImg) {
       ctx.drawImage(baseImg, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
     } else {

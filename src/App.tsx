@@ -97,7 +97,8 @@ export const App: React.FC = () => {
     photoValues: Record<string, string>,
     textValues: Record<string, string>,
     selectedSize: 'A4' | 'A3',
-    customizedFramePreviewUrl?: string
+    customizedFramePreviewUrl?: string,
+    frameTemplateId?: string
   ) => {
     try {
       const prod = activeProduct;
@@ -150,6 +151,7 @@ export const App: React.FC = () => {
         uploadedPhotoUrl: firstPhoto,
         customizedFramePreviewUrl: (customizedFramePreviewUrl && (customizedFramePreviewUrl.startsWith('data:image') || customizedFramePreviewUrl.startsWith('http://') || customizedFramePreviewUrl.startsWith('https://')) && !customizedFramePreviewUrl.includes('[COMPRESSED_FIRESTORE_PREVIEW]') ? customizedFramePreviewUrl : ''),
         customTextValues: mergedValues,
+        frameTemplateId: frameTemplateId || prod?.linkedFrameTemplateId,
         quantity: 1,
         photoScale: 1,
         photoPosition: { x: 0, y: 0 },

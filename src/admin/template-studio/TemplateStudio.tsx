@@ -8,6 +8,7 @@ import { StudioPropertiesPanel } from './components/StudioPropertiesPanel';
 import { StudioAIImportModal } from './components/StudioAIImportModal';
 import { StudioPSDImportModal } from './components/StudioPSDImportModal';
 import { createNewTemplate, createDefaultSlot, createDefaultTextZone, resolveVisibility } from './utils/templateDefaults';
+import { generateCleanBaseImage } from '../../utils/cleanBaseGenerator';
 import { firebaseCloudDb } from '../../config/firebase';
 import { useCartStore } from '../../store/useCartStore';
 import { UniversalFrameCustomizer } from '../../components/customizer/UniversalFrameCustomizer';
@@ -74,7 +75,7 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
     }
   }, [initialTemplate]);
 
-  const handleApplyAICandidates = ({
+  const handleApplyAICandidates = async ({
     baseImageUrl,
     photoSlots,
     textZones,
@@ -88,9 +89,16 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
     aiConfidenceRecord: Record<string, number>;
   }) => {
     pushHistory(template);
+    let cleanBase = baseImageUrl;
+    try {
+      cleanBase = await generateCleanBaseImage(baseImageUrl, photoSlots, textZones);
+    } catch (e) {
+      console.warn('Failed to generate clean base image:', e);
+    }
     setTemplate((prev) => ({
       ...prev,
       baseImageUrl,
+      cleanBaseImageUrl: cleanBase,
       originalUploadUrl,
       importSource: 'ai-image',
       photoSlots,
@@ -294,8 +302,20 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
     setIsSaving(true);
     setSaveMessage(null);
     try {
+      let cleanBase = template.cleanBaseImageUrl;
+      if (!cleanBase && template.baseImageUrl) {
+        try {
+          cleanBase = await generateCleanBaseImage(template.baseImageUrl, template.photoSlots, template.textZones);
+        } catch (e) {
+          cleanBase = template.baseImageUrl;
+        }
+      }
+
       const templateToSave: UniversalFrameTemplate = {
         ...template,
+        cleanBaseImageUrl: cleanBase,
+        status: template.status || 'published',
+        category: template.category || 'baby-birth-frame',
         createdAt: template.createdAt || new Date().toISOString(),
       };
 
@@ -305,7 +325,8 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
       // 2. If linked to a product, sync to products collection and store
       if (templateToSave.productId) {
         const productUpdate = {
-          baseImageUrl: templateToSave.baseImageUrl,
+          linkedFrameTemplateId: templateToSave.id,
+          baseImageUrl: templateToSave.cleanBaseImageUrl || templateToSave.baseImageUrl,
           photoSlots: templateToSave.photoSlots,
           textZones: templateToSave.textZones,
           templateConfig: templateToSave,

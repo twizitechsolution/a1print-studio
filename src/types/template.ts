@@ -64,6 +64,8 @@ export interface UniversalFrameTemplate {
   basePrice: number;
   originalPrice: number;
   baseImageUrl: string;
+  cleanBaseImageUrl?: string;
+  status?: 'draft' | 'published';
   images?: string[];
   photoSlots: PhotoSlotConfig[];
   textZones: TextZoneConfig[];

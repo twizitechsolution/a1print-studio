@@ -68,6 +68,7 @@ export interface Product {
   frames: FrameOption[];
   photoSlots?: PhotoSlotConfig[];
   textZones?: TextZoneConfig[];
+  linkedFrameTemplateId?: string; // References UniversalFrameTemplate.id
   stockQuantity?: number;
   stockLogs?: StockLogItem[];
   allowedPaymentModes?: ('Prepaid' | 'COD' | 'GoQuick50')[];
@@ -88,6 +89,7 @@ export interface CartItem {
   selectedFrame: FrameOption;
   uploadedPhotoUrl: string;
   customizedFramePreviewUrl?: string; // Full composite customized frame artwork URL
+  frameTemplateId?: string;           // References UniversalFrameTemplate.id
   customTextValues: Record<string, string>;
   selectedFontFamily?: string;
   quantity: number;

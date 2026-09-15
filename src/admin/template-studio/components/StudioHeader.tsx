@@ -102,7 +102,7 @@ export const StudioHeader: React.FC<StudioHeaderProps> = ({
             className="font-playfair text-lg sm:text-xl font-extrabold bg-transparent hover:bg-slate-800/80 focus:bg-slate-800 px-2 py-0.5 rounded-lg border border-transparent focus:border-pink-500 focus:outline-hidden transition-all text-white w-full max-w-sm"
           />
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <select
               value={template.category}
               onChange={(e) => onUpdateTemplateMeta({ category: e.target.value })}
@@ -113,6 +113,19 @@ export const StudioHeader: React.FC<StudioHeaderProps> = ({
                   {cat.name}
                 </option>
               ))}
+            </select>
+
+            <select
+              value={template.status || 'published'}
+              onChange={(e) => onUpdateTemplateMeta({ status: e.target.value as 'draft' | 'published' })}
+              className={`px-2.5 py-1 text-xs font-extrabold rounded-lg border cursor-pointer ${
+                (template.status || 'published') === 'published'
+                  ? 'bg-emerald-950/60 border-emerald-500/50 text-emerald-300'
+                  : 'bg-amber-950/60 border-amber-500/50 text-amber-300'
+              }`}
+            >
+              <option value="published">🟢 Published</option>
+              <option value="draft">🟡 Draft</option>
             </select>
 
             <span className="text-[11px] text-slate-400 font-mono">

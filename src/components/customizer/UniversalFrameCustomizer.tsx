@@ -224,7 +224,7 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
   // Active Angle Image state for multi-angle photo gallery switching
   const [activeAngleImage, setActiveAngleImage] = useState<string | null>(null);
 
-  const baseImg = template.baseImageUrl || 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80';
+  const baseImg = template.cleanBaseImageUrl || template.baseImageUrl || 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80';
   const rawAngleImages = 
     (template as any).images || 
     (template as any).angleImages || 
@@ -408,11 +408,11 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
         ]);
       }
       setIsExportingCanvas(false);
-      onProceedToCheckout(photoValues, textValues, selectedSize, compiled || template.baseImageUrl);
+      onProceedToCheckout(photoValues, textValues, selectedSize, compiled || template.cleanBaseImageUrl || template.baseImageUrl);
     } catch (err) {
       console.warn('Canvas export fallback:', err);
       setIsExportingCanvas(false);
-      onProceedToCheckout(photoValues, textValues, selectedSize, compiledPreviewUrl || template.baseImageUrl);
+      onProceedToCheckout(photoValues, textValues, selectedSize, compiledPreviewUrl || template.cleanBaseImageUrl || template.baseImageUrl);
     }
   };
 

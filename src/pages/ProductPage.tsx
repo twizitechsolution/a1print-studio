@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Product } from '../types';
 import { UniversalFrameCustomizer } from '../components/customizer/UniversalFrameCustomizer';
 import { UniversalFrameTemplate } from '../types/template';
+import { firebaseCloudDb } from '../config/firebase';
 import { Star, ShieldCheck, Truck, Heart, Award, CheckCircle2, ChevronRight } from 'lucide-react';
 
 interface ProductPageProps {
@@ -10,7 +11,8 @@ interface ProductPageProps {
     photoValues: Record<string, string>,
     textValues: Record<string, string>,
     selectedSize: 'A4' | 'A3',
-    customizedFramePreviewUrl?: string
+    customizedFramePreviewUrl?: string,
+    frameTemplateId?: string
   ) => void;
   onNavigate: (page: string) => void;
 }
@@ -20,6 +22,26 @@ export const ProductPage: React.FC<ProductPageProps> = ({
   onProceedToCheckout,
   onNavigate,
 }) => {
+  const [linkedTemplate, setLinkedTemplate] = useState<UniversalFrameTemplate | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (product.linkedFrameTemplateId) {
+      firebaseCloudDb.getDocument<UniversalFrameTemplate>('universal_templates', product.linkedFrameTemplateId)
+        .then((tmpl) => {
+          if (isMounted && tmpl) {
+            setLinkedTemplate(tmpl);
+          }
+        })
+        .catch((err) => {
+          console.warn('Failed to load linked frame template:', err);
+        });
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [product.linkedFrameTemplateId]);
+
   const [activeTab, setActiveTab] = useState<'description' | 'specifications' | 'reviews'>('description');
   const [newReviewAuthor, setNewReviewAuthor] = useState('');
   const [newReviewComment, setNewReviewComment] = useState('');
@@ -78,24 +100,28 @@ export const ProductPage: React.FC<ProductPageProps> = ({
     setTimeout(() => setReviewSubmitted(false), 4000);
   };
 
-  // Construct dynamic template EXCLUSIVELY from saved product object (0 legacy fallbacks!)
+  // Construct dynamic template from linked frame template or saved product
+  const cleanBase = linkedTemplate?.cleanBaseImageUrl || (product as any)?.cleanBaseImageUrl;
+  const baseImg = cleanBase ||
+    (product.baseImageUrl && !product.baseImageUrl.includes('[COMPRESSED_FIRESTORE_PREVIEW]') ? product.baseImageUrl : null) ||
+    (product.thumbnail && !product.thumbnail.includes('[COMPRESSED_FIRESTORE_PREVIEW]') ? product.thumbnail : null) ||
+    (product.images && product.images[0] && !product.images[0].includes('[COMPRESSED_FIRESTORE_PREVIEW]') ? product.images[0] : null) ||
+    'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80';
+
   const currentTemplate: UniversalFrameTemplate = {
-    id: `tmpl-${product.id}`,
+    id: linkedTemplate?.id || (product.linkedFrameTemplateId || `tmpl-${product.id}`),
     productId: product.id,
-    title: product.title,
-    category: product.category,
+    title: linkedTemplate?.title || product.title,
+    category: linkedTemplate?.category || product.category,
     basePrice: product.sizes[0]?.price || 699,
     originalPrice: product.sizes[0]?.originalPrice || 999,
-    baseImageUrl:
-      (product.baseImageUrl && !product.baseImageUrl.includes('[COMPRESSED_FIRESTORE_PREVIEW]') ? product.baseImageUrl : null) ||
-      (product.thumbnail && !product.thumbnail.includes('[COMPRESSED_FIRESTORE_PREVIEW]') ? product.thumbnail : null) ||
-      (product.images && product.images[0] && !product.images[0].includes('[COMPRESSED_FIRESTORE_PREVIEW]') ? product.images[0] : null) ||
-      'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80',
-    photoSlots: product.photoSlots || [],
-    textZones: product.textZones || [],
+    baseImageUrl: baseImg,
+    cleanBaseImageUrl: cleanBase,
+    photoSlots: (linkedTemplate?.photoSlots && linkedTemplate.photoSlots.length > 0) ? linkedTemplate.photoSlots : (product.photoSlots || []),
+    textZones: (linkedTemplate?.textZones && linkedTemplate.textZones.length > 0) ? linkedTemplate.textZones : (product.textZones || []),
     images: (product as any).angleImages || product.images || [],
     product: product,
-    createdAt: new Date().toISOString(),
+    createdAt: linkedTemplate?.createdAt || new Date().toISOString(),
   };
 
   return (
@@ -111,11 +137,17 @@ export const ProductPage: React.FC<ProductPageProps> = ({
       </nav>
 
       {/* Main Interactive Universal Customizer Workspace */}
-
-      {/* Main Interactive Universal Customizer Workspace */}
       <UniversalFrameCustomizer
         template={currentTemplate}
-        onProceedToCheckout={onProceedToCheckout}
+        onProceedToCheckout={(photos, texts, size, compiledUrl) => {
+          onProceedToCheckout(
+            photos,
+            texts,
+            size as 'A4' | 'A3',
+            compiledUrl,
+            linkedTemplate?.id || product.linkedFrameTemplateId
+          );
+        }}
       />
 
       {/* Detailed Product Description & Customer Reviews Tabs Section */}

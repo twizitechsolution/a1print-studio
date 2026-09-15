@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Product } from '../../types';
-import { PhotoSlotConfig, TextZoneConfig } from '../../types/template';
+import { PhotoSlotConfig, TextZoneConfig, UniversalFrameTemplate } from '../../types/template';
 import { useCartStore } from '../../store/useCartStore';
-import { Upload, Sparkles, X, Check, Image as ImageIcon, Loader2, Trash2, Plus, Package } from 'lucide-react';
+import { Upload, Sparkles, X, Check, Image as ImageIcon, Loader2, Trash2, Plus, Package, Link2 } from 'lucide-react';
 import { compressImageBase64 } from '../../utils/imageCompressor';
+import { firebaseCloudDb } from '../../config/firebase';
 
 interface AdminProductListingModalProps {
   isOpen: boolean;
@@ -30,9 +31,28 @@ export const AdminProductListingModal: React.FC<AdminProductListingModalProps> =
   const [angleImages, setAngleImages] = useState<string[]>([]);
   const [isCompressing, setIsCompressing] = useState<boolean>(false);
 
+  const [linkedFrameTemplateId, setLinkedFrameTemplateId] = useState<string>('');
+  const [availableTemplates, setAvailableTemplates] = useState<UniversalFrameTemplate[]>([]);
+
   const [detectedPhotoSlots, setDetectedPhotoSlots] = useState<PhotoSlotConfig[]>([]);
   const [detectedTextZones, setDetectedTextZones] = useState<TextZoneConfig[]>([]);
   const [allowedPaymentModes, setAllowedPaymentModes] = useState<('Prepaid' | 'COD' | 'GoQuick50')[]>(['Prepaid', 'COD', 'GoQuick50']);
+
+  useEffect(() => {
+    const loadTemplates = async () => {
+      try {
+        const tmpls = await firebaseCloudDb.getCollection<UniversalFrameTemplate>('universal_templates');
+        if (Array.isArray(tmpls)) {
+          setAvailableTemplates(tmpls.filter((t) => (t.status || 'published') === 'published'));
+        }
+      } catch (err) {
+        console.warn('Failed to load templates:', err);
+      }
+    };
+    if (isOpen) {
+      loadTemplates();
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     if (editingProduct) {
@@ -47,6 +67,7 @@ export const AdminProductListingModal: React.FC<AdminProductListingModalProps> =
       setDetectedPhotoSlots(editingProduct.photoSlots || []);
       setDetectedTextZones(editingProduct.textZones || []);
       setAllowedPaymentModes(editingProduct.allowedPaymentModes || ['Prepaid', 'COD', 'GoQuick50']);
+      setLinkedFrameTemplateId(editingProduct.linkedFrameTemplateId || '');
     } else {
       setTitle('');
       setProductId(`PRD-${Math.floor(1000 + Math.random() * 9000)}`);
@@ -59,6 +80,7 @@ export const AdminProductListingModal: React.FC<AdminProductListingModalProps> =
       setDetectedPhotoSlots([]);
       setDetectedTextZones([]);
       setAllowedPaymentModes(['Prepaid', 'COD', 'GoQuick50']);
+      setLinkedFrameTemplateId('');
     }
   }, [editingProduct, isOpen, categories]);
 
@@ -133,6 +155,27 @@ export const AdminProductListingModal: React.FC<AdminProductListingModalProps> =
     }
   };
 
+  const handleSelectTemplate = (templateId: string) => {
+    setLinkedFrameTemplateId(templateId);
+    if (!templateId) return;
+    const selected = availableTemplates.find((t) => t.id === templateId);
+    if (!selected) return;
+
+    if (selected.cleanBaseImageUrl || selected.baseImageUrl) {
+      setUploadedPosterUrl(selected.cleanBaseImageUrl || selected.baseImageUrl);
+      setAngleImages([selected.cleanBaseImageUrl || selected.baseImageUrl]);
+    }
+    if (selected.photoSlots) {
+      setDetectedPhotoSlots(selected.photoSlots);
+    }
+    if (selected.textZones) {
+      setDetectedTextZones(selected.textZones);
+    }
+    if (!title && selected.title) {
+      setTitle(selected.title);
+    }
+  };
+
   const handleSave = () => {
     if (!title.trim()) {
       alert('Please enter a product title!');
@@ -167,6 +210,7 @@ export const AdminProductListingModal: React.FC<AdminProductListingModalProps> =
         'High-density Synthetic Frame Wood',
         'Pre-fitted Wall Mount Hooks',
       ],
+      linkedFrameTemplateId: linkedFrameTemplateId || undefined,
       sizes: [
         {
           id: 'size-a4',
@@ -177,18 +221,18 @@ export const AdminProductListingModal: React.FC<AdminProductListingModalProps> =
           discountPercentage: Math.round(((originalPrice - price) / originalPrice) * 100),
         },
         {
-          id: 'size-12x18',
-          name: '12 x 18 in Large Frame',
+          id: 'size-a3',
+          name: 'A3 Size (12 x 18 in)',
           dimensions: '12 x 18 inches',
-          price: price + 300,
-          originalPrice: originalPrice + 400,
+          price: Math.round(price * 1.4),
+          originalPrice: Math.round(originalPrice * 1.4),
           discountPercentage: Math.round(((originalPrice - price) / originalPrice) * 100),
         },
       ],
       frames: [
         {
           id: 'frame-black',
-          name: 'Classic Matte Black',
+          name: 'Solid Synthetic Black Wood',
           borderStyle: 'solid',
           frameColor: '#000000',
           borderColorClass: 'border-black',
@@ -197,6 +241,8 @@ export const AdminProductListingModal: React.FC<AdminProductListingModalProps> =
       photoSlots: detectedPhotoSlots,
       textZones: detectedTextZones,
       allowedPaymentModes,
+      isDeleted: false,
+      updatedAt: new Date().toISOString(),
     };
 
     onSaveProduct(newProd);
@@ -204,16 +250,21 @@ export const AdminProductListingModal: React.FC<AdminProductListingModalProps> =
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/80 backdrop-blur-xs font-sans select-none">
-      <div className="relative bg-zinc-950 text-zinc-100 rounded-xl p-6 sm:p-7 max-w-4xl w-full shadow-2xl border border-zinc-800 space-y-6 max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto font-jost animate-in fade-in duration-200">
+      <div className="bg-zinc-950 border border-zinc-800 rounded-2xl w-full max-w-4xl p-6 shadow-2xl relative my-8 text-zinc-100 max-h-[90vh] overflow-y-auto">
         
         {/* Modal Header */}
-        <div className="flex items-center justify-between border-b border-zinc-800/80 pb-4">
-          <div>
-            <h2 className="text-lg font-bold text-zinc-100 tracking-tight">
-              {editingProduct ? 'Edit Frame Product' : 'Add New Frame Product'}
-            </h2>
-            <p className="text-xs text-zinc-400 mt-0.5">Enter product details, upload multiple angle photos, and set available stock quantity.</p>
+        <div className="flex items-center justify-between border-b border-zinc-800 pb-4 mb-6">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 bg-purple-900/30 text-purple-400 rounded-xl border border-purple-500/20">
+              <Package className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-zinc-100">
+                {editingProduct ? 'Edit Frame Product' : 'Add New Frame Product'}
+              </h2>
+              <p className="text-xs text-zinc-400">Configure photo print listing details and multi-angle previews</p>
+            </div>
           </div>
           <button
             onClick={onClose}
@@ -228,6 +279,28 @@ export const AdminProductListingModal: React.FC<AdminProductListingModalProps> =
           
           {/* Left Column: Form Inputs (6 Cols) */}
           <div className="lg:col-span-6 space-y-4 text-xs">
+            
+            {/* Smart Frame Template Linking */}
+            {availableTemplates.length > 0 && (
+              <div className="p-3 bg-purple-950/30 border border-purple-500/30 rounded-xl space-y-1.5">
+                <label className="text-xs font-bold text-purple-300 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-pink-400" />
+                  <span>Link Universal Template (Optional) :</span>
+                </label>
+                <select
+                  value={linkedFrameTemplateId}
+                  onChange={(e) => handleSelectTemplate(e.target.value)}
+                  className="w-full px-3 py-2 bg-zinc-900 border border-purple-500/40 rounded-lg text-purple-200 text-xs font-bold focus:outline-none cursor-pointer"
+                >
+                  <option value="">-- No Template Linked --</option>
+                  {availableTemplates.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.title} ({t.photoSlots?.length || 0} Slots, {t.textZones?.length || 0} Texts)
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             
             <div className="grid grid-cols-12 gap-3">
               <div className="col-span-4 space-y-1.5">
