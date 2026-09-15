@@ -352,30 +352,47 @@ export const StudioPropertiesPanel: React.FC<StudioPropertiesPanelProps> = ({
         </div>
 
         {/* Coordinates */}
-        <div className="grid grid-cols-2 gap-2 bg-slate-950/60 p-3 rounded-2xl border border-slate-800">
-          <div>
-            <label className="text-[10px] text-slate-400 font-bold">X Position ({zone.x}%)</label>
-            <input
-              type="number"
-              value={zone.x}
-              min={0}
-              max={100}
-              step={0.5}
-              onChange={(e) => onUpdateZone({ ...zone, x: Number(e.target.value) })}
-              className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-white font-mono"
-            />
-          </div>
-          <div>
-            <label className="text-[10px] text-slate-400 font-bold">Y Position ({zone.y}%)</label>
-            <input
-              type="number"
-              value={zone.y}
-              min={0}
-              max={100}
-              step={0.5}
-              onChange={(e) => onUpdateZone({ ...zone, y: Number(e.target.value) })}
-              className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-white font-mono"
-            />
+        <div className="space-y-2 bg-slate-950/60 p-3 rounded-2xl border border-slate-800">
+          <span className="font-extrabold text-[11px] uppercase tracking-wider text-slate-400 block">
+            Canvas Geometry (% Percentages)
+          </span>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-[10px] text-slate-400 font-bold">X Center ({zone.x}%)</label>
+              <input
+                type="number"
+                value={zone.x}
+                min={0}
+                max={100}
+                step={0.5}
+                onChange={(e) => onUpdateZone({ ...zone, x: Number(e.target.value) })}
+                className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-white font-mono"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] text-slate-400 font-bold">Y Center ({zone.y}%)</label>
+              <input
+                type="number"
+                value={zone.y}
+                min={0}
+                max={100}
+                step={0.5}
+                onChange={(e) => onUpdateZone({ ...zone, y: Number(e.target.value) })}
+                className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-white font-mono"
+              />
+            </div>
+            <div className="col-span-2">
+              <label className="text-[10px] text-slate-400 font-bold">Max Boundary Width ({zone.maxWidth || 80}%)</label>
+              <input
+                type="number"
+                value={zone.maxWidth || 80}
+                min={10}
+                max={100}
+                step={1}
+                onChange={(e) => onUpdateZone({ ...zone, maxWidth: Number(e.target.value) })}
+                className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-white font-mono"
+              />
+            </div>
           </div>
         </div>
 

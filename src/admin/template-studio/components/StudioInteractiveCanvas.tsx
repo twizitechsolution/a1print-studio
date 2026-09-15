@@ -270,22 +270,55 @@ export const StudioInteractiveCanvas: React.FC<StudioInteractiveCanvasProps> = (
     // 5. Draw Active Selection Gizmo & Handles
     if (selectedLayer) {
       let box: any = null;
-      if (selectedLayer.type === 'slot') {
+      let label = '';
+      let isSlot = selectedLayer.type === 'slot';
+
+      if (isSlot) {
         const slot = template.photoSlots.find((s) => s.id === selectedLayer.id);
-        if (slot) box = getSlotBoundingBox(slot, CANVAS_WIDTH, CANVAS_HEIGHT);
+        if (slot) {
+          box = getSlotBoundingBox(slot, CANVAS_WIDTH, CANVAS_HEIGHT);
+          label = `📷 ${slot.label || 'Photo Slot'}`;
+        }
       } else {
         const zone = template.textZones.find((z) => z.id === selectedLayer.id);
-        if (zone) box = getTextZoneBoundingBox(zone, CANVAS_WIDTH, CANVAS_HEIGHT);
+        if (zone) {
+          box = getTextZoneBoundingBox(zone, CANVAS_WIDTH, CANVAS_HEIGHT);
+          label = `✎ ${zone.label || 'Text Zone'}`;
+        }
       }
 
       if (box) {
-        // Selection bounding rectangle
         ctx.save();
-        ctx.strokeStyle = '#F82BA9';
-        ctx.lineWidth = 2.5;
-        ctx.setLineDash([8, 6]);
+        // Outer dark shadow outline for contrast against any background
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)';
+        ctx.lineWidth = 4.5;
+        ctx.setLineDash([]);
+        ctx.strokeRect(box.left - 1, box.top - 1, box.width + 2, box.height + 2);
+
+        // Inner glowing selection outline
+        ctx.strokeStyle = isSlot ? '#F82BA9' : '#A855F7';
+        ctx.lineWidth = 3;
+        ctx.setLineDash([8, 5]);
         ctx.strokeRect(box.left, box.top, box.width, box.height);
-        ctx.restore();
+
+        // Selected Floating Pill Badge
+        const badgeText = `★ ACTIVE: ${label}`;
+        ctx.font = 'bold 13px sans-serif';
+        const tm = ctx.measureText(badgeText);
+        const bW = tm.width + 20;
+        const bH = 26;
+        const bX = Math.max(10, Math.min(CANVAS_WIDTH - bW - 10, box.centerX - bW / 2));
+        const bY = Math.max(10, box.top - bH - 6);
+
+        ctx.fillStyle = isSlot ? '#F82BA9' : '#A855F7';
+        ctx.beginPath();
+        ctx.roundRect(bX, bY, bW, bH, 13);
+        ctx.fill();
+
+        ctx.fillStyle = '#FFFFFF';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(badgeText, bX + bW / 2, bY + bH / 2);
 
         // 8 Resize Handles
         const handles = [
@@ -299,15 +332,17 @@ export const StudioInteractiveCanvas: React.FC<StudioInteractiveCanvasProps> = (
           { x: box.right, y: box.bottom },
         ];
 
-        ctx.fillStyle = '#FFFFFF';
-        ctx.strokeStyle = '#F82BA9';
-        ctx.lineWidth = 2.5;
         const hSize = 14;
-
         handles.forEach((h) => {
+          ctx.fillStyle = '#FFFFFF';
+          ctx.strokeStyle = isSlot ? '#F82BA9' : '#A855F7';
+          ctx.lineWidth = 2.5;
+          ctx.setLineDash([]);
           ctx.fillRect(h.x - hSize / 2, h.y - hSize / 2, hSize, hSize);
           ctx.strokeRect(h.x - hSize / 2, h.y - hSize / 2, hSize, hSize);
         });
+
+        ctx.restore();
       }
     }
   }, [template, selectedLayer, cachedImages, CANVAS_WIDTH, CANVAS_HEIGHT, previewMode]);
@@ -333,6 +368,7 @@ export const StudioInteractiveCanvas: React.FC<StudioInteractiveCanvasProps> = (
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const { x, y } = getCanvasCoordinates(e);
 
+    // 1. Check if clicking on a RESIZE HANDLE of currently selected layer
     if (selectedLayer) {
       let box: any = null;
       let activeItem: PhotoSlotConfig | TextZoneConfig | null = null;
@@ -352,8 +388,9 @@ export const StudioInteractiveCanvas: React.FC<StudioInteractiveCanvasProps> = (
       }
 
       if (box && activeItem && !activeItem.locked) {
-        const hitHandle = hitTestHandles(x, y, box, 18);
-        if (hitHandle) {
+        const hitHandle = hitTestHandles(x, y, box, 16);
+        // If hit a true resize handle (not just general body move)
+        if (hitHandle && hitHandle !== 'move') {
           setActiveDrag({
             handle: hitHandle,
             startX: x,
@@ -365,25 +402,7 @@ export const StudioInteractiveCanvas: React.FC<StudioInteractiveCanvasProps> = (
       }
     }
 
-    // Hit-test photo slots (reverse order for top-most)
-    for (let i = template.photoSlots.length - 1; i >= 0; i--) {
-      const slot = template.photoSlots[i];
-      const box = getSlotBoundingBox(slot, CANVAS_WIDTH, CANVAS_HEIGHT);
-      if (x >= box.left && x <= box.right && y >= box.top && y <= box.bottom) {
-        onSelectLayer({ type: 'slot', id: slot.id });
-        if (!slot.locked) {
-          setActiveDrag({
-            handle: 'move',
-            startX: x,
-            startY: y,
-            initialLayer: { ...slot },
-          });
-        }
-        return;
-      }
-    }
-
-    // Hit-test text zones
+    // 2. Hit-test Text Zones FIRST (as text zones typically overlay on top of frame slots)
     for (let i = template.textZones.length - 1; i >= 0; i--) {
       const zone = template.textZones[i];
       const box = getTextZoneBoundingBox(zone, CANVAS_WIDTH, CANVAS_HEIGHT);
@@ -401,7 +420,25 @@ export const StudioInteractiveCanvas: React.FC<StudioInteractiveCanvasProps> = (
       }
     }
 
-    // Deselect if clicked empty background
+    // 3. Hit-test Photo Slots
+    for (let i = template.photoSlots.length - 1; i >= 0; i--) {
+      const slot = template.photoSlots[i];
+      const box = getSlotBoundingBox(slot, CANVAS_WIDTH, CANVAS_HEIGHT);
+      if (x >= box.left && x <= box.right && y >= box.top && y <= box.bottom) {
+        onSelectLayer({ type: 'slot', id: slot.id });
+        if (!slot.locked) {
+          setActiveDrag({
+            handle: 'move',
+            startX: x,
+            startY: y,
+            initialLayer: { ...slot },
+          });
+        }
+        return;
+      }
+    }
+
+    // 4. Deselect if clicked empty canvas area
     onSelectLayer(null);
   };
 

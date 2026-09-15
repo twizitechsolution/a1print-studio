@@ -43,8 +43,8 @@ export function getTextZoneBoundingBox(
   canvasW: number,
   canvasH: number
 ): BoundingBox {
-  const maxW = ((zone.maxWidth || 80) / 100) * canvasW;
-  const estimatedH = (zone.fontSize * 2.5); // approximate bounding box height
+  const maxW = Math.max(80, ((zone.maxWidth || 80) / 100) * canvasW);
+  const estimatedH = Math.max(50, (zone.fontSize || 22) * 2.8); // comfortable bounding box height
   const cx = (zone.x / 100) * canvasW;
   const cy = (zone.y / 100) * canvasH;
   const l = cx - maxW / 2;

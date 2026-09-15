@@ -394,6 +394,13 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
           onNewFrame={() => setCurrentView('wizard')}
           onEditTemplate={(selectedTmpl) => {
             setTemplate(selectedTmpl);
+            if (selectedTmpl.photoSlots?.length > 0) {
+              setSelectedLayer({ type: 'slot', id: selectedTmpl.photoSlots[0].id });
+            } else if (selectedTmpl.textZones?.length > 0) {
+              setSelectedLayer({ type: 'zone', id: selectedTmpl.textZones[0].id });
+            } else {
+              setSelectedLayer(null);
+            }
             setCurrentView('editor');
           }}
           onOpenAdvancedImageImport={() => setIsAIImportOpen(true)}
@@ -448,6 +455,13 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
             };
 
             setTemplate(newTemplate);
+            if (photoSlots.length > 0) {
+              setSelectedLayer({ type: 'slot', id: photoSlots[0].id });
+            } else if (textZones.length > 0) {
+              setSelectedLayer({ type: 'zone', id: textZones[0].id });
+            } else {
+              setSelectedLayer(null);
+            }
             setCurrentView('editor');
           }}
           onOpenAdvancedImageImport={() => setIsAIImportOpen(true)}
