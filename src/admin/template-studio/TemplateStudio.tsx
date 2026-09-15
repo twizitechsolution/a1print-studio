@@ -25,11 +25,17 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
   onExit,
 }) => {
   // Store products for 2-way sync
-  const products = useCartStore((state) => state.products);
-  const updateStoreProduct = useCartStore((state) => state.updateProduct);
+  const { products = [], updateProduct: updateStoreProduct } = useCartStore();
 
   // Main Draft State
-  const [template, setTemplate] = useState<UniversalFrameTemplate>(() => initialTemplate || createNewTemplate());
+  const [template, setTemplate] = useState<UniversalFrameTemplate>(() => {
+    const base = initialTemplate || createNewTemplate();
+    return {
+      ...base,
+      photoSlots: base.photoSlots || [],
+      textZones: base.textZones || [],
+    };
+  });
 
   // Selection
   const [selectedLayer, setSelectedLayer] = useState<SelectedLayer | null>(null);
@@ -155,7 +161,7 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
       setTemplate((prev) => ({ ...prev, productId: undefined }));
       return;
     }
-    const matched = products.find((p) => p.id === productId);
+    const matched = (products || []).find((p) => p.id === productId);
     if (!matched) return;
 
     pushHistory(template);
@@ -371,7 +377,7 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
             className="px-2.5 py-1 bg-slate-800 border border-slate-700 rounded-lg text-white font-semibold text-xs focus:outline-none focus:border-pink-500"
           >
             <option value="">None (Standalone Template)</option>
-            {products.map((p) => (
+            {(products || []).map((p) => (
               <option key={p.id} value={p.id}>
                 {p.title} ({p.categoryLabel || p.category})
               </option>
