@@ -211,32 +211,60 @@ export const StudioInteractiveCanvas: React.FC<StudioInteractiveCanvasProps> = (
       const scaledSize = Math.round((zone.fontSize || 22) * 2.4);
       const isSelected = selectedLayer?.type === 'zone' && selectedLayer.id === zone.id;
 
-      ctx.save();
-      ctx.fillStyle = zone.color || '#160E4B';
-      ctx.font = `bold ${scaledSize}px ${zone.fontFamily || 'serif'}, sans-serif`;
-      ctx.textAlign = (zone.align as CanvasTextAlign) || 'center';
-      ctx.textBaseline = 'middle';
+      if (previewMode === 'cutout') {
+        // Clean Cutout View: Show cleared region boundary only, with NO placeholder text drawn on top
+        // This lets the admin visually inspect that all original baked-in pixels were removed from the base
+        const box = getTextZoneBoundingBox(zone, CANVAS_WIDTH, CANVAS_HEIGHT);
+        ctx.save();
+        ctx.strokeStyle = isSelected ? '#F82BA9' : 'rgba(168, 85, 247, 0.7)';
+        ctx.lineWidth = isSelected ? 2.5 : 1.5;
+        ctx.setLineDash(isSelected ? [6, 4] : [4, 4]);
+        ctx.strokeRect(box.left, box.top, box.width, box.height);
 
-      const displayText = zone.type === 'calendar' || zone.isCalendar
-        ? `🗓️ [${zone.defaultValue || '14 Aug 2024'}]`
-        : zone.defaultValue || zone.label;
+        const tagText = `✎ ${zone.label || 'Text Zone'}`;
+        ctx.font = 'bold 12px sans-serif';
+        const tm = ctx.measureText(tagText);
+        const tagW = tm.width + 16;
+        const tagH = 22;
+        ctx.fillStyle = isSelected ? 'rgba(248, 43, 169, 0.9)' : 'rgba(15, 23, 42, 0.85)';
+        ctx.beginPath();
+        ctx.roundRect(box.left, Math.max(0, box.top - tagH - 2), tagW, tagH, 6);
+        ctx.fill();
 
-      ctx.fillText(displayText, cx, cy);
+        ctx.fillStyle = '#FFFFFF';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(tagText, box.left + 8, Math.max(0, box.top - tagH - 2) + tagH / 2);
+        ctx.restore();
+      } else {
+        // Sample Preview Mode: render typography preview over clean base
+        ctx.save();
+        ctx.fillStyle = zone.color || '#160E4B';
+        ctx.font = `bold ${scaledSize}px ${zone.fontFamily || 'serif'}, sans-serif`;
+        ctx.textAlign = (zone.align as CanvasTextAlign) || 'center';
+        ctx.textBaseline = 'middle';
 
-      if (isSelected) {
-        const textMetrics = ctx.measureText(displayText);
-        const pad = 12;
-        const left = zone.align === 'center' ? cx - textMetrics.width / 2 - pad : cx - pad;
-        const width = textMetrics.width + pad * 2;
-        const height = scaledSize + pad * 1.5;
-        const top = cy - height / 2;
+        const displayText = zone.type === 'calendar' || zone.isCalendar
+          ? `🗓️ [${zone.defaultValue || '14 Aug 2024'}]`
+          : zone.defaultValue || zone.label;
 
-        ctx.strokeStyle = '#A855F7';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([6, 4]);
-        ctx.strokeRect(left, top, width, height);
+        ctx.fillText(displayText, cx, cy);
+
+        if (isSelected) {
+          const textMetrics = ctx.measureText(displayText);
+          const pad = 12;
+          const left = zone.align === 'center' ? cx - textMetrics.width / 2 - pad : cx - pad;
+          const width = textMetrics.width + pad * 2;
+          const height = scaledSize + pad * 1.5;
+          const top = cy - height / 2;
+
+          ctx.strokeStyle = '#A855F7';
+          ctx.lineWidth = 2;
+          ctx.setLineDash([6, 4]);
+          ctx.strokeRect(left, top, width, height);
+        }
+        ctx.restore();
       }
-      ctx.restore();
     });
 
     // 5. Draw Active Selection Gizmo & Handles

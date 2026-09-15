@@ -1,5 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { UniversalFrameTemplate, PhotoSlotConfig, TextZoneConfig, FrameCutoutShape } from '../../types/template';
+import { FrameLibraryView } from './components/FrameLibraryView';
+import { NewFrameWizard } from './components/NewFrameWizard';
 import { SelectedLayer } from './types';
 import { StudioHeader } from './components/StudioHeader';
 import { StudioLayerPanel } from './components/StudioLayerPanel';
@@ -27,6 +29,11 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
 }) => {
   // Store products for 2-way sync
   const { products = [], updateProduct: updateStoreProduct } = useCartStore();
+
+  // Linear Wizard Navigation: Library -> New Frame Wizard -> Editor
+  const [currentView, setCurrentView] = useState<'library' | 'wizard' | 'editor'>(
+    initialTemplate ? 'editor' : 'library'
+  );
 
   // Main Draft State
   const [template, setTemplate] = useState<UniversalFrameTemplate>(() => {
@@ -341,14 +348,15 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
       }
 
       setSaveMessage({
-        text: `Template "${templateToSave.title}" saved successfully to Cloud Firestore!${
-          templateToSave.productId ? ' Linked product updated.' : ''
-        }`,
+        text: `Template "${templateToSave.title}" saved successfully (ID: ${templateToSave.id})! Redirecting to Frame Library...`,
         type: 'success',
       });
 
       onSaveSuccess?.(templateToSave);
-      setTimeout(() => setSaveMessage(null), 4000);
+      setTimeout(() => {
+        setSaveMessage(null);
+        setCurrentView('library');
+      }, 1500);
     } catch (err: any) {
       console.error('Failed to save template:', err);
       setSaveMessage({
@@ -364,6 +372,104 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
   const activeSlot = selectedLayer?.type === 'slot' ? template.photoSlots.find((s) => s.id === selectedLayer.id) || null : null;
   const activeZone = selectedLayer?.type === 'zone' ? template.textZones.find((z) => z.id === selectedLayer.id) || null : null;
 
+  const handleTogglePreviewMode = async () => {
+    const nextMode = previewMode === 'cutout' ? 'sample' : 'cutout';
+    setPreviewMode(nextMode);
+
+    if (nextMode === 'cutout' && !template.cleanBaseImageUrl && template.baseImageUrl) {
+      try {
+        const clean = await generateCleanBaseImage(template.baseImageUrl, template.photoSlots, template.textZones);
+        setTemplate((prev) => ({ ...prev, cleanBaseImageUrl: clean }));
+      } catch (e) {
+        console.warn('On-demand clean base generation warning:', e);
+      }
+    }
+  };
+
+  // STEP 1: FRAME LIBRARY VIEW
+  if (currentView === 'library') {
+    return (
+      <div className="relative">
+        <FrameLibraryView
+          onNewFrame={() => setCurrentView('wizard')}
+          onEditTemplate={(selectedTmpl) => {
+            setTemplate(selectedTmpl);
+            setCurrentView('editor');
+          }}
+          onOpenAdvancedImageImport={() => setIsAIImportOpen(true)}
+        />
+
+        {isAIImportOpen && (
+          <StudioAIImportModal
+            isOpen={isAIImportOpen}
+            onClose={() => setIsAIImportOpen(false)}
+            category={template.category}
+            onApplyCandidates={(candidates) => {
+              handleApplyAICandidates(candidates);
+              setCurrentView('editor');
+              setIsAIImportOpen(false);
+            }}
+          />
+        )}
+      </div>
+    );
+  }
+
+  // STEP 2 & 3: NEW FRAME PSD WIZARD
+  if (currentView === 'wizard') {
+    return (
+      <div className="relative">
+        <NewFrameWizard
+          onBack={() => setCurrentView('library')}
+          onComplete={async ({ title, category, photoSlots, textZones, baseImageUrl, originalUploadUrl }) => {
+            const uniqueId = `tmpl-${Date.now()}`;
+            let cleanBase = baseImageUrl;
+            try {
+              cleanBase = await generateCleanBaseImage(baseImageUrl, photoSlots, textZones);
+            } catch (e) {
+              console.warn('Clean base generation on wizard complete:', e);
+            }
+
+            const newTemplate: UniversalFrameTemplate = {
+              id: uniqueId,
+              productId: `PRD-${Math.floor(1000 + Math.random() * 9000)}`,
+              title,
+              category,
+              basePrice: 699,
+              originalPrice: 999,
+              baseImageUrl,
+              cleanBaseImageUrl: cleanBase,
+              originalUploadUrl,
+              photoSlots,
+              textZones,
+              createdAt: new Date().toISOString(),
+              status: 'draft',
+              importSource: 'psd',
+            };
+
+            setTemplate(newTemplate);
+            setCurrentView('editor');
+          }}
+          onOpenAdvancedImageImport={() => setIsAIImportOpen(true)}
+        />
+
+        {isAIImportOpen && (
+          <StudioAIImportModal
+            isOpen={isAIImportOpen}
+            onClose={() => setIsAIImportOpen(false)}
+            category={template.category}
+            onApplyCandidates={(candidates) => {
+              handleApplyAICandidates(candidates);
+              setCurrentView('editor');
+              setIsAIImportOpen(false);
+            }}
+          />
+        )}
+      </div>
+    );
+  }
+
+  // STEP 4: EDITOR VIEW
   return (
     <div className="flex flex-col h-[calc(100vh-64px)] min-h-[680px] bg-slate-950 font-jost text-white overflow-hidden select-none">
       
@@ -379,11 +485,11 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
         onRedo={handleRedo}
         zoom={zoom}
         onZoomChange={setZoom}
-        onExit={onExit}
+        onExit={() => setCurrentView('library')}
         onOpenAIImport={() => setIsAIImportOpen(true)}
         onOpenPSDImport={() => setIsPSDImportOpen(true)}
         previewMode={previewMode}
-        onTogglePreviewMode={() => setPreviewMode((prev) => (prev === 'cutout' ? 'sample' : 'cutout'))}
+        onTogglePreviewMode={handleTogglePreviewMode}
         onTestCustomizer={() => setIsLiveTestOpen(true)}
       />
 

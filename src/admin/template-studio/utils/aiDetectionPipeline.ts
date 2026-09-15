@@ -111,28 +111,42 @@ export async function runGeminiVisionDetection(
   const { base64, mimeType } = await getBase64FromSource(imageSource);
 
   const prompt = [
-    'You are an expert Web-to-Print photo frame template parser.',
-    'Analyze this custom photo frame design image and identify all photo apertures and customizable text:',
-    '1. Photo Cutout Slots:',
-    '   - Look for where photos are placed, especially circular portrait rings, arch windows, or rectangular/rounded cutouts.',
-    '   - For baby frames, find the central circular baby photo aperture (often with a gold/decorative border).',
-    '   - Coordinates (x, y) must be the CENTER in percentage (0 to 100) of image width and height.',
-    '   - width and height in percentage (0 to 100).',
-    '   - shape: must be "circle", "arch", "rounded", "rectangle", "oval", or "heart".',
-    '   - label: descriptive label (e.g. "Baby Portrait Photo", "Couple Photo").',
-    '2. Customizable Text Zones:',
-    '   - Extract EVERY customizable text line or badge visible in the image with its EXACT text as defaultValue:',
-    '   - Main Title / Name (e.g. "Mithunan" or couple names) -> type: "text"',
-    '   - Birth Date / Anniversary Date (e.g. "29 Jan, 2025" or "NOV 29, 2025") -> type: "date"',
-    '   - Birth Time / Clock badge (e.g. "06:21 AM") -> type: "time"',
-    '   - Weight badge (e.g. "2.7 Kg") -> type: "text"',
-    '   - Parents names (e.g. "Parthiban & Sattihunai") -> type: "text"',
-    '   - Hospital name / Location (e.g. "Panduputhur Sakthi Hospital Salem") -> type: "text"',
-    '   - Coordinates (x, y) must be the CENTER of each text line in percentage (0 to 100).',
-    '   - maxWidth in percentage, fontSize in pt (14 to 42), fontFamily ("Playfair Display", "Jost", "Montserrat", "Great Vibes", "Cinzel"), hex color.',
-    'Respond ONLY with valid JSON in this exact structure:',
-    '{"photoSlots":[{"label":"Baby Portrait Photo","shape":"circle","x":50,"y":43,"width":44,"height":33,"confidence":0.99,"detectedReason":"Central circular baby photo aperture"}],"textZones":[{"label":"Baby Name","defaultValue":"Mithunan","x":50,"y":15,"maxWidth":70,"fontSize":32,"fontFamily":"Playfair Display","color":"#160E4B","align":"center","type":"text","confidence":0.98,"detectedReason":"Primary name header"},{"label":"Birth Date","defaultValue":"29 Jan, 2025","x":28,"y":66,"maxWidth":25,"fontSize":16,"fontFamily":"Jost","color":"#160E4B","align":"center","type":"date","confidence":0.95,"detectedReason":"Birth date text"},{"label":"Birth Time","defaultValue":"06:21 AM","x":72,"y":66,"maxWidth":25,"fontSize":16,"fontFamily":"Jost","color":"#160E4B","align":"center","type":"time","confidence":0.95,"detectedReason":"Birth time text"}]}'
+    'You are an expert Computer Vision and Web-to-Print layout parser.',
+    'Carefully inspect the provided image and extract all customizable photo apertures and text elements present in THIS SPECIFIC IMAGE.',
+    '',
+    'Rules for Photo Apertures (photoSlots):',
+    '- Identify regions designed for personal photos (e.g. portrait cutouts, photo frames, picture holders, circular or rectangular photo windows).',
+    '- Coordinates (x, y) must be the CENTER in percentage (0 to 100) of image width and height.',
+    '- width and height in percentage (0 to 100).',
+    '- shape: "circle" | "arch" | "rounded" | "rectangle" | "oval" | "heart"',
+    '- label: descriptive name (e.g. "Main Portrait Photo", "Couple Photo", "Family Picture")',
+    '',
+    'Rules for Text Elements (textZones):',
+    '- Read and transcribe the EXACT visible text strings printed on this image.',
+    '- For each distinct headline, title, name, date, time, weight, location, or message:',
+    '  - label: descriptive category (e.g. "Headline / Name", "Date", "Time", "Weight", "Location / Details")',
+    '  - defaultValue: the EXACT text as read from this image (do NOT use placeholder or fake text)',
+    '  - type: "text" | "date" | "time" | "calendar"',
+    '  - x: center X position in %',
+    '  - y: center Y position in %',
+    '  - maxWidth: estimated width in %',
+    '  - fontSize: estimated point size (14 to 48)',
+    '  - fontFamily: closest matching font ("Playfair Display", "Cinzel", "Jost", "Montserrat", "Great Vibes")',
+    '  - color: dominant hex color code of the text characters (e.g. "#160E4B", "#B8860B", "#D13B68")',
+    '  - align: "left" | "center" | "right"',
+    '',
+    'Return ONLY valid JSON matching this schema with NO markdown and NO extra text:',
+    '{',
+    '  "photoSlots": [',
+    '    { "label": string, "shape": string, "x": number, "y": number, "width": number, "height": number, "confidence": number, "detectedReason": string }',
+    '  ],',
+    '  "textZones": [',
+    '    { "label": string, "defaultValue": string, "type": "text"|"date"|"time"|"calendar", "x": number, "y": number, "maxWidth": number, "fontSize": number, "fontFamily": string, "color": string, "align": string, "confidence": number, "detectedReason": string }',
+    '  ]',
+    '}'
   ].join('\n');
+
+  console.log(`[Gemini Vision] Sending image to Gemini (mime: ${mimeType}, base64 chars: ${base64.length})`);
 
   const payload = {
     contents: [
@@ -168,6 +182,7 @@ export async function runGeminiVisionDetection(
 
   for (const model of candidateModels) {
     try {
+      console.log(`[Gemini Vision] Attempting detection with model: ${model}`);
       const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey.trim())}`;
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -177,21 +192,26 @@ export async function runGeminiVisionDetection(
 
       if (!response.ok) {
         const errText = await response.text();
+        console.warn(`[Gemini Vision] Model ${model} returned HTTP ${response.status}:`, errText);
         lastError = new Error(`Gemini Vision API (${model}) error (${response.status}): ${errText}`);
         continue;
       }
 
       json = await response.json();
-      if (json?.candidates?.[0]?.content?.parts?.[0]?.text) {
+      const rawResponseText = json?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (rawResponseText) {
+        console.log(`[Gemini Vision] Success with model: ${model}! Raw JSON snippet:`, rawResponseText.slice(0, 200));
         break;
       }
     } catch (e: any) {
+      console.warn(`[Gemini Vision] Model ${model} network error:`, e);
       lastError = e;
     }
   }
 
   if (!json?.candidates?.[0]?.content?.parts?.[0]?.text) {
-    throw lastError || new Error('Gemini Vision API failed across all candidate models.');
+    console.error('[Gemini Vision] All models failed. Last error:', lastError);
+    throw lastError || new Error('Gemini Vision API failed to analyze the image across all models.');
   }
 
   const textContent = json?.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
@@ -588,14 +608,10 @@ export async function runAIDetectionOnImage(
     effectiveKey = await fetchCloudGeminiApiKey();
   }
 
-  if (effectiveKey) {
-    try {
-      return await runGeminiVisionDetection(imageSource, effectiveKey);
-    } catch (err: any) {
-      console.warn('Gemini Vision encountered an issue, gracefully falling back to Client Vision engine:', err);
-      return await runClientVisionDetection(imageSource, categoryHint);
-    }
+  if (!effectiveKey) {
+    throw new Error('Gemini API key not found. Please enter an API key or configure it in Store Settings.');
   }
 
-  return await runClientVisionDetection(imageSource, categoryHint);
+  // Directly run Gemini Vision. On failure, throws an explicit error rather than silently faking results.
+  return await runGeminiVisionDetection(imageSource, effectiveKey);
 }
