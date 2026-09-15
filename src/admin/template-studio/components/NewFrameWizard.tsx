@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { PhotoSlotConfig, TextZoneConfig } from '../../../types/template';
+import { PhotoSlotConfig, TextZoneConfig, StaticLayerConfig } from '../../../types/template';
 import { parsePSDFileBinary } from '../utils/psdParser';
 import { uploadCategoryImage } from '../../../config/firebase';
 import { ArrowLeft, Upload, FileText, CheckCircle2, AlertCircle, Loader2, Sparkles, Layers } from 'lucide-react';
@@ -11,6 +11,7 @@ interface NewFrameWizardProps {
     category: string;
     photoSlots: PhotoSlotConfig[];
     textZones: TextZoneConfig[];
+    staticLayers?: StaticLayerConfig[];
     baseImageUrl: string;
     originalUploadUrl?: string;
     documentDimensions?: { width: number; height: number };
@@ -133,6 +134,7 @@ export const NewFrameWizard: React.FC<NewFrameWizardProps> = ({
         category,
         photoSlots: parsedResult.photoSlots,
         textZones: parsedResult.textZones,
+        staticLayers: parsedResult.staticLayers || [],
         baseImageUrl,
         originalUploadUrl,
         documentDimensions: parsedResult.documentDimensions,

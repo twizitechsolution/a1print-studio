@@ -56,6 +56,18 @@ export interface TextZoneConfig {
   sourceLayerName?: string;       // PSD layer name / AI detection reference
 }
 
+export interface StaticLayerConfig {
+  id: string;
+  label: string;
+  sourceLayerName?: string;
+  x: number; // Percentage X (0-100)
+  y: number; // Percentage Y (0-100)
+  width: number; // Percentage width
+  height: number; // Percentage height
+  defaultPhotoUrl?: string;
+  locked?: boolean;
+}
+
 export interface UniversalFrameTemplate {
   id: string;
   productId: string;
@@ -69,6 +81,7 @@ export interface UniversalFrameTemplate {
   images?: string[];
   photoSlots: PhotoSlotConfig[];
   textZones: TextZoneConfig[];
+  staticLayers?: StaticLayerConfig[];
   createdAt: string;
   importSource?: 'manual' | 'psd' | 'ai-image';
   originalUploadUrl?: string;   // Retained source image/PSD URL for re-analysis or audit

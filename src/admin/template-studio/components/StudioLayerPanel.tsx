@@ -1,7 +1,7 @@
 import React from 'react';
-import { UniversalFrameTemplate, PhotoSlotConfig, TextZoneConfig, FrameCutoutShape } from '../../../types/template';
+import { UniversalFrameTemplate, PhotoSlotConfig, TextZoneConfig, FrameCutoutShape, StaticLayerConfig } from '../../../types/template';
 import { SelectedLayer } from '../types';
-import { Plus, Eye, EyeOff, Lock, Unlock, Trash2, Image as ImageIcon, Type, Calendar, Sparkles } from 'lucide-react';
+import { Plus, Eye, EyeOff, Lock, Unlock, Trash2, Image as ImageIcon, Type, Calendar, Sparkles, Layers, ChevronDown, ChevronRight, ArrowRightLeft } from 'lucide-react';
 import { resolveVisibility } from '../utils/templateDefaults';
 
 interface StudioLayerPanelProps {
@@ -10,9 +10,13 @@ interface StudioLayerPanelProps {
   onSelectLayer: (layer: SelectedLayer | null) => void;
   onAddSlot: (shape?: FrameCutoutShape) => void;
   onAddTextZone: (type?: TextZoneConfig['type']) => void;
-  onDeleteLayer: (type: 'slot' | 'zone', id: string) => void;
+  onDeleteLayer: (type: 'slot' | 'zone' | 'static', id: string) => void;
   onToggleVisibility: (type: 'slot' | 'zone', id: string) => void;
   onToggleLock: (type: 'slot' | 'zone', id: string) => void;
+  onPromoteToSlot?: (staticLayerId: string) => void;
+  onDemoteToStatic?: (slotId: string) => void;
+  hoveredLayerId?: string | null;
+  onHoverLayer?: (layerId: string | null) => void;
 }
 
 export const StudioLayerPanel: React.FC<StudioLayerPanelProps> = ({
@@ -24,7 +28,12 @@ export const StudioLayerPanel: React.FC<StudioLayerPanelProps> = ({
   onDeleteLayer,
   onToggleVisibility,
   onToggleLock,
+  onPromoteToSlot,
+  onDemoteToStatic,
+  hoveredLayerId,
+  onHoverLayer,
 }) => {
+  const [staticOpen, setStaticOpen] = React.useState(true);
   return (
     <div className="w-full lg:w-72 bg-slate-900 border-r border-slate-800 p-4 space-y-6 overflow-y-auto text-white select-none">
       
@@ -58,6 +67,8 @@ export const StudioLayerPanel: React.FC<StudioLayerPanelProps> = ({
                 <div
                   key={slot.id}
                   onClick={() => onSelectLayer({ type: 'slot', id: slot.id })}
+                  onMouseEnter={() => onHoverLayer?.(slot.id)}
+                  onMouseLeave={() => onHoverLayer?.(null)}
                   className={`p-2.5 rounded-xl border transition-all flex items-center justify-between gap-2 cursor-pointer ${
                     isSelected
                       ? 'bg-pink-950/40 border-pink-500 text-white ring-1 ring-pink-500'
@@ -75,6 +86,17 @@ export const StudioLayerPanel: React.FC<StudioLayerPanelProps> = ({
                   </div>
 
                   <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                    {/* Convert to Static Art */}
+                    {onDemoteToStatic && (
+                      <button
+                        onClick={() => onDemoteToStatic(slot.id)}
+                        className="p-1 rounded-md text-slate-500 hover:text-emerald-400 transition-colors"
+                        title="Keep as Static Art (Exclude from Customer Photo Uploads)"
+                      >
+                        <Layers className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+
                     {/* User Visible Eye Toggle */}
                     <button
                       onClick={() => onToggleVisibility('slot', slot.id)}
@@ -154,6 +176,8 @@ export const StudioLayerPanel: React.FC<StudioLayerPanelProps> = ({
                 <div
                   key={zone.id}
                   onClick={() => onSelectLayer({ type: 'zone', id: zone.id })}
+                  onMouseEnter={() => onHoverLayer?.(zone.id)}
+                  onMouseLeave={() => onHoverLayer?.(null)}
                   className={`p-2.5 rounded-xl border transition-all flex items-center justify-between gap-2 cursor-pointer ${
                     isSelected
                       ? 'bg-purple-950/40 border-purple-500 text-white ring-1 ring-purple-500'
@@ -207,6 +231,72 @@ export const StudioLayerPanel: React.FC<StudioLayerPanelProps> = ({
                 </div>
               );
             })}
+          </div>
+        )}
+      </div>
+
+      {/* SECTION 3: STATIC & DECORATIVE ART LAYERS */}
+      <div className="space-y-3 pt-4 border-t border-slate-800">
+        <button
+          onClick={() => setStaticOpen(!staticOpen)}
+          className="w-full flex items-center justify-between text-xs font-extrabold text-slate-400 hover:text-slate-200 uppercase tracking-wider cursor-pointer"
+        >
+          <div className="flex items-center gap-1.5">
+            <Layers className="w-4 h-4 text-emerald-400" />
+            <span>Static Art ({template.staticLayers?.length || 0})</span>
+          </div>
+          {staticOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+        </button>
+
+        {staticOpen && (
+          <div>
+            {!template.staticLayers || template.staticLayers.length === 0 ? (
+              <div className="p-3 bg-slate-950/40 rounded-xl text-center text-xs text-slate-500 border border-dashed border-slate-800">
+                No static art layers.
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                {template.staticLayers.map((layer) => {
+                  return (
+                    <div
+                      key={layer.id}
+                      onMouseEnter={() => onHoverLayer?.(layer.id)}
+                      onMouseLeave={() => onHoverLayer?.(null)}
+                      className="p-2.5 rounded-xl border border-slate-800/80 bg-slate-950/40 hover:border-slate-700 transition-all flex items-center justify-between gap-2"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500/60 shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-slate-300 truncate leading-tight">{layer.label || layer.id}</p>
+                          <span className="text-[10px] text-slate-500 font-mono">
+                            Static Art • {Math.round(layer.width)}%×{Math.round(layer.height)}%
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {onPromoteToSlot && (
+                          <button
+                            onClick={() => onPromoteToSlot(layer.id)}
+                            className="px-2 py-1 bg-pink-600/20 hover:bg-pink-600/30 text-pink-300 border border-pink-500/30 rounded-lg text-[10px] font-extrabold transition-colors flex items-center gap-1 cursor-pointer"
+                            title="Promote this layer to an editable Customer Photo Slot"
+                          >
+                            <Plus className="w-3 h-3" /> Make Slot
+                          </button>
+                        )}
+                        <button
+                          onClick={() => onDeleteLayer('static', layer.id)}
+                          className="p-1 text-slate-600 hover:text-rose-400 rounded-md transition-colors"
+                          title="Delete Static Layer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
       </div>

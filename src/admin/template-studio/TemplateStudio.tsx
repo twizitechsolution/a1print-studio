@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { UniversalFrameTemplate, PhotoSlotConfig, TextZoneConfig, FrameCutoutShape } from '../../types/template';
+import { UniversalFrameTemplate, PhotoSlotConfig, TextZoneConfig, FrameCutoutShape, StaticLayerConfig } from '../../types/template';
 import { FrameLibraryView } from './components/FrameLibraryView';
 import { NewFrameWizard } from './components/NewFrameWizard';
 import { SelectedLayer } from './types';
@@ -14,7 +14,7 @@ import { generateCleanBaseImage } from '../../utils/cleanBaseGenerator';
 import { firebaseCloudDb } from '../../config/firebase';
 import { useCartStore } from '../../store/useCartStore';
 import { UniversalFrameCustomizer } from '../../components/customizer/UniversalFrameCustomizer';
-import { CheckCircle2, AlertCircle, Link2, X } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Link2, X, Grid } from 'lucide-react';
 
 interface TemplateStudioProps {
   initialTemplate?: UniversalFrameTemplate;
@@ -50,6 +50,10 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
 
   // Preview Mode: 'cutout' (clean transparent aperture guides) or 'sample' (mock preview photos)
   const [previewMode, setPreviewMode] = useState<'cutout' | 'sample'>('cutout');
+
+  // Debug wireframe toggle (defaults to false / clean Photoshop view)
+  const [showWireframes, setShowWireframes] = useState<boolean>(false);
+  const [hoveredLayerId, setHoveredLayerId] = useState<string | null>(null);
 
   // Live Customer Test Modal
   const [isLiveTestOpen, setIsLiveTestOpen] = useState<boolean>(false);
@@ -230,20 +234,83 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
   };
 
   // Delete Layer
-  const handleDeleteLayer = (type: 'slot' | 'zone', id: string) => {
+  const handleDeleteLayer = (type: 'slot' | 'zone' | 'static', id: string) => {
     pushHistory(template);
     if (type === 'slot') {
       setTemplate((prev) => ({
         ...prev,
         photoSlots: prev.photoSlots.filter((s) => s.id !== id),
       }));
-    } else {
+    } else if (type === 'zone') {
       setTemplate((prev) => ({
         ...prev,
         textZones: prev.textZones.filter((z) => z.id !== id),
       }));
+    } else {
+      setTemplate((prev) => ({
+        ...prev,
+        staticLayers: (prev.staticLayers || []).filter((s) => s.id !== id),
+      }));
     }
     if (selectedLayer?.id === id) {
+      setSelectedLayer(null);
+    }
+  };
+
+  // Promote static art layer to customer photo slot (1-click override)
+  const handlePromoteToSlot = (staticLayerId: string) => {
+    const staticLayer = (template.staticLayers || []).find((s) => s.id === staticLayerId);
+    if (!staticLayer) return;
+
+    pushHistory(template);
+    const promotedSlot: PhotoSlotConfig = {
+      id: `slot-${Date.now().toString(36)}`,
+      label: staticLayer.label.replace(/^Decorative Art/i, 'Photo Slot'),
+      shape: 'rounded',
+      x: staticLayer.x,
+      y: staticLayer.y,
+      width: staticLayer.width,
+      height: staticLayer.height,
+      defaultPhotoUrl: staticLayer.defaultPhotoUrl || 'https://images.unsplash.com/photo-1519689680058-324335c77eba?auto=format&fit=crop&q=80&w=600',
+      visibility: {
+        ...DEFAULT_VISIBILITY,
+        userLabel: `Upload ${staticLayer.label}`,
+      },
+      sourceLayerName: staticLayer.sourceLayerName,
+    };
+
+    setTemplate((prev) => ({
+      ...prev,
+      photoSlots: [...prev.photoSlots, promotedSlot],
+      staticLayers: (prev.staticLayers || []).filter((s) => s.id !== staticLayerId),
+    }));
+    setSelectedLayer({ type: 'slot', id: promotedSlot.id });
+  };
+
+  // Demote photo slot to static art layer (1-click override)
+  const handleDemoteToStatic = (slotId: string) => {
+    const slot = template.photoSlots.find((s) => s.id === slotId);
+    if (!slot) return;
+
+    pushHistory(template);
+    const demotedStatic: StaticLayerConfig = {
+      id: `static-${Date.now().toString(36)}`,
+      label: slot.label.replace(/^Photo Slot/i, 'Decorative Art'),
+      sourceLayerName: slot.sourceLayerName,
+      x: slot.x,
+      y: slot.y,
+      width: slot.width,
+      height: slot.height,
+      defaultPhotoUrl: slot.defaultPhotoUrl,
+      locked: true,
+    };
+
+    setTemplate((prev) => ({
+      ...prev,
+      photoSlots: prev.photoSlots.filter((s) => s.id !== slotId),
+      staticLayers: [...(prev.staticLayers || []), demotedStatic],
+    }));
+    if (selectedLayer?.id === slotId) {
       setSelectedLayer(null);
     }
   };
@@ -428,7 +495,7 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
       <div className="relative">
         <NewFrameWizard
           onBack={() => setCurrentView('library')}
-          onComplete={async ({ title, category, photoSlots, textZones, baseImageUrl, originalUploadUrl }) => {
+          onComplete={async ({ title, category, photoSlots, textZones, staticLayers, baseImageUrl, originalUploadUrl }) => {
             const uniqueId = `tmpl-${Date.now()}`;
             let cleanBase = baseImageUrl;
             try {
@@ -449,6 +516,7 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
               originalUploadUrl,
               photoSlots,
               textZones,
+              staticLayers: staticLayers || [],
               createdAt: new Date().toISOString(),
               status: 'draft',
               importSource: 'psd',
@@ -529,7 +597,24 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
         <div className="flex items-center gap-3 text-slate-400 text-[11px]">
           <span>Slots: <strong className="text-cyan-400">{template.photoSlots.length}</strong></span>
           <span>Text Zones: <strong className="text-purple-400">{template.textZones.length}</strong></span>
+          {template.staticLayers && template.staticLayers.length > 0 && (
+            <span>Static Art: <strong className="text-emerald-400">{template.staticLayers.length}</strong></span>
+          )}
           <span>View: <strong className={previewMode === 'cutout' ? 'text-cyan-300' : 'text-pink-400'}>{previewMode === 'cutout' ? 'Clean Cutouts' : 'Sample Photos'}</strong></span>
+
+          {/* Wireframes Debug Toggle (Off by default for pristine clean canvas) */}
+          <button
+            onClick={() => setShowWireframes(!showWireframes)}
+            className={`px-2 py-0.5 rounded-lg border text-[11px] font-bold transition-all flex items-center gap-1 cursor-pointer ${
+              showWireframes
+                ? 'bg-pink-600/30 border-pink-500 text-pink-300'
+                : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'
+            }`}
+            title="Toggle faint outlines for all regions (Unfilled debug lines only)"
+          >
+            <Grid className="w-3 h-3" />
+            <span>Wireframes: {showWireframes ? 'ON' : 'OFF'}</span>
+          </button>
         </div>
       </div>
 
@@ -560,6 +645,10 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
           onDeleteLayer={handleDeleteLayer}
           onToggleVisibility={handleToggleVisibility}
           onToggleLock={handleToggleLock}
+          onPromoteToSlot={handlePromoteToSlot}
+          onDemoteToStatic={handleDemoteToStatic}
+          hoveredLayerId={hoveredLayerId}
+          onHoverLayer={setHoveredLayerId}
         />
 
         {/* Center: Live Interactive Canvas Workspace */}
@@ -571,6 +660,9 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
           onUpdateZone={handleUpdateZone}
           zoom={zoom}
           previewMode={previewMode}
+          showWireframes={showWireframes}
+          hoveredLayerId={hoveredLayerId}
+          onHoverLayer={setHoveredLayerId}
         />
 
         {/* Right: Properties & Visibility Inspector */}

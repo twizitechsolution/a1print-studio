@@ -11,6 +11,9 @@ interface StudioInteractiveCanvasProps {
   onUpdateZone: (updatedZone: TextZoneConfig) => void;
   zoom: number;
   previewMode?: 'cutout' | 'sample';
+  showWireframes?: boolean;
+  hoveredLayerId?: string | null;
+  onHoverLayer?: (layerId: string | null) => void;
 }
 
 // Helper to draw shape clip paths on 2D context
@@ -71,6 +74,9 @@ export const StudioInteractiveCanvas: React.FC<StudioInteractiveCanvasProps> = (
   onUpdateZone,
   zoom,
   previewMode = 'cutout',
+  showWireframes = false,
+  hoveredLayerId = null,
+  onHoverLayer,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -80,6 +86,10 @@ export const StudioInteractiveCanvas: React.FC<StudioInteractiveCanvasProps> = (
 
   // Dynamic canvas dimensions based on base image aspect ratio
   const [canvasDimensions, setCanvasDimensions] = useState({ width: 1200, height: 1600 });
+
+  // Local hover tracking
+  const [internalHoverId, setInternalHoverId] = useState<string | null>(null);
+  const activeHoverId = hoveredLayerId || internalHoverId;
 
   // Interaction State
   const [activeDrag, setActiveDrag] = useState<{
@@ -119,7 +129,7 @@ export const StudioInteractiveCanvas: React.FC<StudioInteractiveCanvasProps> = (
 
   const { width: CANVAS_WIDTH, height: CANVAS_HEIGHT } = canvasDimensions;
 
-  // Main Render Loop
+  // Main Clean Photoshop-Style Render Loop
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -128,17 +138,16 @@ export const StudioInteractiveCanvas: React.FC<StudioInteractiveCanvasProps> = (
 
     ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-    // 1. Background Fill
+    // 1. Background Fill (Canvas Workspace)
     ctx.fillStyle = '#1E293B';
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-    // 2. Draw Base Poster Artwork
+    // 2. Base Poster Artwork (Rendered Cleanly & Pristine)
     const activeBaseUrl = template.cleanBaseImageUrl || template.baseImageUrl;
     const baseImg = cachedImages[activeBaseUrl] || cachedImages[template.baseImageUrl];
     if (baseImg) {
       ctx.drawImage(baseImg, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
     } else {
-      // Sleek placeholder base
       ctx.fillStyle = '#0F172A';
       ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
       ctx.fillStyle = '#64748B';
@@ -147,17 +156,14 @@ export const StudioInteractiveCanvas: React.FC<StudioInteractiveCanvasProps> = (
       ctx.fillText('Artwork Poster Preview', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
     }
 
-    // 3. Draw Photo Slots
-    template.photoSlots.forEach((slot, idx) => {
-      const box = getSlotBoundingBox(slot, CANVAS_WIDTH, CANVAS_HEIGHT);
-      const isSelected = selectedLayer?.type === 'slot' && selectedLayer.id === slot.id;
-
-      if (previewMode === 'sample') {
-        // Sample photo preview mode
+    // 3. Sample Mode Rendering (Only if previewMode is 'sample')
+    if (previewMode === 'sample') {
+      // Draw sample photos into apertures
+      template.photoSlots.forEach((slot) => {
+        const box = getSlotBoundingBox(slot, CANVAS_WIDTH, CANVAS_HEIGHT);
         ctx.save();
         clipShapePath(ctx, slot.shape, box.left, box.top, box.width, box.height);
         ctx.clip();
-
         const sampleImg = slot.defaultPhotoUrl ? cachedImages[slot.defaultPhotoUrl] : null;
         if (sampleImg) {
           ctx.drawImage(sampleImg, box.left, box.top, box.width, box.height);
@@ -166,78 +172,14 @@ export const StudioInteractiveCanvas: React.FC<StudioInteractiveCanvasProps> = (
           ctx.fillRect(box.left, box.top, box.width, box.height);
         }
         ctx.restore();
-      } else {
-        // Cutout Guide Mode: Translucent glass tint so base poster artwork remains clearly visible!
-        ctx.save();
-        clipShapePath(ctx, slot.shape, box.left, box.top, box.width, box.height);
-        ctx.fillStyle = isSelected ? 'rgba(248, 43, 169, 0.18)' : 'rgba(6, 182, 212, 0.12)';
-        ctx.fill();
+      });
 
-        ctx.strokeStyle = isSelected ? '#F82BA9' : '#06B6D4';
-        ctx.lineWidth = isSelected ? 3.5 : 2;
-        ctx.setLineDash(isSelected ? [8, 6] : [6, 4]);
-        ctx.stroke();
-        ctx.restore();
+      // Draw sample text typography
+      template.textZones.forEach((zone) => {
+        const cx = (zone.x / 100) * CANVAS_WIDTH;
+        const cy = (zone.y / 100) * CANVAS_HEIGHT;
+        const scaledSize = Math.round((zone.fontSize || 22) * 2.4);
 
-        // Centered Aperture Badge
-        ctx.save();
-        const badgeText = `📷 #${idx + 1} ${slot.label || 'Photo'}`;
-        ctx.font = 'bold 18px sans-serif';
-        const textMetrics = ctx.measureText(badgeText);
-        const badgeW = textMetrics.width + 24;
-        const badgeH = 34;
-
-        ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
-        ctx.beginPath();
-        ctx.roundRect(box.centerX - badgeW / 2, box.centerY - badgeH / 2, badgeW, badgeH, 17);
-        ctx.fill();
-        ctx.strokeStyle = isSelected ? '#F82BA9' : 'rgba(6, 182, 212, 0.6)';
-        ctx.lineWidth = 1.5;
-        ctx.setLineDash([]);
-        ctx.stroke();
-
-        ctx.fillStyle = isSelected ? '#FFFFFF' : '#67E8F9';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(badgeText, box.centerX, box.centerY);
-        ctx.restore();
-      }
-    });
-
-    // 4. Draw Text Zones
-    template.textZones.forEach((zone) => {
-      const cx = (zone.x / 100) * CANVAS_WIDTH;
-      const cy = (zone.y / 100) * CANVAS_HEIGHT;
-      const scaledSize = Math.round((zone.fontSize || 22) * 2.4);
-      const isSelected = selectedLayer?.type === 'zone' && selectedLayer.id === zone.id;
-
-      if (previewMode === 'cutout') {
-        // Clean Cutout View: Show cleared region boundary only, with NO placeholder text drawn on top
-        // This lets the admin visually inspect that all original baked-in pixels were removed from the base
-        const box = getTextZoneBoundingBox(zone, CANVAS_WIDTH, CANVAS_HEIGHT);
-        ctx.save();
-        ctx.strokeStyle = isSelected ? '#F82BA9' : 'rgba(168, 85, 247, 0.7)';
-        ctx.lineWidth = isSelected ? 2.5 : 1.5;
-        ctx.setLineDash(isSelected ? [6, 4] : [4, 4]);
-        ctx.strokeRect(box.left, box.top, box.width, box.height);
-
-        const tagText = `✎ ${zone.label || 'Text Zone'}`;
-        ctx.font = 'bold 12px sans-serif';
-        const tm = ctx.measureText(tagText);
-        const tagW = tm.width + 16;
-        const tagH = 22;
-        ctx.fillStyle = isSelected ? 'rgba(248, 43, 169, 0.9)' : 'rgba(15, 23, 42, 0.85)';
-        ctx.beginPath();
-        ctx.roundRect(box.left, Math.max(0, box.top - tagH - 2), tagW, tagH, 6);
-        ctx.fill();
-
-        ctx.fillStyle = '#FFFFFF';
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(tagText, box.left + 8, Math.max(0, box.top - tagH - 2) + tagH / 2);
-        ctx.restore();
-      } else {
-        // Sample Preview Mode: render typography preview over clean base
         ctx.save();
         ctx.fillStyle = zone.color || '#160E4B';
         ctx.font = `bold ${scaledSize}px ${zone.fontFamily || 'serif'}, sans-serif`;
@@ -249,70 +191,115 @@ export const StudioInteractiveCanvas: React.FC<StudioInteractiveCanvasProps> = (
           : zone.defaultValue || zone.label;
 
         ctx.fillText(displayText, cx, cy);
+        ctx.restore();
+      });
+    }
 
-        if (isSelected) {
-          const textMetrics = ctx.measureText(displayText);
-          const pad = 12;
-          const left = zone.align === 'center' ? cx - textMetrics.width / 2 - pad : cx - pad;
-          const width = textMetrics.width + pad * 2;
-          const height = scaledSize + pad * 1.5;
-          const top = cy - height / 2;
+    // 4. Optional Debug Wireframes: ONLY when explicitly toggled ON by admin
+    // Thin, unfilled outlines only — NEVER filled color blocks or center badges!
+    if (showWireframes) {
+      ctx.save();
+      // Photo Slots Wireframes (Thin dashed cyan outline)
+      template.photoSlots.forEach((slot) => {
+        if (selectedLayer?.type === 'slot' && selectedLayer.id === slot.id) return;
+        const box = getSlotBoundingBox(slot, CANVAS_WIDTH, CANVAS_HEIGHT);
+        ctx.save();
+        clipShapePath(ctx, slot.shape, box.left, box.top, box.width, box.height);
+        ctx.strokeStyle = 'rgba(6, 182, 212, 0.45)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        ctx.stroke();
+        ctx.restore();
+      });
 
-          ctx.strokeStyle = '#A855F7';
-          ctx.lineWidth = 2;
-          ctx.setLineDash([6, 4]);
-          ctx.strokeRect(left, top, width, height);
+      // Text Zones Wireframes (Thin dashed purple outline)
+      template.textZones.forEach((zone) => {
+        if (selectedLayer?.type === 'zone' && selectedLayer.id === zone.id) return;
+        const box = getTextZoneBoundingBox(zone, CANVAS_WIDTH, CANVAS_HEIGHT);
+        ctx.strokeStyle = 'rgba(168, 85, 247, 0.45)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        ctx.strokeRect(box.left, box.top, box.width, box.height);
+      });
+      ctx.restore();
+    }
+
+    // 5. Hover Preview (Non-committal, thin 1px outline for single hovered region)
+    if (activeHoverId && (!selectedLayer || selectedLayer.id !== activeHoverId)) {
+      let hBox: any = null;
+      let hShape = 'rectangle';
+      const slot = template.photoSlots.find((s) => s.id === activeHoverId);
+      if (slot) {
+        hBox = getSlotBoundingBox(slot, CANVAS_WIDTH, CANVAS_HEIGHT);
+        hShape = slot.shape;
+      } else {
+        const zone = template.textZones.find((z) => z.id === activeHoverId);
+        if (zone) {
+          hBox = getTextZoneBoundingBox(zone, CANVAS_WIDTH, CANVAS_HEIGHT);
+        }
+      }
+
+      if (hBox) {
+        ctx.save();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([4, 3]);
+        if (slot) {
+          clipShapePath(ctx, hShape, hBox.left, hBox.top, hBox.width, hBox.height);
+          ctx.stroke();
+        } else {
+          ctx.strokeRect(hBox.left, hBox.top, hBox.width, hBox.height);
         }
         ctx.restore();
       }
-    });
+    }
 
-    // 5. Draw Active Selection Gizmo & Handles
+    // 6. Selected Layer Focus (Photoshop/Canva-Style Free Transform Gizmo & Handles)
     if (selectedLayer) {
       let box: any = null;
       let label = '';
-      let isSlot = selectedLayer.type === 'slot';
+      const isSlot = selectedLayer.type === 'slot';
 
       if (isSlot) {
         const slot = template.photoSlots.find((s) => s.id === selectedLayer.id);
         if (slot) {
           box = getSlotBoundingBox(slot, CANVAS_WIDTH, CANVAS_HEIGHT);
-          label = `📷 ${slot.label || 'Photo Slot'}`;
+          label = slot.label || 'Photo Slot';
         }
       } else {
         const zone = template.textZones.find((z) => z.id === selectedLayer.id);
         if (zone) {
           box = getTextZoneBoundingBox(zone, CANVAS_WIDTH, CANVAS_HEIGHT);
-          label = `✎ ${zone.label || 'Text Zone'}`;
+          label = zone.label || 'Text Zone';
         }
       }
 
       if (box) {
         ctx.save();
-        // Outer dark shadow outline for contrast against any background
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)';
-        ctx.lineWidth = 4.5;
+        // High-contrast outer stroke
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.lineWidth = 4;
         ctx.setLineDash([]);
         ctx.strokeRect(box.left - 1, box.top - 1, box.width + 2, box.height + 2);
 
-        // Inner glowing selection outline
+        // Vibrant inner transform outline
         ctx.strokeStyle = isSlot ? '#F82BA9' : '#A855F7';
-        ctx.lineWidth = 3;
-        ctx.setLineDash([8, 5]);
+        ctx.lineWidth = 2.5;
+        ctx.setLineDash([]);
         ctx.strokeRect(box.left, box.top, box.width, box.height);
 
-        // Selected Floating Pill Badge
-        const badgeText = `★ ACTIVE: ${label}`;
-        ctx.font = 'bold 13px sans-serif';
+        // Selected Floating Pill Badge (Top-center of box)
+        const badgeText = `${isSlot ? '📷' : '✎'} ${label}`;
+        ctx.font = 'bold 12px sans-serif';
         const tm = ctx.measureText(badgeText);
         const bW = tm.width + 20;
-        const bH = 26;
+        const bH = 24;
         const bX = Math.max(10, Math.min(CANVAS_WIDTH - bW - 10, box.centerX - bW / 2));
-        const bY = Math.max(10, box.top - bH - 6);
+        const bY = Math.max(8, box.top - bH - 6);
 
         ctx.fillStyle = isSlot ? '#F82BA9' : '#A855F7';
         ctx.beginPath();
-        ctx.roundRect(bX, bY, bW, bH, 13);
+        ctx.roundRect(bX, bY, bW, bH, 12);
         ctx.fill();
 
         ctx.fillStyle = '#FFFFFF';
@@ -332,7 +319,7 @@ export const StudioInteractiveCanvas: React.FC<StudioInteractiveCanvasProps> = (
           { x: box.right, y: box.bottom },
         ];
 
-        const hSize = 14;
+        const hSize = 13;
         handles.forEach((h) => {
           ctx.fillStyle = '#FFFFFF';
           ctx.strokeStyle = isSlot ? '#F82BA9' : '#A855F7';
@@ -345,7 +332,16 @@ export const StudioInteractiveCanvas: React.FC<StudioInteractiveCanvasProps> = (
         ctx.restore();
       }
     }
-  }, [template, selectedLayer, cachedImages, CANVAS_WIDTH, CANVAS_HEIGHT, previewMode]);
+  }, [
+    template,
+    selectedLayer,
+    cachedImages,
+    CANVAS_WIDTH,
+    CANVAS_HEIGHT,
+    previewMode,
+    showWireframes,
+    activeHoverId,
+  ]);
 
   useEffect(() => {
     draw();
@@ -549,11 +545,47 @@ export const StudioInteractiveCanvas: React.FC<StudioInteractiveCanvasProps> = (
       }
     }
 
+    // Detect layer hover for lightweight preview outline
+    if (!activeDrag) {
+      let foundHoverId: string | null = null;
+      // Test text zones first
+      for (let i = template.textZones.length - 1; i >= 0; i--) {
+        const zone = template.textZones[i];
+        const box = getTextZoneBoundingBox(zone, CANVAS_WIDTH, CANVAS_HEIGHT);
+        if (x >= box.left && x <= box.right && y >= box.top && y <= box.bottom) {
+          foundHoverId = zone.id;
+          break;
+        }
+      }
+      // Then photo slots
+      if (!foundHoverId) {
+        for (let i = template.photoSlots.length - 1; i >= 0; i--) {
+          const slot = template.photoSlots[i];
+          const box = getSlotBoundingBox(slot, CANVAS_WIDTH, CANVAS_HEIGHT);
+          if (x >= box.left && x <= box.right && y >= box.top && y <= box.bottom) {
+            foundHoverId = slot.id;
+            break;
+          }
+        }
+      }
+
+      if (foundHoverId !== internalHoverId) {
+        setInternalHoverId(foundHoverId);
+        onHoverLayer?.(foundHoverId);
+      }
+    }
+
     setCursor('default');
   };
 
   const handleMouseUp = () => {
     setActiveDrag(null);
+  };
+
+  const handleMouseLeave = () => {
+    setActiveDrag(null);
+    setInternalHoverId(null);
+    onHoverLayer?.(null);
   };
 
   return (
@@ -581,7 +613,7 @@ export const StudioInteractiveCanvas: React.FC<StudioInteractiveCanvasProps> = (
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
+          onMouseLeave={handleMouseLeave}
           className="block bg-slate-900 shadow-inner"
         />
       </div>

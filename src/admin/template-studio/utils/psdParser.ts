@@ -1,4 +1,4 @@
-import { PhotoSlotConfig, TextZoneConfig, FrameCutoutShape } from '../../../types/template';
+import { PhotoSlotConfig, TextZoneConfig, FrameCutoutShape, StaticLayerConfig } from '../../../types/template';
 import { DEFAULT_VISIBILITY } from './templateDefaults';
 
 export interface PSDParsedLayer {
@@ -9,7 +9,7 @@ export interface PSDParsedLayer {
   bottom: number;
   width: number;
   height: number;
-  type: 'photo' | 'text' | 'calendar' | 'background';
+  type: 'photo' | 'text' | 'calendar' | 'background' | 'static';
   textValue?: string;
   shape?: FrameCutoutShape;
   fontFamily?: string;
@@ -21,6 +21,7 @@ export interface PSDImportResult {
   documentDimensions: { width: number; height: number };
   photoSlots: PhotoSlotConfig[];
   textZones: TextZoneConfig[];
+  staticLayers: StaticLayerConfig[];
   detectedLayerCount: number;
   compositePreviewUrl?: string;
 }
@@ -205,9 +206,11 @@ export async function parsePSDFileBinary(file: File): Promise<PSDImportResult> {
       const allLayers = psd.children ? flattenPsdChildren(psd.children) : [];
       const photoSlots: PhotoSlotConfig[] = [];
       const textZones: TextZoneConfig[] = [];
+      const staticLayers: StaticLayerConfig[] = [];
 
       let slotCounter = 1;
       let textCounter = 1;
+      let staticCounter = 1;
 
       for (let i = 0; i < allLayers.length; i++) {
         const layer = allLayers[i];
@@ -272,8 +275,8 @@ export async function parsePSDFileBinary(file: File): Promise<PSDImportResult> {
           });
           textCounter++;
         }
-        // 2. Pixel / Image / Photo Slot Layer
-        else if (layer.canvas || classifyPSDLayer(layerName).type === 'photo' || (!layer.text && layerWidth >= 40 && layerHeight >= 40)) {
+        // 2. Pixel / Image Layer
+        else if (layer.canvas || (!layer.text && layerWidth >= 20 && layerHeight >= 20)) {
           let defaultPhotoUrl = 'https://images.unsplash.com/photo-1519689680058-324335c77eba?auto=format&fit=crop&q=80&w=600';
           if (layer.canvas && typeof layer.canvas.toDataURL === 'function') {
             try {
@@ -283,32 +286,92 @@ export async function parsePSDFileBinary(file: File): Promise<PSDImportResult> {
             }
           }
 
-          photoSlots.push({
-            id: `slot-psd-${Date.now().toString(36)}-${slotCounter}`,
-            label: layerName || `Photo Slot ${slotCounter}`,
-            shape: inferShapeFromLayerName(layerName),
-            x: xPct,
-            y: yPct,
-            width: wPct,
-            height: hPct,
-            defaultPhotoUrl,
-            visibility: {
-              ...DEFAULT_VISIBILITY,
-              userLabel: `Upload ${layerName.replace(/[_-]/g, ' ')}`,
-            },
-            sourceLayerName: layerName,
-          });
-          slotCounter++;
+          // SMART APERTURE DETECTION:
+          // A layer is classified as a Photo Aperture ONLY if:
+          // a) It matches common photo aperture keywords (photo, slot, image, pic, portrait, baby, couple, placeholder, insert, cutout, avatar, upload)
+          // b) Or it is a Photoshop clipping mask / vector mask container
+          const lowerName = layerName.toLowerCase();
+          const isAperture =
+            /photo|slot|image|pic|portrait|couple|baby|insert|cutout|placeholder|avatar|upload|frame_photo|box_photo|img|pic_here|user_photo|aperture|picture|face|subject|person/i.test(lowerName) ||
+            Boolean(layer.clipping);
+
+          if (isAperture) {
+            photoSlots.push({
+              id: `slot-psd-${Date.now().toString(36)}-${slotCounter}`,
+              label: layerName || `Photo Slot ${slotCounter}`,
+              shape: inferShapeFromLayerName(layerName),
+              x: xPct,
+              y: yPct,
+              width: wPct,
+              height: hPct,
+              defaultPhotoUrl,
+              visibility: {
+                ...DEFAULT_VISIBILITY,
+                userLabel: `Upload ${layerName.replace(/[_-]/g, ' ')}`,
+              },
+              sourceLayerName: layerName,
+            });
+            slotCounter++;
+          } else {
+            // Otherwise, it is Static/Decorative Art (stickers, clipart, borders, design elements)
+            // Kept in staticLayers so it stays part of base artwork and does NOT clutter customer photo slots!
+            staticLayers.push({
+              id: `static-psd-${Date.now().toString(36)}-${staticCounter}`,
+              label: layerName || `Decorative Art ${staticCounter}`,
+              sourceLayerName: layerName,
+              x: xPct,
+              y: yPct,
+              width: wPct,
+              height: hPct,
+              defaultPhotoUrl,
+              locked: true,
+            });
+            staticCounter++;
+          }
         }
       }
 
+      // If no layers matched aperture keywords, pick at most the 1-2 most prominent aperture-sized layers
+      // from staticLayers and promote them, keeping all decorative clipart static.
+      if (photoSlots.length === 0 && staticLayers.length > 0) {
+        // Find prominent candidates (between 15% and 85% width/height)
+        const prominentCandidates = staticLayers.filter(
+          (s) => s.width >= 15 && s.width <= 85 && s.height >= 15 && s.height <= 85
+        );
+        const candidatesToPromote = prominentCandidates.length > 0 ? [prominentCandidates[0]] : [staticLayers[0]];
+
+        candidatesToPromote.forEach((candidate) => {
+          const idx = staticLayers.findIndex((s) => s.id === candidate.id);
+          if (idx !== -1) {
+            staticLayers.splice(idx, 1);
+          }
+          photoSlots.push({
+            id: `slot-psd-${Date.now().toString(36)}-${slotCounter}`,
+            label: candidate.label || `Photo Slot ${slotCounter}`,
+            shape: inferShapeFromLayerName(candidate.label),
+            x: candidate.x,
+            y: candidate.y,
+            width: candidate.width,
+            height: candidate.height,
+            defaultPhotoUrl: candidate.defaultPhotoUrl,
+            visibility: {
+              ...DEFAULT_VISIBILITY,
+              userLabel: `Upload ${candidate.label.replace(/[_-]/g, ' ')}`,
+            },
+            sourceLayerName: candidate.sourceLayerName,
+          });
+          slotCounter++;
+        });
+      }
+
       // If at least some discrete zones or composite were extracted, return parsed result!
-      if (photoSlots.length > 0 || textZones.length > 0 || compositePreviewUrl) {
+      if (photoSlots.length > 0 || textZones.length > 0 || staticLayers.length > 0 || compositePreviewUrl) {
         return {
           documentDimensions: { width: docWidth, height: docHeight },
           photoSlots,
           textZones,
-          detectedLayerCount: photoSlots.length + textZones.length,
+          staticLayers,
+          detectedLayerCount: photoSlots.length + textZones.length + staticLayers.length,
           compositePreviewUrl: compositePreviewUrl || undefined,
         };
       }
@@ -485,6 +548,7 @@ export async function parsePSDFileBinary(file: File): Promise<PSDImportResult> {
     documentDimensions: { width: docWidth, height: docHeight },
     photoSlots: fallbackPhotoSlots,
     textZones: fallbackTextZones,
+    staticLayers: [],
     detectedLayerCount: fallbackPhotoSlots.length + fallbackTextZones.length,
   };
 }
