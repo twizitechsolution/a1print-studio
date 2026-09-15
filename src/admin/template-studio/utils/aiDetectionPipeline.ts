@@ -155,12 +155,12 @@ export async function runGeminiVisionDetection(
   };
 
   const candidateModels = [
-    'gemini-3.6-flash',
     'gemini-3.5-flash',
-    'gemini-3.7-flash',
+    'gemini-3.5-flash-lite',
+    'gemini-3.6-flash',
+    'gemini-3-flash-preview',
+    'gemini-3.1-flash-lite',
     'gemini-flash-latest',
-    'gemini-2.0-flash',
-    'gemini-1.5-flash',
   ];
 
   let lastError: Error | null = null;
@@ -589,7 +589,12 @@ export async function runAIDetectionOnImage(
   }
 
   if (effectiveKey) {
-    return await runGeminiVisionDetection(imageSource, effectiveKey);
+    try {
+      return await runGeminiVisionDetection(imageSource, effectiveKey);
+    } catch (err: any) {
+      console.warn('Gemini Vision encountered an issue, gracefully falling back to Client Vision engine:', err);
+      return await runClientVisionDetection(imageSource, categoryHint);
+    }
   }
 
   return await runClientVisionDetection(imageSource, categoryHint);
