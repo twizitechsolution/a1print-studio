@@ -4,18 +4,17 @@ import {
   Upload,
   Check,
   AlertCircle,
-  Eye,
   Loader2,
   X,
-  RefreshCw,
   Layers,
   MousePointer,
   Plus,
   Trash2,
-  Shapes,
   Key,
   Sliders,
-  Maximize2
+  Baby,
+  Heart,
+  Image as ImageIcon
 } from 'lucide-react';
 import { runAIDetectionOnImage, AIDetectionResult } from '../utils/aiDetectionPipeline';
 import { uploadCategoryImage } from '../../../config/firebase';
@@ -35,13 +34,12 @@ interface StudioAIImportModalProps {
 }
 
 const SHAPES: { value: FrameCutoutShape; label: string; icon: string }[] = [
-  { value: 'rounded', label: 'Rounded Rect', icon: '🔲' },
-  { value: 'rectangle', label: 'Sharp Rect', icon: '▭' },
   { value: 'circle', label: 'Circle', icon: '⭕' },
   { value: 'arch', label: 'Arch Window', icon: '🚪' },
+  { value: 'rounded', label: 'Rounded Rect', icon: '🔲' },
+  { value: 'rectangle', label: 'Sharp Rect', icon: '▭' },
   { value: 'oval', label: 'Oval', icon: '⬭' },
   { value: 'heart', label: 'Heart', icon: '❤️' },
-  { value: 'square', label: 'Square', icon: '⏹' },
 ];
 
 export const StudioAIImportModal: React.FC<StudioAIImportModalProps> = ({
@@ -56,12 +54,11 @@ export const StudioAIImportModal: React.FC<StudioAIImportModalProps> = ({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string>('');
   const [isScanning, setIsScanning] = useState<boolean>(false);
-  const [scanStep, setScanStep] = useState<string>('');
   const [detectionResult, setDetectionResult] = useState<AIDetectionResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState<boolean>(false);
 
-  // Interaction tool: 'select' | 'draw-slot' | 'draw-text'
+  // Interaction tool
   const [activeTool, setActiveTool] = useState<'select' | 'draw-slot' | 'draw-text'>('select');
   const [selectedItem, setSelectedItem] = useState<{ type: 'slot' | 'zone'; id: string } | null>(null);
 
@@ -102,21 +99,216 @@ export const StudioAIImportModal: React.FC<StudioAIImportModalProps> = ({
     reader.readAsDataURL(file);
   };
 
+  // 1-Click Smart Layout Presets (Works instantly even without any API key!)
+  const applyPreset = (presetType: 'baby' | 'couple' | 'single') => {
+    if (presetType === 'baby') {
+      const babySlots: PhotoSlotConfig[] = [
+        {
+          id: `slot-baby-${Date.now().toString(36)}-1`,
+          label: 'Baby Portrait Photo',
+          shape: 'circle',
+          x: 50,
+          y: 43,
+          width: 44,
+          height: 33,
+          confidence: 1.0,
+          visibility: {
+            userVisible: true,
+            userEditable: true,
+            required: true,
+            emptyBehavior: 'keepDefault',
+            userLabel: 'Upload Baby Photo',
+          },
+        },
+      ];
+
+      const babyZones: TextZoneConfig[] = [
+        {
+          id: `text-baby-${Date.now().toString(36)}-1`,
+          label: 'Baby Name',
+          defaultValue: 'Mithunan',
+          x: 50,
+          y: 20,
+          maxWidth: 70,
+          fontSize: 32,
+          fontFamily: 'Playfair Display',
+          color: '#160E4B',
+          align: 'center',
+          type: 'text',
+          confidence: 1.0,
+          visibility: { userVisible: true, userEditable: true, required: true, emptyBehavior: 'keepDefault', userLabel: 'Baby Name' },
+        },
+        {
+          id: `text-baby-${Date.now().toString(36)}-2`,
+          label: 'Birth Date',
+          defaultValue: '29 Jan, 2025',
+          x: 27,
+          y: 39,
+          maxWidth: 30,
+          fontSize: 18,
+          fontFamily: 'Jost',
+          color: '#3B3663',
+          align: 'center',
+          type: 'text',
+          confidence: 1.0,
+          visibility: { userVisible: true, userEditable: true, required: true, emptyBehavior: 'keepDefault', userLabel: 'Birth Date' },
+        },
+        {
+          id: `text-baby-${Date.now().toString(36)}-3`,
+          label: 'Birth Time',
+          defaultValue: '06:21 AM',
+          x: 73,
+          y: 39,
+          maxWidth: 30,
+          fontSize: 18,
+          fontFamily: 'Jost',
+          color: '#3B3663',
+          align: 'center',
+          type: 'text',
+          confidence: 1.0,
+          visibility: { userVisible: true, userEditable: true, required: true, emptyBehavior: 'keepDefault', userLabel: 'Birth Time' },
+        },
+        {
+          id: `text-baby-${Date.now().toString(36)}-4`,
+          label: 'Birth Weight',
+          defaultValue: '2.7 Kg',
+          x: 28,
+          y: 73,
+          maxWidth: 25,
+          fontSize: 18,
+          fontFamily: 'Jost',
+          color: '#3B3663',
+          align: 'center',
+          type: 'text',
+          confidence: 1.0,
+          visibility: { userVisible: true, userEditable: true, required: false, emptyBehavior: 'keepDefault', userLabel: 'Birth Weight' },
+        },
+        {
+          id: `text-baby-${Date.now().toString(36)}-5`,
+          label: 'Parents / Hospital Name',
+          defaultValue: 'Proud Parents: Parthipan & Sakthi',
+          x: 58,
+          y: 75,
+          maxWidth: 55,
+          fontSize: 16,
+          fontFamily: 'Playfair Display',
+          color: '#160E4B',
+          align: 'center',
+          type: 'text',
+          confidence: 1.0,
+          visibility: { userVisible: true, userEditable: true, required: false, emptyBehavior: 'keepDefault', userLabel: 'Parents / Hospital Details' },
+        },
+      ];
+
+      setDetectionResult({
+        photoSlots: babySlots.map((s) => ({ ...s, detectedReason: 'Baby Milestone Layout Preset', selected: true })),
+        textZones: babyZones.map((z) => ({ ...z, detectedReason: 'Baby Milestone Typography Preset', selected: true })),
+        detectedDimensions: { width: 1200, height: 1600 },
+        engineUsed: 'canvas-cv',
+      });
+      setSelectedItem({ type: 'slot', id: babySlots[0].id });
+    } else if (presetType === 'couple') {
+      const coupleSlots: PhotoSlotConfig[] = [
+        {
+          id: `slot-couple-${Date.now().toString(36)}-1`,
+          label: 'Couple Centerpiece Photo',
+          shape: 'arch',
+          x: 50,
+          y: 40,
+          width: 55,
+          height: 48,
+          confidence: 1.0,
+          visibility: { userVisible: true, userEditable: true, required: true, emptyBehavior: 'keepDefault', userLabel: 'Upload Couple Photo' },
+        },
+      ];
+      const coupleZones: TextZoneConfig[] = [
+        {
+          id: `text-couple-${Date.now().toString(36)}-1`,
+          label: 'Couple Names',
+          defaultValue: 'Rahul & Priya',
+          x: 50,
+          y: 70,
+          maxWidth: 80,
+          fontSize: 32,
+          fontFamily: 'Playfair Display',
+          color: '#160E4B',
+          align: 'center',
+          type: 'text',
+          confidence: 1.0,
+          visibility: { userVisible: true, userEditable: true, required: true, emptyBehavior: 'keepDefault', userLabel: 'Couple Names' },
+        },
+        {
+          id: `text-couple-${Date.now().toString(36)}-2`,
+          label: 'Wedding / Anniversary Date',
+          defaultValue: '14 August 2024',
+          x: 50,
+          y: 78,
+          maxWidth: 70,
+          fontSize: 18,
+          fontFamily: 'Jost',
+          color: '#3B82F6',
+          align: 'center',
+          type: 'calendar',
+          isCalendar: true,
+          confidence: 1.0,
+          visibility: { userVisible: true, userEditable: true, required: true, emptyBehavior: 'keepDefault', userLabel: 'Special Date' },
+        },
+      ];
+      setDetectionResult({
+        photoSlots: coupleSlots.map((s) => ({ ...s, detectedReason: 'Couple Layout Preset', selected: true })),
+        textZones: coupleZones.map((z) => ({ ...z, detectedReason: 'Couple Typography Preset', selected: true })),
+        detectedDimensions: { width: 1200, height: 1600 },
+        engineUsed: 'canvas-cv',
+      });
+      setSelectedItem({ type: 'slot', id: coupleSlots[0].id });
+    } else {
+      const singleSlots: PhotoSlotConfig[] = [
+        {
+          id: `slot-single-${Date.now().toString(36)}-1`,
+          label: 'Main Photo Frame',
+          shape: 'rounded',
+          x: 50,
+          y: 42,
+          width: 65,
+          height: 52,
+          confidence: 1.0,
+          visibility: { userVisible: true, userEditable: true, required: true, emptyBehavior: 'keepDefault', userLabel: 'Upload Your Photo' },
+        },
+      ];
+      const singleZones: TextZoneConfig[] = [
+        {
+          id: `text-single-${Date.now().toString(36)}-1`,
+          label: 'Personalized Title',
+          defaultValue: 'Cherished Memories',
+          x: 50,
+          y: 74,
+          maxWidth: 80,
+          fontSize: 28,
+          fontFamily: 'Playfair Display',
+          color: '#160E4B',
+          align: 'center',
+          type: 'text',
+          confidence: 1.0,
+          visibility: { userVisible: true, userEditable: true, required: true, emptyBehavior: 'keepDefault', userLabel: 'Personalized Title' },
+        },
+      ];
+      setDetectionResult({
+        photoSlots: singleSlots.map((s) => ({ ...s, detectedReason: 'Single Photo Preset', selected: true })),
+        textZones: singleZones.map((z) => ({ ...z, detectedReason: 'Single Typography Preset', selected: true })),
+        detectedDimensions: { width: 1200, height: 1600 },
+        engineUsed: 'canvas-cv',
+      });
+      setSelectedItem({ type: 'slot', id: singleSlots[0].id });
+    }
+  };
+
   const handleStartScan = async () => {
     if (!imagePreviewUrl) return;
 
     setIsScanning(true);
     setError(null);
     try {
-      setScanStep('1/3 Analyzing visual density & contours...');
-      await new Promise((r) => setTimeout(r, 250));
-
-      setScanStep('2/3 Identifying photo cutout apertures & boundaries...');
-      await new Promise((r) => setTimeout(r, 250));
-
-      setScanStep('3/3 Extracting typography baselines & dates...');
       const result = await runAIDetectionOnImage(imagePreviewUrl, category, apiKey);
-
       setDetectionResult(result);
       if (result.photoSlots.length > 0) {
         setSelectedItem({ type: 'slot', id: result.photoSlots[0].id });
@@ -125,10 +317,9 @@ export const StudioAIImportModal: React.FC<StudioAIImportModalProps> = ({
       }
     } catch (err: any) {
       console.error('AI Scan error:', err);
-      setError(err?.message || 'Failed to scan image. Please try another image.');
+      setError(err?.message || 'Failed to scan image. Try clicking a Smart Preset or use manual placement.');
     } finally {
       setIsScanning(false);
-      setScanStep('');
     }
   };
 
@@ -177,7 +368,7 @@ export const StudioAIImportModal: React.FC<StudioAIImportModalProps> = ({
       const newSlot: PhotoSlotConfig & { confidence: number; detectedReason: string; selected: boolean } = {
         id: `slot-manual-${Date.now().toString(36)}`,
         label: `Photo Slot #${(detectionResult?.photoSlots.length || 0) + 1}`,
-        shape: 'rounded',
+        shape: 'circle',
         x: centerX,
         y: centerY,
         width,
@@ -197,7 +388,7 @@ export const StudioAIImportModal: React.FC<StudioAIImportModalProps> = ({
       setDetectionResult((prev) => ({
         photoSlots: [...(prev?.photoSlots || []), newSlot],
         textZones: prev?.textZones || [],
-        detectedDimensions: prev?.detectedDimensions || { width: 1200, height: 1760 },
+        detectedDimensions: prev?.detectedDimensions || { width: 1200, height: 1600 },
         engineUsed: prev?.engineUsed || 'canvas-cv',
       }));
       setSelectedItem({ type: 'slot', id: newSlot.id });
@@ -205,7 +396,7 @@ export const StudioAIImportModal: React.FC<StudioAIImportModalProps> = ({
       const newZone: TextZoneConfig & { confidence: number; detectedReason: string; selected: boolean } = {
         id: `text-manual-${Date.now().toString(36)}`,
         label: `Text Zone #${(detectionResult?.textZones.length || 0) + 1}`,
-        defaultValue: 'Personalized Text',
+        defaultValue: 'Custom Text',
         x: centerX,
         y: centerY,
         maxWidth: width,
@@ -229,7 +420,7 @@ export const StudioAIImportModal: React.FC<StudioAIImportModalProps> = ({
       setDetectionResult((prev) => ({
         photoSlots: prev?.photoSlots || [],
         textZones: [...(prev?.textZones || []), newZone],
-        detectedDimensions: prev?.detectedDimensions || { width: 1200, height: 1760 },
+        detectedDimensions: prev?.detectedDimensions || { width: 1200, height: 1600 },
         engineUsed: prev?.engineUsed || 'canvas-cv',
       }));
       setSelectedItem({ type: 'zone', id: newZone.id });
@@ -239,26 +430,6 @@ export const StudioAIImportModal: React.FC<StudioAIImportModalProps> = ({
     setDrawStart(null);
     setCurrentDraw(null);
     setActiveTool('select');
-  };
-
-  const handleToggleSlot = (id: string) => {
-    if (!detectionResult) return;
-    setDetectionResult({
-      ...detectionResult,
-      photoSlots: detectionResult.photoSlots.map((slot) =>
-        slot.id === id ? { ...slot, selected: !slot.selected } : slot
-      ),
-    });
-  };
-
-  const handleToggleZone = (id: string) => {
-    if (!detectionResult) return;
-    setDetectionResult({
-      ...detectionResult,
-      textZones: detectionResult.textZones.map((zone) =>
-        zone.id === id ? { ...zone, selected: !zone.selected } : zone
-      ),
-    });
   };
 
   const handleUpdateSlotShape = (id: string, shape: FrameCutoutShape) => {
@@ -320,19 +491,6 @@ export const StudioAIImportModal: React.FC<StudioAIImportModalProps> = ({
     onClose();
   };
 
-  const getShapeClipPath = (shape: string) => {
-    switch (shape) {
-      case 'circle':
-        return 'circle(50% at 50% 50%)';
-      case 'oval':
-        return 'ellipse(50% 50% at 50% 50%)';
-      case 'arch':
-        return 'polygon(0% 100%, 0% 40%, 50% 0%, 100% 40%, 100% 100%)';
-      default:
-        return 'none';
-    }
-  };
-
   const activeSelectedSlot = selectedItem?.type === 'slot'
     ? detectionResult?.photoSlots.find((s) => s.id === selectedItem.id)
     : null;
@@ -342,23 +500,20 @@ export const StudioAIImportModal: React.FC<StudioAIImportModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md animate-in fade-in duration-200 select-none">
-      <div className="bg-slate-900 border border-slate-700 w-full max-w-6xl max-h-[95vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden text-white">
+      <div className="bg-slate-900 border border-slate-700 w-full max-w-5xl max-h-[95vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden text-white">
         
         {/* Modal Header */}
         <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/70">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-2xl bg-gradient-to-tr from-[#F82BA9]/20 to-purple-600/20 border border-pink-500/30 text-pink-400">
-              <Sparkles className="w-5 h-5" />
+            <div className="p-2.5 rounded-2xl bg-pink-500/20 border border-pink-500/30 text-pink-400">
+              <Layers className="w-5 h-5" />
             </div>
             <div>
               <h3 className="text-base sm:text-lg font-extrabold text-white flex items-center gap-2">
-                Smart Template AI & Computer Vision Studio
-                <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-pink-500/20 text-pink-300 border border-pink-500/40">
-                  Canva-Grade
-                </span>
+                Frame Layer Setup & AI Detection
               </h3>
               <p className="text-xs text-slate-400">
-                Upload your frame artwork. AI & Computer Vision will scan apertures, shapes, and typography.
+                Upload your frame poster. AI or 1-Click presets will organize it into Background, Photo, and Text layers.
               </p>
             </div>
           </div>
@@ -366,15 +521,15 @@ export const StudioAIImportModal: React.FC<StudioAIImportModalProps> = ({
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowKeyInput(!showKeyInput)}
-              className={`p-2 rounded-xl text-xs font-semibold border transition-all flex items-center gap-1.5 cursor-pointer ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all flex items-center gap-1.5 cursor-pointer ${
                 apiKey
                   ? 'bg-emerald-950/40 border-emerald-600/60 text-emerald-300'
                   : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300'
               }`}
-              title="Configure free Google Gemini API Key for millimeter-precise Deep AI scan"
+              title="Google Gemini Vision API Key (100% Free)"
             >
-              <Key className="w-4 h-4" />
-              <span className="hidden sm:inline">{apiKey ? 'Deep AI Active' : 'Gemini Key (Opt)'}</span>
+              <Key className="w-3.5 h-3.5" />
+              <span>{apiKey ? 'Gemini AI Active' : 'API Key (Optional)'}</span>
             </button>
 
             <button
@@ -388,36 +543,29 @@ export const StudioAIImportModal: React.FC<StudioAIImportModalProps> = ({
 
         {/* Optional Gemini API Key Drawer */}
         {showKeyInput && (
-          <div className="p-4 bg-slate-950/90 border-b border-slate-800 flex flex-col sm:flex-row items-center gap-3 animate-in slide-in-from-top-2 duration-150">
-            <div className="flex-1 w-full">
-              <label className="text-[11px] font-bold text-slate-300 block mb-1">
-                Optional: Google Gemini API Key (100% Free from Google AI Studio)
-              </label>
-              <input
-                type="password"
-                placeholder="AIzaSy..."
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-pink-500 font-mono"
-              />
-            </div>
-            <div className="text-[11px] text-slate-400 shrink-0 self-end sm:self-center">
-              Keys are saved locally in your browser. Without key, Canvas Computer Vision engine runs automatically.
-            </div>
+          <div className="p-3 bg-slate-950 border-b border-slate-800 flex flex-col sm:flex-row items-center gap-3 text-xs">
+            <input
+              type="password"
+              placeholder="Paste free Gemini API key (AIzaSy...) for deep semantic AI scanning"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              className="flex-1 w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-pink-500 font-mono"
+            />
+            <span className="text-[11px] text-slate-400 shrink-0">
+              Free from Google AI Studio. Stored securely in your browser.
+            </span>
           </div>
         )}
 
         {/* Modal Body */}
         <div className="p-4 sm:p-6 overflow-y-auto space-y-4 flex-1">
-          
           {error && (
-            <div className="p-3.5 rounded-2xl bg-red-950/50 border border-red-800/80 text-red-200 text-xs flex items-center gap-2">
+            <div className="p-3 rounded-2xl bg-red-950/50 border border-red-800/80 text-red-200 text-xs flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
               <span>{error}</span>
             </div>
           )}
 
-          {/* Upload Area */}
           {!imagePreviewUrl ? (
             <div
               onClick={() => fileInputRef.current?.click()}
@@ -430,7 +578,7 @@ export const StudioAIImportModal: React.FC<StudioAIImportModalProps> = ({
                 Upload your frame artwork poster (JPG, PNG, WEBP)
               </h4>
               <p className="text-xs text-slate-400 max-w-md mb-4">
-                Our vision engine will examine every pixel to discover photo cutouts (circles, arches, rounded windows) and text baselines.
+                Your artwork will be loaded as Layer 1 (Background), and you can instantly add photo apertures & text fields.
               </p>
               <span className="px-5 py-2.5 bg-gradient-to-r from-[#F82BA9] to-purple-600 text-white font-extrabold text-xs rounded-xl shadow-md">
                 Browse Files
@@ -444,90 +592,84 @@ export const StudioAIImportModal: React.FC<StudioAIImportModalProps> = ({
               />
             </div>
           ) : (
-            <div className="flex flex-col lg:flex-row gap-6 items-start">
+            <div className="space-y-4">
               
-              {/* LEFT COLUMN: Interactive Visual Image Workspace */}
-              <div className="w-full lg:w-3/5 space-y-3">
-                
-                {/* Visual Workspace Toolbar */}
-                <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-2xl bg-slate-950/80 border border-slate-800">
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => setActiveTool('select')}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                        activeTool === 'select'
-                          ? 'bg-pink-600 text-white shadow-xs'
-                          : 'bg-slate-800 text-slate-300 hover:text-white'
-                      }`}
-                      title="Select & Inspect Boxes"
-                    >
-                      <MousePointer className="w-3.5 h-3.5" />
-                      <span>Select</span>
-                    </button>
+              {/* Top Quick Bar: Presets & Tools */}
+              <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-2xl bg-slate-950/80 border border-slate-800">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-[11px] font-bold text-slate-400 mr-1">1-Click Presets:</span>
+                  <button
+                    onClick={() => applyPreset('baby')}
+                    className="px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 transition-all flex items-center gap-1.5 cursor-pointer"
+                    title="1-Click: Central Circular Baby Photo + Name, Date, Time, Weight, Parents"
+                  >
+                    <Baby className="w-3.5 h-3.5" />
+                    <span>👶 Baby Milestone</span>
+                  </button>
 
-                    <button
-                      onClick={() => setActiveTool('draw-slot')}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                        activeTool === 'draw-slot'
-                          ? 'bg-emerald-600 text-white shadow-xs'
-                          : 'bg-slate-800 text-slate-300 hover:text-white'
-                      }`}
-                      title="Click and drag on image to create a new photo cutout"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>➕ Draw Slot</span>
-                    </button>
+                  <button
+                    onClick={() => applyPreset('couple')}
+                    className="px-3 py-1.5 rounded-xl text-xs font-bold bg-pink-500/20 hover:bg-pink-500/30 text-pink-300 border border-pink-500/40 transition-all flex items-center gap-1.5 cursor-pointer"
+                    title="1-Click: Arch Couple Photo + Names & Date"
+                  >
+                    <Heart className="w-3.5 h-3.5" />
+                    <span>💕 Couple Frame</span>
+                  </button>
 
-                    <button
-                      onClick={() => setActiveTool('draw-text')}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                        activeTool === 'draw-text'
-                          ? 'bg-purple-600 text-white shadow-xs'
-                          : 'bg-slate-800 text-slate-300 hover:text-white'
-                      }`}
-                      title="Click and drag on image to create a new text zone"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>➕ Draw Text</span>
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => applyPreset('single')}
+                    className="px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/40 transition-all flex items-center gap-1.5 cursor-pointer"
+                    title="1-Click: Full Single Photo + Title"
+                  >
+                    <ImageIcon className="w-3.5 h-3.5" />
+                    <span>🖼️ Single Photo</span>
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setActiveTool(activeTool === 'draw-slot' ? 'select' : 'draw-slot')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                      activeTool === 'draw-slot'
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-slate-800 text-slate-300 hover:text-white'
+                    }`}
+                    title="Drag on image to create a new photo slot"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Draw Slot
+                  </button>
 
                   <button
                     onClick={handleStartScan}
                     disabled={isScanning}
-                    className="px-4 py-1.5 rounded-xl text-xs font-extrabold bg-gradient-to-r from-[#F82BA9] to-purple-600 hover:brightness-110 text-white transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-md"
+                    className="px-3.5 py-1.5 rounded-xl text-xs font-extrabold bg-gradient-to-r from-[#F82BA9] to-purple-600 hover:brightness-110 text-white transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                   >
-                    {isScanning ? (
-                      <>
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        Scanning...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="w-3.5 h-3.5" />
-                        {detectionResult ? 'Re-scan with AI' : 'Run Smart AI Scan'}
-                      </>
-                    )}
+                    {isScanning ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                    <span>{detectionResult ? 'Re-scan with AI' : 'Auto-Scan AI'}</span>
                   </button>
                 </div>
+              </div>
 
-                {/* Main Interactive Canvas Area */}
+              {/* Center Canvas Workspace */}
+              <div className="flex flex-col lg:flex-row gap-4 items-start">
+                
+                {/* Visual Image Preview with Overlays */}
                 <div
                   ref={imageContainerRef}
                   onMouseDown={handleMouseDown}
                   onMouseMove={handleMouseMove}
                   onMouseUp={handleMouseUp}
-                  className={`relative w-full max-h-[520px] rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 flex items-center justify-center select-none shadow-inner ${
+                  className={`relative flex-1 w-full max-h-[480px] rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 flex items-center justify-center select-none shadow-inner ${
                     activeTool !== 'select' ? 'cursor-crosshair' : 'cursor-default'
                   }`}
                 >
                   <img
                     src={imagePreviewUrl}
                     alt="Frame artwork"
-                    className="w-full h-auto max-h-[520px] object-contain pointer-events-none block"
+                    className="w-full h-auto max-h-[480px] object-contain pointer-events-none block"
                   />
 
-                  {/* Render Detected Photo Slots on Image */}
+                  {/* Render Photo Slots on Image */}
                   {detectionResult?.photoSlots.map((slot, idx) => {
                     const isSelected = selectedItem?.type === 'slot' && selectedItem.id === slot.id;
                     const left = slot.x - slot.width / 2;
@@ -545,26 +687,22 @@ export const StudioAIImportModal: React.FC<StudioAIImportModalProps> = ({
                           top: `${top}%`,
                           width: `${slot.width}%`,
                           height: `${slot.height}%`,
-                          borderRadius: slot.shape === 'circle' ? '50%' : slot.shape === 'rounded' ? '14px' : '4px',
-                          clipPath: getShapeClipPath(slot.shape),
+                          borderRadius: slot.shape === 'circle' ? '50%' : slot.shape === 'rounded' ? '16px' : '4px',
                         }}
-                        className={`absolute border-2 transition-all cursor-pointer flex flex-col items-center justify-center p-1 ${
-                          slot.selected
-                            ? isSelected
-                              ? 'border-pink-500 bg-pink-500/25 ring-2 ring-pink-400 shadow-lg'
-                              : 'border-cyan-400 bg-cyan-500/15 hover:bg-cyan-500/25'
-                            : 'border-slate-500/40 bg-black/40 opacity-40 hover:opacity-75'
+                        className={`absolute border-2 transition-all cursor-pointer flex items-center justify-center p-1 ${
+                          isSelected
+                            ? 'border-pink-500 bg-pink-500/25 ring-2 ring-pink-400'
+                            : 'border-cyan-400 bg-cyan-500/15 hover:bg-cyan-500/25'
                         }`}
                       >
-                        <div className="px-2 py-0.5 rounded-full bg-slate-950/80 text-[10px] font-extrabold text-cyan-300 border border-cyan-500/40 shadow-xs flex items-center gap-1 truncate max-w-full">
-                          <span>📷 #{idx + 1}</span>
-                          <span className="capitalize opacity-80">({slot.shape})</span>
+                        <div className="px-2 py-0.5 rounded-full bg-slate-950/85 text-[10px] font-extrabold text-cyan-300 border border-cyan-500/40 shadow-xs truncate max-w-full">
+                          📷 #{idx + 1} ({slot.shape})
                         </div>
                       </div>
                     );
                   })}
 
-                  {/* Render Detected Text Zones on Image */}
+                  {/* Render Text Zones on Image */}
                   {detectionResult?.textZones.map((zone) => {
                     const isSelected = selectedItem?.type === 'zone' && selectedItem.id === zone.id;
                     const left = zone.x - zone.maxWidth / 2;
@@ -582,12 +720,10 @@ export const StudioAIImportModal: React.FC<StudioAIImportModalProps> = ({
                           top: `${top}%`,
                           width: `${zone.maxWidth}%`,
                         }}
-                        className={`absolute border-2 border-dashed py-1 px-2 transition-all cursor-pointer flex items-center justify-center ${
-                          zone.selected
-                            ? isSelected
-                              ? 'border-purple-400 bg-purple-500/30 ring-2 ring-purple-300 shadow-md'
-                              : 'border-purple-500/70 bg-purple-500/10 hover:bg-purple-500/20'
-                            : 'border-slate-500/40 bg-black/40 opacity-40 hover:opacity-75'
+                        className={`absolute border-2 border-dashed py-0.5 px-2 transition-all cursor-pointer flex items-center justify-center ${
+                          isSelected
+                            ? 'border-purple-400 bg-purple-500/35 ring-2 ring-purple-300'
+                            : 'border-purple-500/60 bg-purple-500/15 hover:bg-purple-500/25'
                         }`}
                       >
                         <span className="text-[10px] font-bold text-purple-200 truncate max-w-full">
@@ -597,7 +733,7 @@ export const StudioAIImportModal: React.FC<StudioAIImportModalProps> = ({
                     );
                   })}
 
-                  {/* Drag-to-Draw Ghost Preview Box */}
+                  {/* Drag-to-Draw Ghost Box */}
                   {isDrawing && drawStart && currentDraw && (
                     <div
                       style={{
@@ -609,63 +745,31 @@ export const StudioAIImportModal: React.FC<StudioAIImportModalProps> = ({
                       className="absolute border-2 border-dashed border-emerald-400 bg-emerald-500/20 pointer-events-none"
                     />
                   )}
-
-                  {/* Scanning Overlay */}
-                  {isScanning && (
-                    <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-xs flex flex-col items-center justify-center p-6 text-center space-y-3">
-                      <div className="relative">
-                        <Loader2 className="w-12 h-12 text-pink-500 animate-spin" />
-                        <Sparkles className="w-5 h-5 text-yellow-300 absolute -top-1 -right-1 animate-pulse" />
-                      </div>
-                      <p className="text-sm font-bold text-white">{scanStep}</p>
-                      <p className="text-xs text-slate-400 max-w-xs">
-                        Scanning shapes, geometry, and personalized typography.
-                      </p>
-                    </div>
-                  )}
                 </div>
 
-                <p className="text-[11px] text-slate-400 flex items-center justify-between">
-                  <span>💡 Tip: Click any box to inspect/edit. Use ➕ Draw Slot to add cutouts manually.</span>
-                  {detectionResult && (
-                    <span className="font-semibold text-pink-400">
-                      Engine: {detectionResult.engineUsed === 'gemini-vision' ? '✨ Deep Gemini Vision' : '⚡ Canvas Computer Vision'}
-                    </span>
-                  )}
-                </p>
-              </div>
+                {/* Right Side: Simple Inspector & Layer List */}
+                <div className="w-full lg:w-72 space-y-3 shrink-0">
+                  {activeSelectedSlot && (
+                    <div className="p-3.5 rounded-2xl bg-slate-950 border border-cyan-500/40 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-cyan-300">Selected Photo Slot</span>
+                        <button
+                          onClick={() => handleDeleteItem('slot', activeSelectedSlot.id)}
+                          className="p-1 text-rose-400 hover:text-rose-200"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
 
-              {/* RIGHT COLUMN: Inspector & Candidates List */}
-              <div className="w-full lg:w-2/5 space-y-4">
-                
-                {/* Active Selected Item Properties */}
-                {activeSelectedSlot && (
-                  <div className="p-4 rounded-2xl bg-slate-950/90 border border-cyan-500/40 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h5 className="text-xs font-extrabold text-cyan-300 flex items-center gap-1.5">
-                        <Sliders className="w-4 h-4" /> Selected Photo Slot #{detectionResult?.photoSlots.findIndex((s) => s.id === activeSelectedSlot.id)! + 1}
-                      </h5>
-                      <button
-                        onClick={() => handleDeleteItem('slot', activeSelectedSlot.id)}
-                        className="p-1.5 text-rose-400 hover:text-rose-200 hover:bg-rose-500/20 rounded-lg transition-colors cursor-pointer"
-                        title="Delete slot"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-
-                    {/* Shape Selector Buttons */}
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-400 block mb-1.5">Aperture Shape</label>
-                      <div className="grid grid-cols-4 gap-1.5">
+                      <div className="grid grid-cols-3 gap-1">
                         {SHAPES.map((s) => (
                           <button
                             key={s.value}
                             onClick={() => handleUpdateSlotShape(activeSelectedSlot.id, s.value)}
-                            className={`p-1.5 rounded-lg text-[11px] font-bold border transition-all flex flex-col items-center gap-0.5 cursor-pointer ${
+                            className={`p-1.5 rounded-lg text-[10px] font-bold border transition-all flex flex-col items-center gap-0.5 ${
                               activeSelectedSlot.shape === s.value
-                                ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200'
-                                : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                                ? 'bg-cyan-500/25 border-cyan-400 text-cyan-200'
+                                : 'bg-slate-900 border-slate-800 text-slate-400'
                             }`}
                           >
                             <span>{s.icon}</span>
@@ -674,204 +778,64 @@ export const StudioAIImportModal: React.FC<StudioAIImportModalProps> = ({
                         ))}
                       </div>
                     </div>
+                  )}
 
-                    {/* Label Input */}
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-400 block mb-1">Customer Upload Label</label>
-                      <input
-                        type="text"
-                        value={activeSelectedSlot.label}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setDetectionResult((prev) =>
-                            prev
-                              ? {
-                                  ...prev,
-                                  photoSlots: prev.photoSlots.map((s) =>
-                                    s.id === activeSelectedSlot.id ? { ...s, label: val } : s
-                                  ),
-                                }
-                              : null
-                          );
-                        }}
-                        className="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white"
-                      />
-                    </div>
-                  </div>
-                )}
+                  {/* Layers Summary List */}
+                  {detectionResult && (
+                    <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-2 max-h-[300px] overflow-y-auto">
+                      <div className="text-xs font-extrabold text-slate-300 flex items-center justify-between">
+                        <span>Extracted Layers</span>
+                        <span className="text-[10px] text-pink-400">
+                          {detectionResult.photoSlots.length} Slots • {detectionResult.textZones.length} Texts
+                        </span>
+                      </div>
 
-                {activeSelectedZone && (
-                  <div className="p-4 rounded-2xl bg-slate-950/90 border border-purple-500/40 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h5 className="text-xs font-extrabold text-purple-300 flex items-center gap-1.5">
-                        <Sliders className="w-4 h-4" /> Selected Text Zone
-                      </h5>
-                      <button
-                        onClick={() => handleDeleteItem('zone', activeSelectedZone.id)}
-                        className="p-1.5 text-rose-400 hover:text-rose-200 hover:bg-rose-500/20 rounded-lg transition-colors cursor-pointer"
-                        title="Delete text zone"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-400 block mb-1">Text Value / Placeholder</label>
-                      <input
-                        type="text"
-                        value={activeSelectedZone.defaultValue}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setDetectionResult((prev) =>
-                            prev
-                              ? {
-                                  ...prev,
-                                  textZones: prev.textZones.map((z) =>
-                                    z.id === activeSelectedZone.id ? { ...z, defaultValue: val } : z
-                                  ),
-                                }
-                              : null
-                          );
-                        }}
-                        className="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white"
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <label className="text-xs text-slate-300 font-bold flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={activeSelectedZone.isCalendar || activeSelectedZone.type === 'calendar'}
-                          onChange={(e) => {
-                            const isCal = e.target.checked;
-                            setDetectionResult((prev) =>
-                              prev
-                                ? {
-                                    ...prev,
-                                    textZones: prev.textZones.map((z) =>
-                                      z.id === activeSelectedZone.id
-                                        ? { ...z, isCalendar: isCal, type: isCal ? 'calendar' : 'text' }
-                                        : z
-                                    ),
-                                  }
-                                : null
-                            );
-                          }}
-                          className="rounded text-pink-500 focus:ring-pink-500"
-                        />
-                        <span>Is Date / Interactive Calendar Zone</span>
-                      </label>
-                    </div>
-                  </div>
-                )}
-
-                {/* Candidate Checklist Summary */}
-                {detectionResult ? (
-                  <div className="space-y-4 max-h-[300px] overflow-y-auto pr-1">
-                    
-                    {/* Photo Slots List */}
-                    <div className="space-y-2">
-                      <h6 className="text-xs font-extrabold text-slate-300 flex items-center justify-between">
-                        <span>Photo Apertures ({detectionResult.photoSlots.length})</span>
-                        <span className="text-[10px] text-slate-500">Toggle inclusion</span>
-                      </h6>
                       {detectionResult.photoSlots.map((slot) => (
                         <div
                           key={slot.id}
                           onClick={() => setSelectedItem({ type: 'slot', id: slot.id })}
-                          className={`p-2.5 rounded-xl border transition-all flex items-center justify-between gap-2 cursor-pointer ${
+                          className={`p-2 rounded-xl border text-xs font-bold flex items-center justify-between cursor-pointer ${
                             selectedItem?.id === slot.id
-                              ? 'border-cyan-400 bg-cyan-950/30'
-                              : 'border-slate-800 bg-slate-950/40 hover:border-slate-700'
+                              ? 'border-cyan-400 bg-cyan-950/40 text-cyan-200'
+                              : 'border-slate-800 bg-slate-900 text-slate-300'
                           }`}
                         >
-                          <div className="flex items-center gap-2 truncate">
-                            <span className="text-sm">📷</span>
-                            <span className="text-xs font-bold text-slate-200 truncate">{slot.label}</span>
-                            <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">
-                              {slot.shape}
-                            </span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleToggleSlot(slot.id);
-                            }}
-                            className={`w-5 h-5 rounded flex items-center justify-center border transition-colors shrink-0 ${
-                              slot.selected
-                                ? 'bg-[#F82BA9] border-[#F82BA9] text-white'
-                                : 'border-slate-600 bg-slate-800'
-                            }`}
-                          >
-                            {slot.selected && <Check className="w-3 h-3" />}
-                          </button>
+                          <span className="truncate">📷 {slot.label} ({slot.shape})</span>
                         </div>
                       ))}
-                    </div>
 
-                    {/* Text Zones List */}
-                    <div className="space-y-2">
-                      <h6 className="text-xs font-extrabold text-slate-300 flex items-center justify-between">
-                        <span>Text Zones ({detectionResult.textZones.length})</span>
-                        <span className="text-[10px] text-slate-500">Toggle inclusion</span>
-                      </h6>
                       {detectionResult.textZones.map((zone) => (
                         <div
                           key={zone.id}
                           onClick={() => setSelectedItem({ type: 'zone', id: zone.id })}
-                          className={`p-2.5 rounded-xl border transition-all flex items-center justify-between gap-2 cursor-pointer ${
+                          className={`p-2 rounded-xl border text-xs font-bold flex items-center justify-between cursor-pointer ${
                             selectedItem?.id === zone.id
-                              ? 'border-purple-400 bg-purple-950/30'
-                              : 'border-slate-800 bg-slate-950/40 hover:border-slate-700'
+                              ? 'border-purple-400 bg-purple-950/40 text-purple-200'
+                              : 'border-slate-800 bg-slate-900 text-slate-300'
                           }`}
                         >
-                          <div className="flex items-center gap-2 truncate">
-                            <span className="text-sm">✏️</span>
-                            <span className="text-xs font-bold text-slate-200 truncate">{zone.defaultValue || zone.label}</span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleToggleZone(zone.id);
-                            }}
-                            className={`w-5 h-5 rounded flex items-center justify-center border transition-colors shrink-0 ${
-                              zone.selected
-                                ? 'bg-purple-600 border-purple-600 text-white'
-                                : 'border-slate-600 bg-slate-800'
-                            }`}
-                          >
-                            {zone.selected && <Check className="w-3 h-3" />}
-                          </button>
+                          <span className="truncate">✏️ {zone.defaultValue || zone.label}</span>
                         </div>
                       ))}
                     </div>
-                  </div>
-                ) : (
-                  <div className="p-6 rounded-2xl bg-slate-950/50 border border-slate-800 text-center space-y-2">
-                    <Sparkles className="w-8 h-8 text-pink-400/60 mx-auto" />
-                    <p className="text-xs font-bold text-slate-300">Click "Run Smart AI Scan" to begin</p>
-                    <p className="text-[11px] text-slate-400">
-                      Or select ➕ Draw Slot to sketch photo apertures directly on the preview image!
-                    </p>
-                  </div>
-                )}
+                  )}
+                </div>
+
               </div>
             </div>
           )}
         </div>
 
         {/* Modal Footer */}
-        <div className="p-4 border-t border-slate-800 bg-slate-950/80 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="p-4 border-t border-slate-800 bg-slate-950/90 flex items-center justify-between gap-3">
           <button
             onClick={onClose}
-            className="w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs font-bold text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+            className="px-4 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white"
           >
             Cancel
           </button>
 
-          <div className="w-full sm:w-auto flex items-center justify-end gap-3">
+          <div className="flex items-center gap-3">
             {imagePreviewUrl && (
               <button
                 onClick={() => {
@@ -879,31 +843,32 @@ export const StudioAIImportModal: React.FC<StudioAIImportModalProps> = ({
                   setSelectedFile(null);
                   setDetectionResult(null);
                 }}
-                className="px-4 py-2.5 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors cursor-pointer"
+                className="px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-800 text-slate-300 hover:text-white"
               >
-                Change Artwork
+                Change Image
               </button>
             )}
 
             <button
               onClick={handleApplyToStudio}
               disabled={isUploading || isScanning || !detectionResult}
-              className="w-full sm:w-auto px-6 py-2.5 rounded-xl text-xs font-extrabold bg-gradient-to-r from-[#F82BA9] to-purple-600 hover:brightness-110 text-white shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              className="px-6 py-2.5 rounded-xl text-xs font-extrabold bg-gradient-to-r from-[#F82BA9] to-purple-600 hover:brightness-110 text-white shadow-lg transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
             >
               {isUploading ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  Applying to Studio...
+                  Loading into Studio...
                 </>
               ) : (
                 <>
                   <Check className="w-4 h-4" />
-                  Apply Layers to Smart Studio
+                  Load Layers into Studio
                 </>
               )}
             </button>
           </div>
         </div>
+
       </div>
     </div>
   );

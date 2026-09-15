@@ -64,24 +64,24 @@ export async function runGeminiVisionDetection(
 
   const prompt = [
     'You are an expert Web-to-Print photo frame template parser.',
-    'Analyze this photo frame artwork image and identify:',
-    '1. All photo slots / apertures / cutout windows where a user photo should be inserted.',
-    '   - Coordinates (x, y) must be the CENTER of each photo slot in percentage (0 to 100) of image width and height.',
-    '   - width and height in percentage (0 to 100) of image width and height.',
-    '   - shape: one of "rectangle", "rounded", "circle", "oval", "arch", "heart", "polaroid", "square".',
-    '   - label: human descriptive label (e.g. "Main Photo", "Baby Photo", "Couple Photo").',
-    '2. All customizable text zones (names, dates, calendar, quotes).',
+    'Analyze this custom photo frame design and identify all photo apertures and customizable text:',
+    '1. Photo Cutout Slots:',
+    '   - Look for where photos are placed, especially circular portrait rings, arch windows, or rectangular/rounded cutouts.',
+    '   - For baby frames, find the central circular baby photo aperture (often with a gold/decorative border).',
+    '   - Coordinates (x, y) must be the CENTER in percentage (0 to 100) of image width and height.',
+    '   - width and height in percentage (0 to 100).',
+    '   - shape: must be "circle", "arch", "rounded", "rectangle", "oval", or "heart".',
+    '   - label: descriptive label (e.g. "Baby Portrait Photo", "Couple Photo").',
+    '2. Customizable Text Zones:',
+    '   - Main Title / Name (e.g. "Mithunan" or couple names).',
+    '   - Birth Date / Anniversary Date (e.g. "29 Jan, 2025").',
+    '   - Birth Time / Clock badge (e.g. "06:21 AM").',
+    '   - Weight badge (e.g. "2.7 Kg").',
+    '   - Parents / Hospital / Quote details.',
     '   - Coordinates (x, y) must be the CENTER of each text line in percentage (0 to 100).',
-    '   - maxWidth in percentage.',
-    '   - fontSize estimated in pt (16 to 48).',
-    '   - fontFamily: one of "Playfair Display", "Jost", "Montserrat", "Great Vibes", "Cinzel", "Arial".',
-    '   - color: hex code (e.g. "#160E4B", "#000000").',
-    '   - align: "center", "left", or "right".',
-    '   - type: "text", "date", or "calendar".',
-    '   - defaultValue: detected or placeholder text.',
-    '   - label: descriptive label.',
+    '   - maxWidth in percentage, fontSize in pt (14 to 42), fontFamily ("Playfair Display", "Jost", "Montserrat", "Great Vibes", "Cinzel"), hex color.',
     'Respond ONLY with valid JSON in this exact structure:',
-    '{"photoSlots":[{"label":"Main Photo","shape":"rounded","x":50,"y":42,"width":60,"height":45,"confidence":0.98,"detectedReason":"Central aperture"}],"textZones":[{"label":"Names","defaultValue":"Rahul & Priya","x":50,"y":70,"maxWidth":80,"fontSize":28,"fontFamily":"Playfair Display","color":"#160E4B","align":"center","type":"text","confidence":0.95,"detectedReason":"Header typography"}]}'
+    '{"photoSlots":[{"label":"Baby Portrait Photo","shape":"circle","x":50,"y":43,"width":44,"height":33,"confidence":0.99,"detectedReason":"Central circular baby photo aperture"}],"textZones":[{"label":"Baby Name","defaultValue":"Mithunan","x":50,"y":20,"maxWidth":70,"fontSize":32,"fontFamily":"Playfair Display","color":"#160E4B","align":"center","type":"text","confidence":0.98,"detectedReason":"Primary name header"}]}'
   ].join('\n');
 
   const payload = {
