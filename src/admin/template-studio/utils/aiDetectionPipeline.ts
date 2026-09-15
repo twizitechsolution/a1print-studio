@@ -51,20 +51,27 @@ async function getBase64FromSource(src: string | HTMLImageElement): Promise<{ ba
   };
 }
 
+export const DEFAULT_GEMINI_API_KEY = 'AIzaSyDTk2d7lrz6lNJNqTFXq9fg6_jiRnXV8ic';
+
+export function getActiveGeminiApiKey(): string {
+  const envKey = (import.meta.env.VITE_GEMINI_API_KEY as string) || '';
+  const storedKey = typeof window !== 'undefined' ? localStorage.getItem('A1PRINT_GEMINI_API_KEY') || '' : '';
+  return (storedKey || envKey || DEFAULT_GEMINI_API_KEY).trim();
+}
+
 /**
- * Deep Semantic Vision Detection using Google Gemini 1.5 Flash API.
- * Accurately detects photographic cutout apertures, shapes, and text typography.
+ * Deep Semantic Vision Detection using Google Gemini Vision API.
+ * Accurately detects photographic cutout apertures, shapes, and text typography from the actual image.
  */
 export async function runGeminiVisionDetection(
   imageSource: string | HTMLImageElement,
   apiKey: string
 ): Promise<AIDetectionResult> {
   const { base64, mimeType } = await getBase64FromSource(imageSource);
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(apiKey.trim())}`;
 
   const prompt = [
     'You are an expert Web-to-Print photo frame template parser.',
-    'Analyze this custom photo frame design and identify all photo apertures and customizable text:',
+    'Analyze this custom photo frame design image and identify all photo apertures and customizable text:',
     '1. Photo Cutout Slots:',
     '   - Look for where photos are placed, especially circular portrait rings, arch windows, or rectangular/rounded cutouts.',
     '   - For baby frames, find the central circular baby photo aperture (often with a gold/decorative border).',
@@ -73,15 +80,17 @@ export async function runGeminiVisionDetection(
     '   - shape: must be "circle", "arch", "rounded", "rectangle", "oval", or "heart".',
     '   - label: descriptive label (e.g. "Baby Portrait Photo", "Couple Photo").',
     '2. Customizable Text Zones:',
-    '   - Main Title / Name (e.g. "Mithunan" or couple names).',
-    '   - Birth Date / Anniversary Date (e.g. "29 Jan, 2025").',
-    '   - Birth Time / Clock badge (e.g. "06:21 AM").',
-    '   - Weight badge (e.g. "2.7 Kg").',
-    '   - Parents / Hospital / Quote details.',
+    '   - Extract EVERY customizable text line or badge visible in the image with its EXACT text as defaultValue:',
+    '   - Main Title / Name (e.g. "Mithunan" or couple names) -> type: "text"',
+    '   - Birth Date / Anniversary Date (e.g. "29 Jan, 2025" or "NOV 29, 2025") -> type: "date"',
+    '   - Birth Time / Clock badge (e.g. "06:21 AM") -> type: "time"',
+    '   - Weight badge (e.g. "2.7 Kg") -> type: "text"',
+    '   - Parents names (e.g. "Parthiban & Sattihunai") -> type: "text"',
+    '   - Hospital name / Location (e.g. "Panduputhur Sakthi Hospital Salem") -> type: "text"',
     '   - Coordinates (x, y) must be the CENTER of each text line in percentage (0 to 100).',
     '   - maxWidth in percentage, fontSize in pt (14 to 42), fontFamily ("Playfair Display", "Jost", "Montserrat", "Great Vibes", "Cinzel"), hex color.',
     'Respond ONLY with valid JSON in this exact structure:',
-    '{"photoSlots":[{"label":"Baby Portrait Photo","shape":"circle","x":50,"y":43,"width":44,"height":33,"confidence":0.99,"detectedReason":"Central circular baby photo aperture"}],"textZones":[{"label":"Baby Name","defaultValue":"Mithunan","x":50,"y":20,"maxWidth":70,"fontSize":32,"fontFamily":"Playfair Display","color":"#160E4B","align":"center","type":"text","confidence":0.98,"detectedReason":"Primary name header"}]}'
+    '{"photoSlots":[{"label":"Baby Portrait Photo","shape":"circle","x":50,"y":43,"width":44,"height":33,"confidence":0.99,"detectedReason":"Central circular baby photo aperture"}],"textZones":[{"label":"Baby Name","defaultValue":"Mithunan","x":50,"y":15,"maxWidth":70,"fontSize":32,"fontFamily":"Playfair Display","color":"#160E4B","align":"center","type":"text","confidence":0.98,"detectedReason":"Primary name header"},{"label":"Birth Date","defaultValue":"29 Jan, 2025","x":28,"y":66,"maxWidth":25,"fontSize":16,"fontFamily":"Jost","color":"#160E4B","align":"center","type":"date","confidence":0.95,"detectedReason":"Birth date text"},{"label":"Birth Time","defaultValue":"06:21 AM","x":72,"y":66,"maxWidth":25,"fontSize":16,"fontFamily":"Jost","color":"#160E4B","align":"center","type":"time","confidence":0.95,"detectedReason":"Birth time text"}]}'
   ].join('\n');
 
   const payload = {
@@ -162,31 +171,45 @@ export async function runGeminiVisionDetection(
     selected: true,
     visibility: {
       ...DEFAULT_VISIBILITY,
+      userVisible: true,
+      userEditable: true,
+      required: true,
       userLabel: slot.label || `Upload Photo #${idx + 1}`,
     },
   }));
 
-  const textZones = (parsed.textZones || []).map((zone: any, idx: number) => ({
-    id: `text-ai-${Date.now().toString(36)}-${idx + 1}`,
-    label: zone.label || `Text Zone #${idx + 1}`,
-    defaultValue: zone.defaultValue || '',
-    x: Number(zone.x) || 50,
-    y: Number(zone.y) || 70,
-    maxWidth: Number(zone.maxWidth) || 80,
-    fontSize: Number(zone.fontSize) || 24,
-    fontFamily: zone.fontFamily || 'Playfair Display',
-    color: zone.color || '#160E4B',
-    align: (zone.align as 'left' | 'center' | 'right') || 'center',
-    type: (zone.type as 'text' | 'date' | 'calendar') || 'text',
-    isCalendar: zone.type === 'calendar',
-    confidence: Number(zone.confidence) || 0.92,
-    detectedReason: zone.detectedReason || 'AI text baseline recognition',
-    selected: true,
-    visibility: {
-      ...DEFAULT_VISIBILITY,
-      userLabel: zone.label || `Enter Text #${idx + 1}`,
-    },
-  }));
+  const textZones = (parsed.textZones || []).map((zone: any, idx: number) => {
+    const rawType = String(zone.type || '').toLowerCase();
+    const labelLower = String(zone.label || '').toLowerCase();
+    const isDate = rawType === 'date' || /date|calendar|dob|anniversary/i.test(labelLower);
+    const isTime = rawType === 'time' || /time|clock|am|pm/i.test(labelLower);
+    const finalType: 'text' | 'date' | 'time' | 'calendar' = isDate ? 'date' : isTime ? 'time' : 'text';
+
+    return {
+      id: `text-ai-${Date.now().toString(36)}-${idx + 1}`,
+      label: zone.label || `Text Zone #${idx + 1}`,
+      defaultValue: zone.defaultValue || '',
+      x: Number(zone.x) || 50,
+      y: Number(zone.y) || 70,
+      maxWidth: Number(zone.maxWidth) || 80,
+      fontSize: Number(zone.fontSize) || 24,
+      fontFamily: zone.fontFamily || 'Playfair Display',
+      color: zone.color || '#160E4B',
+      align: (zone.align as 'left' | 'center' | 'right') || 'center',
+      type: finalType,
+      isCalendar: finalType === 'calendar',
+      confidence: Number(zone.confidence) || 0.92,
+      detectedReason: zone.detectedReason || 'AI text baseline recognition',
+      selected: true,
+      visibility: {
+        ...DEFAULT_VISIBILITY,
+        userVisible: true,
+        userEditable: true,
+        required: true,
+        userLabel: zone.label || `Enter Text #${idx + 1}`,
+      },
+    };
+  });
 
   return {
     photoSlots,
@@ -397,7 +420,7 @@ export async function runClientVisionDetection(
     candidateZones.push({
       id: `text-cv-${Date.now().toString(36)}-1`,
       label: isBaby ? 'Baby Name' : isCouple ? 'Couple Names' : 'Main Title / Name',
-      defaultValue: isBaby ? 'Aarav' : isCouple ? 'Rahul & Priya' : 'Personalized Name',
+      defaultValue: isBaby ? 'Baby Name' : isCouple ? 'Couple Names' : 'Personalized Name',
       x: 50,
       y: yPct,
       maxWidth: 80,
@@ -411,6 +434,9 @@ export async function runClientVisionDetection(
       selected: true,
       visibility: {
         ...DEFAULT_VISIBILITY,
+        userVisible: true,
+        userEditable: true,
+        required: true,
         userLabel: isBaby ? 'Baby Name' : isCouple ? 'Couple Names' : 'Main Name',
       },
     });
@@ -421,7 +447,7 @@ export async function runClientVisionDetection(
     candidateZones.push({
       id: `text-cv-${Date.now().toString(36)}-2`,
       label: 'Special Date / Calendar',
-      defaultValue: '14 August 2024',
+      defaultValue: 'Date / Calendar',
       x: 50,
       y: yPct,
       maxWidth: 70,
@@ -429,14 +455,17 @@ export async function runClientVisionDetection(
       fontFamily: 'Jost',
       color: '#3B82F6',
       align: 'center',
-      type: 'calendar',
+      type: 'date',
       isCalendar: true,
       confidence: 0.88,
-      detectedReason: `Date/calendar baseline detected at vertical position ${yPct}%`,
+      detectedReason: `Date baseline detected at vertical position ${yPct}%`,
       selected: true,
       visibility: {
         ...DEFAULT_VISIBILITY,
-        userLabel: 'Special Date (Calendar)',
+        userVisible: true,
+        userEditable: true,
+        required: true,
+        userLabel: 'Special Date',
       },
     });
   }
@@ -446,7 +475,7 @@ export async function runClientVisionDetection(
     candidateZones.push({
       id: `text-cv-${Date.now().toString(36)}-3`,
       label: isBaby ? 'Birth Details (Weight, Time)' : 'Personal Message / Quote',
-      defaultValue: isBaby ? '08:45 AM | 3.2 Kg' : 'Together Forever & Always',
+      defaultValue: isBaby ? 'Birth Details' : 'Personal Message',
       x: 50,
       y: yPct,
       maxWidth: 85,
@@ -460,8 +489,10 @@ export async function runClientVisionDetection(
       selected: true,
       visibility: {
         ...DEFAULT_VISIBILITY,
-        userLabel: isBaby ? 'Birth Details' : 'Message / Quote',
+        userVisible: true,
+        userEditable: true,
         required: false,
+        userLabel: isBaby ? 'Birth Details' : 'Message / Quote',
       },
     });
   }
@@ -484,6 +515,9 @@ export async function runClientVisionDetection(
       selected: true,
       visibility: {
         ...DEFAULT_VISIBILITY,
+        userVisible: true,
+        userEditable: true,
+        required: true,
         userLabel: 'Title / Names',
       },
     });
@@ -499,17 +533,15 @@ export async function runClientVisionDetection(
 
 /**
  * Universal Unified AI Detection Entry Point:
- * Automatically uses Gemini Vision if an API key is available (in env, params, or localStorage),
- * otherwise runs high-accuracy client-side Computer Vision.
+ * Automatically uses Gemini Vision (powered by the guaranteed default key, env, or localStorage)
+ * with multi-model fallback, and smoothly falls back to Computer Vision if offline.
  */
 export async function runAIDetectionOnImage(
   imageSource: string | HTMLImageElement,
   categoryHint?: string,
   apiKeyOverride?: string
 ): Promise<AIDetectionResult> {
-  const envKey = (import.meta.env.VITE_GEMINI_API_KEY as string) || '';
-  const storedKey = typeof window !== 'undefined' ? localStorage.getItem('A1PRINT_GEMINI_API_KEY') || '' : '';
-  const effectiveKey = (apiKeyOverride || storedKey || envKey).trim();
+  const effectiveKey = (apiKeyOverride || getActiveGeminiApiKey()).trim();
 
   if (effectiveKey) {
     try {

@@ -176,10 +176,28 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
   onProceedToCheckout,
 }) => {
   const [photoValues, setPhotoValues] = useState<Record<string, string>>({});
-  const [textValues, setTextValues] = useState<Record<string, string>>({});
+  const [textValues, setTextValues] = useState<Record<string, string>>(() => {
+    const init: Record<string, string> = {};
+    (template.textZones || []).forEach((zone) => {
+      if (zone.defaultValue) {
+        init[zone.id] = zone.defaultValue;
+      }
+    });
+    return init;
+  });
   const [fontValues, setFontValues] = useState<Record<string, string>>({});
   const [validationError, setValidationError] = useState<string | null>(null);
   const [selectedSize, setSelectedSize] = useState<string>('A4 (8x12 in)');
+
+  useEffect(() => {
+    const init: Record<string, string> = {};
+    (template.textZones || []).forEach((zone) => {
+      if (zone.defaultValue) {
+        init[zone.id] = zone.defaultValue;
+      }
+    });
+    setTextValues((prev) => ({ ...init, ...prev }));
+  }, [template.id]);
 
   const FONT_OPTIONS = [
     'Playfair Display',
@@ -740,18 +758,6 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                 </h4>
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {!visibleTextZones.some((z) => {
-                    const l = (z.label || '').toLowerCase();
-                    const i = (z.id || '').toLowerCase();
-                    return z.isCalendar || z.type === 'calendar' || z.type === 'date' || l.includes('date') || l.includes('dob') || i.includes('date');
-                  }) && (
-                    <DatePickerControl
-                      label="Special Birthday Date (Calendar ❤️)"
-                      value={textValues['specialDate'] || '14 Feb 2026'}
-                      onChange={(val) => setTextValues({ ...textValues, specialDate: val })}
-                    />
-                  )}
-
                   {visibleTextZones.map((zone) => {
                     const vis = resolveVisibility(zone.visibility);
                     const displayLabel = vis.userLabel || zone.label;

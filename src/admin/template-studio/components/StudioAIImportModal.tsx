@@ -16,7 +16,7 @@ import {
   Heart,
   Image as ImageIcon
 } from 'lucide-react';
-import { runAIDetectionOnImage, AIDetectionResult } from '../utils/aiDetectionPipeline';
+import { runAIDetectionOnImage, AIDetectionResult, getActiveGeminiApiKey } from '../utils/aiDetectionPipeline';
 import { uploadCategoryImage } from '../../../config/firebase';
 import { PhotoSlotConfig, TextZoneConfig, FrameCutoutShape } from '../../../types/template';
 
@@ -28,18 +28,17 @@ interface StudioAIImportModalProps {
     baseImageUrl: string;
     photoSlots: PhotoSlotConfig[];
     textZones: TextZoneConfig[];
-    originalUploadUrl?: string;
-    aiConfidenceRecord: Record<string, number>;
+    dimensions?: { width: number; height: number };
   }) => void;
 }
 
-const SHAPES: { value: FrameCutoutShape; label: string; icon: string }[] = [
-  { value: 'circle', label: 'Circle', icon: '⭕' },
-  { value: 'arch', label: 'Arch Window', icon: '🚪' },
-  { value: 'rounded', label: 'Rounded Rect', icon: '🔲' },
-  { value: 'rectangle', label: 'Sharp Rect', icon: '▭' },
-  { value: 'oval', label: 'Oval', icon: '⬭' },
-  { value: 'heart', label: 'Heart', icon: '❤️' },
+const SHAPES: { label: string; value: FrameCutoutShape; icon: string }[] = [
+  { label: 'Circle', value: 'circle', icon: '⭕' },
+  { label: 'Arch Window', value: 'arch', icon: '🏛️' },
+  { label: 'Rounded Rect', value: 'rounded', icon: '🔲' },
+  { label: 'Sharp Rect', value: 'rectangle', icon: '⏹️' },
+  { label: 'Oval', value: 'oval', icon: '🥚' },
+  { label: 'Heart', value: 'heart', icon: '❤️' },
 ];
 
 export const StudioAIImportModal: React.FC<StudioAIImportModalProps> = ({
@@ -48,32 +47,28 @@ export const StudioAIImportModal: React.FC<StudioAIImportModalProps> = ({
   category,
   onApplyCandidates,
 }) => {
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const imageContainerRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageContainerRef = useRef<HTMLDivElement>(null);
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string>('');
-  const [isScanning, setIsScanning] = useState<boolean>(false);
-  const [detectionResult, setDetectionResult] = useState<AIDetectionResult | null>(null);
+  const [isScanning, setIsScanning] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isUploading, setIsUploading] = useState<boolean>(false);
 
-  // Interaction tool
-  const [activeTool, setActiveTool] = useState<'select' | 'draw-slot' | 'draw-text'>('select');
+  // Inspector & Tool State
+  const [activeTool, setActiveTool] = useState<'select' | 'draw-slot'>('select');
   const [selectedItem, setSelectedItem] = useState<{ type: 'slot' | 'zone'; id: string } | null>(null);
+  const [detectionResult, setDetectionResult] = useState<AIDetectionResult | null>(null);
 
   // Manual Drag-to-Draw State
   const [isDrawing, setIsDrawing] = useState(false);
   const [drawStart, setDrawStart] = useState<{ xPct: number; yPct: number } | null>(null);
   const [currentDraw, setCurrentDraw] = useState<{ xPct: number; yPct: number } | null>(null);
 
-  // Optional Gemini API Key
+  // Gemini API Key (Defaults to guaranteed working key)
   const [apiKey, setApiKey] = useState<string>(() => {
-    const envKey = (import.meta.env.VITE_GEMINI_API_KEY as string) || '';
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('A1PRINT_GEMINI_API_KEY') || envKey;
-    }
-    return envKey;
+    return getActiveGeminiApiKey();
   });
   const [showKeyInput, setShowKeyInput] = useState<boolean>(false);
 
@@ -84,6 +79,28 @@ export const StudioAIImportModal: React.FC<StudioAIImportModalProps> = ({
   }, [apiKey]);
 
   if (!isOpen) return null;
+
+  const handleStartScanWithUrl = async (imgUrl: string) => {
+    if (!imgUrl) return;
+
+    setIsScanning(true);
+    setError(null);
+    try {
+      const activeKey = apiKey || getActiveGeminiApiKey();
+      const result = await runAIDetectionOnImage(imgUrl, category, activeKey);
+      setDetectionResult(result);
+      if (result.photoSlots.length > 0) {
+        setSelectedItem({ type: 'slot', id: result.photoSlots[0].id });
+      } else if (result.textZones.length > 0) {
+        setSelectedItem({ type: 'zone', id: result.textZones[0].id });
+      }
+    } catch (err: any) {
+      console.error('AI Scan error:', err);
+      setError(err?.message || 'Failed to scan image. Try clicking a Smart Preset or use manual placement.');
+    } finally {
+      setIsScanning(false);
+    }
+  };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -97,7 +114,10 @@ export const StudioAIImportModal: React.FC<StudioAIImportModalProps> = ({
     const reader = new FileReader();
     reader.onload = () => {
       if (typeof reader.result === 'string') {
-        setImagePreviewUrl(reader.result);
+        const preview = reader.result;
+        setImagePreviewUrl(preview);
+        // Automatically trigger AI analysis on upload!
+        handleStartScanWithUrl(preview);
       }
     };
     reader.readAsDataURL(file);
@@ -306,25 +326,30 @@ export const StudioAIImportModal: React.FC<StudioAIImportModalProps> = ({
     }
   };
 
-  const handleStartScan = async () => {
-    if (!imagePreviewUrl) return;
-
-    setIsScanning(true);
-    setError(null);
-    try {
-      const result = await runAIDetectionOnImage(imagePreviewUrl, category, apiKey);
-      setDetectionResult(result);
-      if (result.photoSlots.length > 0) {
-        setSelectedItem({ type: 'slot', id: result.photoSlots[0].id });
-      } else if (result.textZones.length > 0) {
-        setSelectedItem({ type: 'zone', id: result.textZones[0].id });
-      }
-    } catch (err: any) {
-      console.error('AI Scan error:', err);
-      setError(err?.message || 'Failed to scan image. Try clicking a Smart Preset or use manual placement.');
-    } finally {
-      setIsScanning(false);
+  const handleStartScan = () => {
+    if (imagePreviewUrl) {
+      handleStartScanWithUrl(imagePreviewUrl);
     }
+  };
+
+  const handleUpdateZoneLabel = (id: string, label: string) => {
+    setDetectionResult((prev) => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        textZones: prev.textZones.map((z) => (z.id === id ? { ...z, label } : z)),
+      };
+    });
+  };
+
+  const handleUpdateZoneDefault = (id: string, defaultValue: string) => {
+    setDetectionResult((prev) => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        textZones: prev.textZones.map((z) => (z.id === id ? { ...z, defaultValue } : z)),
+      };
+    });
   };
 
   const getContainerPct = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -749,6 +774,22 @@ export const StudioAIImportModal: React.FC<StudioAIImportModalProps> = ({
                       className="absolute border-2 border-dashed border-emerald-400 bg-emerald-500/20 pointer-events-none"
                     />
                   )}
+
+                  {/* Active Scanning Animation Overlay */}
+                  {isScanning && (
+                    <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-xs flex flex-col items-center justify-center gap-3 z-30 animate-in fade-in">
+                      <div className="relative">
+                        <div className="w-16 h-16 rounded-full border-4 border-pink-500/20 border-t-pink-500 animate-spin" />
+                        <Sparkles className="w-7 h-7 text-pink-400 absolute inset-0 m-auto animate-pulse" />
+                      </div>
+                      <div className="text-center px-4">
+                        <p className="text-sm font-extrabold text-white">Gemini Vision AI Analyzing Artwork...</p>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          Detecting photo cutouts, baby portrait rings, names, dates, times, and weight badges
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Right Side: Simple Inspector & Layer List */}
@@ -784,12 +825,46 @@ export const StudioAIImportModal: React.FC<StudioAIImportModalProps> = ({
                     </div>
                   )}
 
+                  {activeSelectedZone && (
+                    <div className="p-3.5 rounded-2xl bg-slate-950 border border-purple-500/40 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-purple-300">Selected Text Field</span>
+                        <button
+                          onClick={() => handleDeleteItem('zone', activeSelectedZone.id)}
+                          className="p-1 text-rose-400 hover:text-rose-200"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Field Label</label>
+                        <input
+                          type="text"
+                          value={activeSelectedZone.label}
+                          onChange={(e) => handleUpdateZoneLabel(activeSelectedZone.id, e.target.value)}
+                          className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-xs text-white focus:outline-hidden focus:border-purple-500"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Detected Value (Default)</label>
+                        <input
+                          type="text"
+                          value={activeSelectedZone.defaultValue}
+                          onChange={(e) => handleUpdateZoneDefault(activeSelectedZone.id, e.target.value)}
+                          className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-xs text-pink-300 font-bold focus:outline-hidden focus:border-purple-500"
+                        />
+                      </div>
+                    </div>
+                  )}
+
                   {/* Layers Summary List */}
                   {detectionResult && (
                     <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-2 max-h-[300px] overflow-y-auto">
                       <div className="text-xs font-extrabold text-slate-300 flex items-center justify-between">
                         <span>Extracted Layers</span>
-                        <span className="text-[10px] text-pink-400">
+                        <span className="text-[10px] text-pink-400 font-extrabold">
                           {detectionResult.photoSlots.length} Slots • {detectionResult.textZones.length} Texts
                         </span>
                       </div>
@@ -798,13 +873,23 @@ export const StudioAIImportModal: React.FC<StudioAIImportModalProps> = ({
                         <div
                           key={slot.id}
                           onClick={() => setSelectedItem({ type: 'slot', id: slot.id })}
-                          className={`p-2 rounded-xl border text-xs font-bold flex items-center justify-between cursor-pointer ${
+                          className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-between cursor-pointer transition-all ${
                             selectedItem?.id === slot.id
                               ? 'border-cyan-400 bg-cyan-950/40 text-cyan-200'
-                              : 'border-slate-800 bg-slate-900 text-slate-300'
+                              : 'border-slate-800 bg-slate-900/90 text-slate-300 hover:border-slate-700'
                           }`}
                         >
-                          <span className="truncate">📷 {slot.label} ({slot.shape})</span>
+                          <div className="flex flex-col min-w-0 pr-1">
+                            <span className="truncate text-slate-400 text-[10px] font-extrabold uppercase tracking-wider">
+                              Photo Cutout
+                            </span>
+                            <span className="truncate text-cyan-300 font-extrabold text-xs">
+                              📷 {slot.label}
+                            </span>
+                          </div>
+                          <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-md bg-cyan-900/60 border border-cyan-700/50 text-cyan-300 uppercase shrink-0">
+                            {slot.shape}
+                          </span>
                         </div>
                       ))}
 
@@ -812,13 +897,23 @@ export const StudioAIImportModal: React.FC<StudioAIImportModalProps> = ({
                         <div
                           key={zone.id}
                           onClick={() => setSelectedItem({ type: 'zone', id: zone.id })}
-                          className={`p-2 rounded-xl border text-xs font-bold flex items-center justify-between cursor-pointer ${
+                          className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-between gap-2 cursor-pointer transition-all ${
                             selectedItem?.id === zone.id
                               ? 'border-purple-400 bg-purple-950/40 text-purple-200'
-                              : 'border-slate-800 bg-slate-900 text-slate-300'
+                              : 'border-slate-800 bg-slate-900/90 text-slate-300 hover:border-slate-700'
                           }`}
                         >
-                          <span className="truncate">✏️ {zone.defaultValue || zone.label}</span>
+                          <div className="flex flex-col min-w-0 pr-1">
+                            <span className="truncate text-slate-400 text-[10px] font-extrabold uppercase tracking-wider">
+                              {zone.label}
+                            </span>
+                            <span className="truncate text-white font-extrabold text-xs">
+                              {zone.defaultValue || '(Blank)'}
+                            </span>
+                          </div>
+                          <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-md bg-purple-900/60 border border-purple-700/50 text-purple-300 uppercase shrink-0">
+                            {zone.type}
+                          </span>
                         </div>
                       ))}
                     </div>
