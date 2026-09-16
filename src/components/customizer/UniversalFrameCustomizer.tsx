@@ -176,27 +176,13 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
   onProceedToCheckout,
 }) => {
   const [photoValues, setPhotoValues] = useState<Record<string, string>>({});
-  const [textValues, setTextValues] = useState<Record<string, string>>(() => {
-    const init: Record<string, string> = {};
-    (template.textZones || []).forEach((zone) => {
-      if (zone.defaultValue) {
-        init[zone.id] = zone.defaultValue;
-      }
-    });
-    return init;
-  });
+  const [textValues, setTextValues] = useState<Record<string, string>>({});
   const [fontValues, setFontValues] = useState<Record<string, string>>({});
   const [validationError, setValidationError] = useState<string | null>(null);
   const [selectedSize, setSelectedSize] = useState<string>('A4 (8x12 in)');
 
   useEffect(() => {
-    const init: Record<string, string> = {};
-    (template.textZones || []).forEach((zone) => {
-      if (zone.defaultValue) {
-        init[zone.id] = zone.defaultValue;
-      }
-    });
-    setTextValues((prev) => ({ ...init, ...prev }));
+    setTextValues({});
   }, [template.id]);
 
   const FONT_OPTIONS = [
@@ -517,9 +503,11 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
               {/* Dynamic Text Zones Overlay using Saved Coordinates */}
               {textZones.map((zone) => {
                 const customVal = textValues[zone.id];
-                // Only render when the customer has customized this text!
-                // Otherwise let the designer's original, sharp Photoshop typography show through!
-                if (!customVal || customVal.trim() === '') return null;
+                // Only render when the customer has entered a new custom value!
+                // If not edited, let the designer's original, sharp Photoshop typography show through directly!
+                if (!customVal || customVal.trim() === '' || customVal.trim() === (zone.defaultValue || '').trim()) {
+                  return null;
+                }
 
                 const isCalendarGrid = zone.type === 'calendar_grid';
                 if (isCalendarGrid) {
@@ -551,12 +539,13 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                     }}
                   >
                     <span
-                      className="px-2 py-0.5 rounded-sm bg-white/95 shadow-sm border border-gray-200/60 backdrop-blur-xs font-bold inline-block"
+                      className="inline-block font-bold select-none bg-transparent leading-tight"
                       style={{
                         color: zone.color || '#160E4B',
                         fontFamily: zone.fontFamily || 'serif',
-                        fontSize: 'clamp(9px, 2.5vw, 15px)',
+                        fontSize: 'clamp(9px, 2.5vw, 16px)',
                         textAlign: (zone.align as any) || 'center',
+                        textShadow: '0 1px 2px rgba(255,255,255,0.7)',
                       }}
                     >
                       {customVal}
@@ -1021,7 +1010,9 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
 
                   {textZones.map((zone) => {
                     const customVal = textValues[zone.id];
-                    if (!customVal || customVal.trim() === '') return null;
+                    if (!customVal || customVal.trim() === '' || customVal.trim() === (zone.defaultValue || '').trim()) {
+                      return null;
+                    }
 
                     const isCalendarGrid = zone.type === 'calendar_grid';
 
@@ -1047,7 +1038,7 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                     return (
                       <div
                         key={zone.id}
-                        className="absolute transform -translate-x-1/2 -translate-y-1/2 whitespace-pre-wrap leading-tight text-center"
+                        className="absolute transform -translate-x-1/2 -translate-y-1/2 whitespace-pre-wrap leading-tight text-center pointer-events-none select-none"
                         style={{
                           left: `${zone.x}%`,
                           top: `${zone.y}%`,
@@ -1055,12 +1046,13 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                         }}
                       >
                         <span
-                          className="px-2 py-0.5 rounded-sm bg-white/95 shadow-sm border border-gray-200/60 backdrop-blur-xs font-bold inline-block"
+                          className="inline-block font-bold select-none bg-transparent leading-tight"
                           style={{
                             color: zone.color || '#160E4B',
                             fontFamily: zone.fontFamily || 'serif',
-                            fontSize: 'clamp(9px, 2.5vw, 15px)',
+                            fontSize: 'clamp(9px, 2.5vw, 16px)',
                             textAlign: (zone.align as any) || 'center',
+                            textShadow: '0 1px 2px rgba(255,255,255,0.7)',
                           }}
                         >
                           {customVal}
