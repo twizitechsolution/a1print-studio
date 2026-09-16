@@ -306,9 +306,14 @@ export async function parsePSDFileBinary(file: File): Promise<PSDImportResult> {
       const cropApertureThumbnail = (l: number, t: number, w: number, h: number): string => {
         if (!psd.canvas || typeof document === 'undefined') return '';
         try {
+          const maxDim = 200;
+          const scale = Math.min(1, maxDim / Math.max(w, h, 1));
+          const targetW = Math.max(1, Math.round(w * scale));
+          const targetH = Math.max(1, Math.round(h * scale));
+
           const c = document.createElement('canvas');
-          c.width = Math.max(1, Math.round(w));
-          c.height = Math.max(1, Math.round(h));
+          c.width = targetW;
+          c.height = targetH;
           const cCtx = c.getContext('2d');
           if (cCtx) {
             cCtx.drawImage(
@@ -319,10 +324,10 @@ export async function parsePSDFileBinary(file: File): Promise<PSDImportResult> {
               Math.max(1, Math.round(h)),
               0,
               0,
-              c.width,
-              c.height
+              targetW,
+              targetH
             );
-            return c.toDataURL('image/png');
+            return c.toDataURL('image/jpeg', 0.75);
           }
         } catch (cropErr) {
           console.warn('Aperture crop notice:', cropErr);

@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { PhotoSlotConfig, TextZoneConfig, StaticLayerConfig } from '../../../types/template';
 import { parsePSDFileBinary } from '../utils/psdParser';
-import { uploadCategoryImage } from '../../../config/firebase';
+import { uploadCategoryImage, uploadProductImage, base64ToBlob } from '../../../config/firebase';
 import { ArrowLeft, Upload, FileText, CheckCircle2, AlertCircle, Loader2, Sparkles, Layers } from 'lucide-react';
 
 interface NewFrameWizardProps {
@@ -98,10 +98,28 @@ export const NewFrameWizard: React.FC<NewFrameWizardProps> = ({
       const parsedResult = await parsePSDFileBinary(selectedFile);
       setParseStep(`Found ${parsedResult.detectedLayerCount} layer(s). Preparing base canvas...`);
 
-      // 2. Upload PSD file or generate preview
+      // 2. Upload high-resolution composite preview to Cloudinary CDN
       let baseImageUrl = parsedResult.compositePreviewUrl || '';
       let originalUploadUrl: string | undefined = undefined;
 
+      if (parsedResult.compositePreviewUrl && parsedResult.compositePreviewUrl.startsWith('data:image')) {
+        try {
+          setParseStep('Uploading high-resolution poster artwork to Cloudinary CDN...');
+          const posterBlob = base64ToBlob(parsedResult.compositePreviewUrl);
+          const uploadedPosterUrl = await uploadProductImage(
+            `frame-${Date.now()}`,
+            posterBlob,
+            'poster.jpg'
+          );
+          if (uploadedPosterUrl) {
+            baseImageUrl = uploadedPosterUrl;
+          }
+        } catch (uploadPosterErr) {
+          console.warn('Poster Cloudinary upload warning, using local preview in editor:', uploadPosterErr);
+        }
+      }
+
+      // 3. Upload PSD asset to Cloudinary storage (non-blocking)
       try {
         setParseStep('Uploading PSD asset to Cloudinary storage...');
         originalUploadUrl = await uploadCategoryImage(category, selectedFile, `psd-${Date.now()}`);

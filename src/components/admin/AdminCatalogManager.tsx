@@ -267,6 +267,8 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
                   (product.baseImageUrl && !product.baseImageUrl.includes('[COMPRESSED_FIRESTORE_PREVIEW]') && product.baseImageUrl.length > 50 ? product.baseImageUrl : null) ||
                   (product.thumbnail && !product.thumbnail.includes('[COMPRESSED_FIRESTORE_PREVIEW]') && product.thumbnail.length > 50 ? product.thumbnail : null) ||
                   (product.images && product.images[0] && product.images[0].length > 50 ? product.images[0] : null) ||
+                  ((product as any).templateConfig?.cleanBaseImageUrl && (product as any).templateConfig.cleanBaseImageUrl.length > 50 ? (product as any).templateConfig.cleanBaseImageUrl : null) ||
+                  ((product as any).templateConfig?.baseImageUrl && (product as any).templateConfig.baseImageUrl.length > 50 ? (product as any).templateConfig.baseImageUrl : null) ||
                   'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80';
                 const priceVal = (product as any).price || (product.sizes && product.sizes[0] ? product.sizes[0].price : 699);
                 const origVal = product.sizes && product.sizes[0] ? product.sizes[0].originalPrice : null;

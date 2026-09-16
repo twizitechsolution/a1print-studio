@@ -211,6 +211,10 @@ export const AdminProductListingModal: React.FC<AdminProductListingModalProps> =
         'Pre-fitted Wall Mount Hooks',
       ],
       linkedFrameTemplateId: linkedFrameTemplateId || undefined,
+      photoSlots: detectedPhotoSlots.length > 0 ? detectedPhotoSlots : (availableTemplates.find((t) => t.id === linkedFrameTemplateId)?.photoSlots || []),
+      textZones: detectedTextZones.length > 0 ? detectedTextZones : (availableTemplates.find((t) => t.id === linkedFrameTemplateId)?.textZones || []),
+      ...(availableTemplates.find((t) => t.id === linkedFrameTemplateId) ? { templateConfig: availableTemplates.find((t) => t.id === linkedFrameTemplateId) } : {}),
+      image: defaultImg,
       sizes: [
         {
           id: 'size-a4',
@@ -238,8 +242,6 @@ export const AdminProductListingModal: React.FC<AdminProductListingModalProps> =
           borderColorClass: 'border-black',
         },
       ],
-      photoSlots: detectedPhotoSlots,
-      textZones: detectedTextZones,
       allowedPaymentModes,
       isDeleted: false,
       updatedAt: new Date().toISOString(),

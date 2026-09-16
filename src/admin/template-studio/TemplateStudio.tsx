@@ -11,7 +11,7 @@ import { StudioAIImportModal } from './components/StudioAIImportModal';
 import { StudioPSDImportModal } from './components/StudioPSDImportModal';
 import { createNewTemplate, createDefaultSlot, createDefaultTextZone, resolveVisibility } from './utils/templateDefaults';
 import { generateCleanBaseImage } from '../../utils/cleanBaseGenerator';
-import { firebaseCloudDb } from '../../config/firebase';
+import { firebaseCloudDb, base64ToBlob, uploadProductImage } from '../../config/firebase';
 import { useCartStore } from '../../store/useCartStore';
 import { UniversalFrameCustomizer } from '../../components/customizer/UniversalFrameCustomizer';
 import { CheckCircle2, AlertCircle, Link2, X, Grid } from 'lucide-react';
@@ -376,11 +376,51 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
     setIsSaving(true);
     setSaveMessage(null);
     try {
-      const cleanBase = template.baseImageUrl || template.cleanBaseImageUrl;
+      let cleanBase = template.cleanBaseImageUrl || template.baseImageUrl || '';
+
+      // CRITICAL GUARANTEE: If cleanBase is a Base64 data URI (e.g. offline/fallback),
+      // upload it directly to Cloudinary now so Firestore never strips it to empty string!
+      if (cleanBase && cleanBase.startsWith('data:image')) {
+        setSaveMessage({
+          text: 'Uploading poster artwork to Cloudinary CDN...',
+          type: 'info',
+        });
+        try {
+          const blob = base64ToBlob(cleanBase);
+          const uploadedUrl = await uploadProductImage(
+            template.id,
+            blob,
+            `poster-${Date.now()}.jpg`
+          );
+          if (uploadedUrl) {
+            cleanBase = uploadedUrl;
+            setTemplate((prev) => ({
+              ...prev,
+              baseImageUrl: uploadedUrl,
+              cleanBaseImageUrl: uploadedUrl,
+            }));
+          }
+        } catch (uploadErr) {
+          console.error('Failed to upload base image to Cloudinary during save:', uploadErr);
+        }
+      }
+
+      // Safeguard slot thumbnails so they never exceed Firestore quota (< 100KB)
+      const sanitizedPhotoSlots = (template.photoSlots || []).map((slot) => {
+        if (slot.defaultPhotoUrl && slot.defaultPhotoUrl.startsWith('data:image') && slot.defaultPhotoUrl.length > 100000) {
+          return {
+            ...slot,
+            defaultPhotoUrl: 'https://images.unsplash.com/photo-1519689680058-324335c77eba?auto=format&fit=crop&q=80&w=600',
+          };
+        }
+        return slot;
+      });
 
       const templateToSave: UniversalFrameTemplate = {
         ...template,
+        baseImageUrl: cleanBase,
         cleanBaseImageUrl: cleanBase,
+        photoSlots: sanitizedPhotoSlots,
         status: template.status || 'published',
         category: template.category || 'baby-birth-frame',
         createdAt: template.createdAt || new Date().toISOString(),
@@ -391,9 +431,12 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
 
       // 2. If linked to a product, sync to products collection and store
       if (templateToSave.productId) {
-        const productUpdate = {
+        const productUpdate: any = {
           linkedFrameTemplateId: templateToSave.id,
-          baseImageUrl: templateToSave.cleanBaseImageUrl || templateToSave.baseImageUrl,
+          baseImageUrl: cleanBase,
+          thumbnail: cleanBase,
+          image: cleanBase,
+          images: [cleanBase],
           photoSlots: templateToSave.photoSlots,
           textZones: templateToSave.textZones,
           templateConfig: templateToSave,

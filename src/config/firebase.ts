@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
-import { getFirestore, collection, getDocs, doc, setDoc, deleteDoc, onSnapshot, enableMultiTabIndexedDbPersistence } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, getDoc, doc, setDoc, deleteDoc, onSnapshot, enableMultiTabIndexedDbPersistence } from 'firebase/firestore';
 
 export const FIREBASE_CONFIG = {
   apiKey: "AIzaSyBmyIAGv2y7UVqrIIOhQdllnrEOwJ8Purk",
@@ -383,6 +383,39 @@ export const firebaseCloudDb = {
 
     // Secondary Fallback: Direct 100ms HTTP REST fetch
     return await fetchViaRest();
+  },
+
+  // Read a single document by ID with REST fallback
+  async getDocument<T = any>(collectionName: string, docId: string): Promise<T | null> {
+    try {
+      const docRef = doc(firebaseDb, collectionName, docId);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data && data.jsonPayload) {
+          try {
+            return JSON.parse(data.jsonPayload) as T;
+          } catch (e) {
+            return { id: docSnap.id, ...data } as T;
+          }
+        }
+        return { id: docSnap.id, ...data } as T;
+      }
+    } catch (sdkErr) {
+      console.warn('Firestore SDK getDocument error, attempting REST fallback:', sdkErr);
+    }
+
+    try {
+      const res = await fetch(`${FIRESTORE_BASE_URL}/${collectionName}/${docId}?${REST_AUTH_PARAM}`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (data.error || !data.fields) return null;
+      const parsed = parseFirestoreRestFields(data.fields);
+      if (parsed) parsed.id = docId;
+      return parsed as T;
+    } catch (e) {
+      return null;
+    }
   },
 
   // Write a document using official Firebase JS Firestore SDK
