@@ -314,9 +314,12 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
   const [cropModalOpen, setCropModalOpen] = useState<boolean>(false);
   const [activeSlotId, setActiveSlotId] = useState<string | null>(null);
   const [tempUploadedImage, setTempUploadedImage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const rawPhotoSlots = template.photoSlots || [];
-  const rawTextZones = template.textZones || [];
+  const photoSlots = template.photoSlots || [];
+  const textZones = template.textZones || [];
+  const rawPhotoSlots = photoSlots;
+  const rawTextZones = textZones;
 
   // Phase 4: Enforce LayerVisibility
   // Admin layers with userVisible === false are hidden from the customer's customization controls
@@ -527,7 +530,7 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                       }}
                     >
                       <InteractiveCalendarZone
-                        value={val}
+                        dateString={val}
                         color={zone.color || '#160E4B'}
                       />
                     </div>
@@ -541,7 +544,7 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                     style={{
                       left: `${zone.x}%`,
                       top: `${zone.y}%`,
-                      width: zone.width ? `${zone.width}%` : 'auto',
+                      width: (zone as any).maxWidth ? `${(zone as any).maxWidth}%` : 'auto',
                       color: zone.color || '#160E4B',
                       fontFamily: zone.fontFamily,
                       fontSize: `${zone.fontSize * 0.75}px`,

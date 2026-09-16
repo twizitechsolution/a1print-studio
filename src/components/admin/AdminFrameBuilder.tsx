@@ -445,6 +445,8 @@ export const AdminFrameBuilder: React.FC<AdminFrameBuilderProps> = ({ onSaveTemp
                         onChange={(e) =>
                           setTextZones(textZones.map((t) => (t.id === zone.id ? { ...t, y: Number(e.target.value) } : t)))
                         }
+                      />
+                    </div>
                     <div>
                       <span>Field Type:</span>
                       <select
