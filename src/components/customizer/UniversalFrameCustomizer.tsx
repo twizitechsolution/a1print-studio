@@ -472,11 +472,12 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
             {/* Interactive Main Frame Template Canvas (Synthetic Black Wood Frame + Photo Slots + Text Zones Overlay) */}
             <div 
               id="live-frame-canvas"
-              className={`relative w-full rounded-xs border-[12px] sm:border-[16px] border-black shadow-[0_25px_60px_rgba(0,0,0,0.6)] bg-white overflow-hidden font-serif select-none transition-all ${
-                ((template.product as any)?.orientation || (template as any).orientation) === 'landscape'
-                  ? 'max-w-[480px] aspect-[4/3]'
-                  : 'max-w-[340px] aspect-[3/4.4]'
-              }`}
+              className="relative w-full rounded-xs border-[12px] sm:border-[16px] border-black shadow-[0_25px_60px_rgba(0,0,0,0.6)] bg-white overflow-hidden font-serif select-none transition-all max-w-[360px]"
+              style={{
+                aspectRatio: template.documentDimensions?.width && template.documentDimensions?.height
+                  ? `${template.documentDimensions.width} / ${template.documentDimensions.height}`
+                  : ((template.product as any)?.orientation || (template as any).orientation) === 'landscape' ? '4 / 3' : '4 / 5',
+              }}
             >
               {/* Base Frame Poster Image with Bulletproof Fallback & onError Guard */}
               <img
@@ -515,11 +516,13 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
 
               {/* Dynamic Text Zones Overlay using Saved Coordinates */}
               {textZones.map((zone) => {
-                const val = textValues[zone.id] || zone.defaultValue;
-                const isCalendarZone = zone.type === 'calendar' || zone.isCalendar === true;
+                const customVal = textValues[zone.id];
+                // Only render when the customer has customized this text!
+                // Otherwise let the designer's original, sharp Photoshop typography show through!
+                if (!customVal || customVal.trim() === '') return null;
 
-                // Render Interactive Calendar Grid with Red Heart Highlight if zone is calendar or date type
-                if (isCalendarZone) {
+                const isCalendarGrid = zone.type === 'calendar_grid';
+                if (isCalendarGrid) {
                   return (
                     <div
                       key={zone.id}
@@ -530,7 +533,7 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                       }}
                     >
                       <InteractiveCalendarZone
-                        dateString={val}
+                        dateString={customVal}
                         color={zone.color || '#160E4B'}
                       />
                     </div>
@@ -540,19 +543,24 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                 return (
                   <div
                     key={zone.id}
-                    className="absolute transform -translate-x-1/2 -translate-y-1/2 pointer-events-none select-none tracking-tight whitespace-pre-wrap leading-tight"
+                    className="absolute transform -translate-x-1/2 -translate-y-1/2 pointer-events-none select-none tracking-tight whitespace-pre-wrap leading-tight text-center"
                     style={{
                       left: `${zone.x}%`,
                       top: `${zone.y}%`,
-                      width: (zone as any).maxWidth ? `${(zone as any).maxWidth}%` : 'auto',
-                      color: zone.color || '#160E4B',
-                      fontFamily: zone.fontFamily,
-                      fontSize: `${zone.fontSize * 0.75}px`,
-                      fontWeight: 'bold',
-                      textAlign: zone.align || 'center',
+                      maxWidth: (zone as any).maxWidth ? `${(zone as any).maxWidth}%` : '85%',
                     }}
                   >
-                    {val}
+                    <span
+                      className="px-2 py-0.5 rounded-sm bg-white/95 shadow-sm border border-gray-200/60 backdrop-blur-xs font-bold inline-block"
+                      style={{
+                        color: zone.color || '#160E4B',
+                        fontFamily: zone.fontFamily || 'serif',
+                        fontSize: 'clamp(9px, 2.5vw, 15px)',
+                        textAlign: (zone.align as any) || 'center',
+                      }}
+                    >
+                      {customVal}
+                    </span>
                   </div>
                 );
               })}
@@ -962,7 +970,12 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
 
             {/* High-Res Canvas Container */}
             <div 
-              className="relative w-full max-w-[340px] aspect-[3/4.4] rounded-xs border-8 border-black shadow-2xl bg-white overflow-hidden select-none font-serif flex items-center justify-center"
+              className="relative w-full max-w-[360px] rounded-xs border-8 border-black shadow-2xl bg-white overflow-hidden select-none font-serif flex items-center justify-center"
+              style={{
+                aspectRatio: template.documentDimensions?.width && template.documentDimensions?.height
+                  ? `${template.documentDimensions.width} / ${template.documentDimensions.height}`
+                  : ((template.product as any)?.orientation || (template as any).orientation) === 'landscape' ? '4 / 3' : '4 / 5',
+              }}
             >
               {isLoadingPreview ? (
                 <div className="flex flex-col items-center justify-center p-8 space-y-3">
@@ -1007,15 +1020,12 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                   })}
 
                   {textZones.map((zone) => {
-                    const val = textValues[zone.id] || zone.defaultValue;
+                    const customVal = textValues[zone.id];
+                    if (!customVal || customVal.trim() === '') return null;
 
-                    const labelLower = (zone.label || '').toLowerCase();
-                    const idLower = (zone.id || '').toLowerCase();
-                    const valLower = (zone.defaultValue || '').toLowerCase();
+                    const isCalendarGrid = zone.type === 'calendar_grid';
 
-                    const isCalendarZone = zone.type === 'calendar' || zone.isCalendar === true;
-
-                    if (isCalendarZone) {
+                    if (isCalendarGrid) {
                       return (
                         <div
                           key={zone.id}
@@ -1026,7 +1036,7 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                           }}
                         >
                           <InteractiveCalendarZone
-                            dateString={val}
+                            dateString={customVal}
                             color={zone.color}
                             fontFamily={zone.fontFamily}
                           />
@@ -1037,20 +1047,24 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                     return (
                       <div
                         key={zone.id}
-                        className="absolute transform -translate-x-1/2 -translate-y-1/2 whitespace-pre-wrap break-words leading-tight"
+                        className="absolute transform -translate-x-1/2 -translate-y-1/2 whitespace-pre-wrap leading-tight text-center"
                         style={{
                           left: `${zone.x}%`,
                           top: `${zone.y}%`,
-                          width: zone.maxWidth ? `${zone.maxWidth}%` : '85%',
-                          maxWidth: zone.maxWidth ? `${zone.maxWidth}%` : '85%',
-                          color: zone.color,
-                          fontFamily: zone.fontFamily,
-                          fontSize: `${zone.fontSize * 0.7}px`,
-                          fontWeight: 'bold',
-                          textAlign: zone.align || 'center',
+                          maxWidth: (zone as any).maxWidth ? `${(zone as any).maxWidth}%` : '85%',
                         }}
                       >
-                        {val}
+                        <span
+                          className="px-2 py-0.5 rounded-sm bg-white/95 shadow-sm border border-gray-200/60 backdrop-blur-xs font-bold inline-block"
+                          style={{
+                            color: zone.color || '#160E4B',
+                            fontFamily: zone.fontFamily || 'serif',
+                            fontSize: 'clamp(9px, 2.5vw, 15px)',
+                            textAlign: (zone.align as any) || 'center',
+                          }}
+                        >
+                          {customVal}
+                        </span>
                       </div>
                     );
                   })}

@@ -244,14 +244,15 @@ export async function parsePSDFileBinary(file: File): Promise<PSDImportResult> {
           const cleanText = rawText.replace(/\r?\n/g, ' ');
 
           // Infer calendar / date type
-          const isDateOrCalendar =
+          const isCalendarGrid = /calendar_grid|calendar_table|date_grid|month_grid/i.test(layerName);
+          const isDateOrTime =
             /calendar|date|month|year|birth|dob|milestone|time/i.test(layerName) ||
             /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})\b/i.test(cleanText);
 
           // Extract styling if available
           const textStyle = layer.text.style || {};
-          const fontSize = textStyle.fontSize ? Math.round(textStyle.fontSize) : (isDateOrCalendar ? 18 : 26);
-          const fontFamily = textStyle.font?.name || (isDateOrCalendar ? 'Jost' : 'Playfair Display');
+          const fontSize = textStyle.fontSize ? Math.round(textStyle.fontSize) : (isDateOrTime ? 18 : 26);
+          const fontFamily = textStyle.font?.name || (isDateOrTime ? 'Jost' : 'Playfair Display');
           const color = textStyle.fillColor ? rgbToHex(textStyle.fillColor) : '#160E4B';
 
           textZones.push({
@@ -265,11 +266,11 @@ export async function parsePSDFileBinary(file: File): Promise<PSDImportResult> {
             fontFamily,
             color,
             align: 'center',
-            type: isDateOrCalendar ? 'calendar' : 'text',
-            isCalendar: isDateOrCalendar,
+            type: isCalendarGrid ? 'calendar' : (isDateOrTime ? 'date' : 'text'),
+            isCalendar: isCalendarGrid,
             visibility: {
               ...DEFAULT_VISIBILITY,
-              userLabel: isDateOrCalendar ? 'Milestone Date' : layerName.replace(/[_-]/g, ' '),
+              userLabel: isDateOrTime ? (layerName.includes('time') || cleanText.includes(':') ? 'Birth Time' : 'Milestone Date') : layerName.replace(/[_-]/g, ' '),
             },
             sourceLayerName: layerName,
           });
