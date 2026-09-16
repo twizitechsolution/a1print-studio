@@ -33,13 +33,28 @@ export const ProductFrameDisplay: React.FC<ProductFrameDisplayProps> = ({
   const isDarkPoster = product.id.includes('brother-sister') || product.id.includes('dad') || product.id.includes('dark');
   const isLandscape = (product as any)?.orientation === 'landscape';
 
+  // Determine if this product has a complete pre-rendered PSD poster artwork
+  const isPsdTemplate = Boolean(
+    product.linkedFrameTemplateId ||
+    (product as any).templateConfig ||
+    (product.baseImageUrl && product.baseImageUrl.includes('cloudinary.com'))
+  );
+
+  const hasCustomPhotos = Object.keys(customPhotoValues).length > 0;
+  const hasCustomTexts = Object.keys(customTextValues).length > 0;
+
+  // Dynamic aspect ratio from template document dimensions if available
+  const docDims = (product as any)?.documentDimensions || (product as any)?.templateConfig?.documentDimensions;
+  const customAspectRatio = docDims && docDims.width && docDims.height ? `${docDims.width}/${docDims.height}` : undefined;
+
   return (
     <div
       className={`relative w-full rounded-xs border-4 sm:border-8 border-black shadow-xl overflow-hidden font-serif select-none transition-all ${
-        isLandscape ? 'aspect-[4/3]' : 'aspect-[3/4.4]'
+        !customAspectRatio ? (isLandscape ? 'aspect-[4/3]' : 'aspect-[3/4.4]') : ''
       } ${
         isDarkPoster ? 'bg-black text-white' : 'bg-white text-gray-900'
       } ${className}`}
+      style={customAspectRatio ? { aspectRatio: customAspectRatio } : undefined}
     >
       {/* 1. Master Base Frame Poster Image Background */}
       {masterFrameImgSrc && (
@@ -57,9 +72,9 @@ export const ProductFrameDisplay: React.FC<ProductFrameDisplayProps> = ({
         />
       )}
 
-      {/* 2. Customer Uploaded Photos (or slot cutout placeholders) */}
+      {/* 2. Customer Uploaded Photos (Only render when customer uploaded a photo, or if not a pre-rendered PSD template) */}
       {photoSlots.map((slot) => {
-        const photoSrc = customPhotoValues[slot.id] || slot.defaultPhotoUrl;
+        const photoSrc = customPhotoValues[slot.id] || (!isPsdTemplate ? slot.defaultPhotoUrl : null);
         if (!photoSrc) return null;
         const shapeStyles = getFrameShapeStyles(slot.shape);
 
@@ -85,9 +100,9 @@ export const ProductFrameDisplay: React.FC<ProductFrameDisplayProps> = ({
         );
       })}
 
-      {/* 3. Dynamic Text Zones Overlay (Renders custom user text OR product default sample text!) */}
+      {/* 3. Dynamic Text Zones Overlay (Only render when customer typed custom text, or if not a pre-rendered PSD template) */}
       {textZones.map((zone) => {
-        const val = customTextValues[zone.id] || zone.defaultValue;
+        const val = customTextValues[zone.id] || (!isPsdTemplate ? zone.defaultValue : null);
         if (!val) return null;
 
         const labelLower = (zone.label || '').toLowerCase();

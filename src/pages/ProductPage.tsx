@@ -100,6 +100,36 @@ export const ProductPage: React.FC<ProductPageProps> = ({
     setTimeout(() => setReviewSubmitted(false), 4000);
   };
 
+  // Safe sizes & frames fallbacks so product.sizes is never undefined
+  const safeSizes = (product.sizes && product.sizes.length > 0) ? product.sizes : [
+    {
+      id: 'size-a4',
+      name: 'A4 Size (8 x 12 in)',
+      dimensions: '8 x 12 inches',
+      price: (product as any).price || 699,
+      originalPrice: (product as any).originalPrice || 999,
+      discountPercentage: 30,
+    },
+    {
+      id: 'size-a3',
+      name: 'A3 Size (12 x 18 in)',
+      dimensions: '12 x 18 inches',
+      price: Math.round(((product as any).price || 699) * 1.4),
+      originalPrice: Math.round(((product as any).originalPrice || 999) * 1.4),
+      discountPercentage: 30,
+    },
+  ];
+
+  const safeFrames = (product.frames && product.frames.length > 0) ? product.frames : [
+    {
+      id: 'frame-black',
+      name: 'Solid Synthetic Black Wood',
+      borderStyle: 'solid',
+      frameColor: '#000000',
+      borderColorClass: 'border-black',
+    },
+  ];
+
   // Construct dynamic template from linked frame template or saved product
   const cleanBase = linkedTemplate?.cleanBaseImageUrl || (product as any)?.cleanBaseImageUrl;
   const baseImg = cleanBase ||
@@ -111,16 +141,21 @@ export const ProductPage: React.FC<ProductPageProps> = ({
   const currentTemplate: UniversalFrameTemplate = {
     id: linkedTemplate?.id || (product.linkedFrameTemplateId || `tmpl-${product.id}`),
     productId: product.id,
-    title: linkedTemplate?.title || product.title,
-    category: linkedTemplate?.category || product.category,
-    basePrice: product.sizes[0]?.price || 699,
-    originalPrice: product.sizes[0]?.originalPrice || 999,
+    title: linkedTemplate?.title || product.title || 'Custom Memory Frame',
+    category: linkedTemplate?.category || product.category || 'baby-birth-frame',
+    basePrice: safeSizes[0]?.price || 699,
+    originalPrice: safeSizes[0]?.originalPrice || 999,
     baseImageUrl: baseImg,
     cleanBaseImageUrl: cleanBase,
     photoSlots: (linkedTemplate?.photoSlots && linkedTemplate.photoSlots.length > 0) ? linkedTemplate.photoSlots : (product.photoSlots || []),
     textZones: (linkedTemplate?.textZones && linkedTemplate.textZones.length > 0) ? linkedTemplate.textZones : (product.textZones || []),
-    images: (product as any).angleImages || product.images || [],
-    product: product,
+    images: (product as any).angleImages || product.images || (baseImg ? [baseImg] : []),
+    product: {
+      ...product,
+      sizes: safeSizes,
+      frames: safeFrames,
+    },
+    documentDimensions: linkedTemplate?.documentDimensions || (product as any)?.documentDimensions,
     createdAt: linkedTemplate?.createdAt || new Date().toISOString(),
   };
 
@@ -131,9 +166,9 @@ export const ProductPage: React.FC<ProductPageProps> = ({
       <nav className="text-xs text-gray-500 font-bold flex items-center gap-1.5">
         <button onClick={() => onNavigate('home')} className="hover:text-[#F82BA9]">Home</button>
         <ChevronRight className="w-3 h-3 text-gray-400" />
-        <button onClick={() => onNavigate('catalog')} className="hover:text-[#F82BA9]">{product.categoryLabel}</button>
+        <button onClick={() => onNavigate('catalog')} className="hover:text-[#F82BA9]">{product.categoryLabel || 'Custom Frame'}</button>
         <ChevronRight className="w-3 h-3 text-gray-400" />
-        <span className="text-gray-900 font-extrabold truncate max-w-xs sm:max-w-md">{product.title}</span>
+        <span className="text-gray-900 font-extrabold truncate max-w-xs sm:max-w-md">{product.title || 'Custom Frame'}</span>
       </nav>
 
       {/* Main Interactive Universal Customizer Workspace */}

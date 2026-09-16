@@ -14,10 +14,10 @@ export const LiveFrameCustomizer: React.FC<LiveFrameCustomizerProps> = ({
   onDirectCheckout,
 }) => {
   const [selectedSize, setSelectedSize] = useState<FrameSize>(
-    product.sizes.find((s) => s.isPopular) || product.sizes[0]
+    product.sizes?.find((s) => s.isPopular) || product.sizes?.[0] || { id: 'size-a4', name: 'A4', price: 699, dimensions: '8x12 in', originalPrice: 999, discountPercentage: 30 }
   );
   const [selectedFrame, setSelectedFrame] = useState<FrameOption>(
-    product.frameOptions[0]
+    product.frameOptions?.[0] || { id: 'frame-black', name: 'Black Wood', frameColor: '#000000', borderStyle: 'solid', borderColorClass: 'border-black' }
   );
 
   const [uploadedPhoto, setUploadedPhoto] = useState<string | null>(null);
