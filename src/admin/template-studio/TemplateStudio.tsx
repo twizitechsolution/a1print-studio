@@ -376,14 +376,7 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
     setIsSaving(true);
     setSaveMessage(null);
     try {
-      let cleanBase = template.cleanBaseImageUrl;
-      if (!cleanBase && template.baseImageUrl) {
-        try {
-          cleanBase = await generateCleanBaseImage(template.baseImageUrl, template.photoSlots, template.textZones);
-        } catch (e) {
-          cleanBase = template.baseImageUrl;
-        }
-      }
+      const cleanBase = template.baseImageUrl || template.cleanBaseImageUrl;
 
       const templateToSave: UniversalFrameTemplate = {
         ...template,
@@ -439,18 +432,8 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
   const activeSlot = selectedLayer?.type === 'slot' ? template.photoSlots.find((s) => s.id === selectedLayer.id) || null : null;
   const activeZone = selectedLayer?.type === 'zone' ? template.textZones.find((z) => z.id === selectedLayer.id) || null : null;
 
-  const handleTogglePreviewMode = async () => {
-    const nextMode = previewMode === 'cutout' ? 'sample' : 'cutout';
-    setPreviewMode(nextMode);
-
-    if (nextMode === 'cutout' && !template.cleanBaseImageUrl && template.baseImageUrl) {
-      try {
-        const clean = await generateCleanBaseImage(template.baseImageUrl, template.photoSlots, template.textZones);
-        setTemplate((prev) => ({ ...prev, cleanBaseImageUrl: clean }));
-      } catch (e) {
-        console.warn('On-demand clean base generation warning:', e);
-      }
-    }
+  const handleTogglePreviewMode = () => {
+    setPreviewMode((prev) => (prev === 'cutout' ? 'sample' : 'cutout'));
   };
 
   // STEP 1: FRAME LIBRARY VIEW
@@ -495,15 +478,9 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
       <div className="relative">
         <NewFrameWizard
           onBack={() => setCurrentView('library')}
-          onComplete={async ({ title, category, photoSlots, textZones, staticLayers, baseImageUrl, originalUploadUrl }) => {
+          onComplete={async ({ title, category, photoSlots, textZones, staticLayers, baseImageUrl, originalUploadUrl, documentDimensions }) => {
             const uniqueId = `tmpl-${Date.now()}`;
-            let cleanBase = baseImageUrl;
-            try {
-              cleanBase = await generateCleanBaseImage(baseImageUrl, photoSlots, textZones);
-            } catch (e) {
-              console.warn('Clean base generation on wizard complete:', e);
-            }
-
+            // For PSD templates, preserve the pure, crystal-clear artwork directly from Photoshop!
             const newTemplate: UniversalFrameTemplate = {
               id: uniqueId,
               productId: `PRD-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -512,7 +489,7 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
               basePrice: 699,
               originalPrice: 999,
               baseImageUrl,
-              cleanBaseImageUrl: cleanBase,
+              cleanBaseImageUrl: baseImageUrl,
               originalUploadUrl,
               photoSlots,
               textZones,
@@ -520,6 +497,7 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
               createdAt: new Date().toISOString(),
               status: 'draft',
               importSource: 'psd',
+              documentDimensions,
             };
 
             setTemplate(newTemplate);

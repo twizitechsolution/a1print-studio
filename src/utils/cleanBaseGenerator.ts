@@ -170,53 +170,12 @@ function inpaintRegion(
  */
 export async function generateCleanBaseImage(
   baseImageUrl: string,
-  photoSlots: PhotoSlotConfig[],
-  textZones: TextZoneConfig[]
+  _photoSlots: PhotoSlotConfig[] = [],
+  _textZones: TextZoneConfig[] = []
 ): Promise<string> {
-  const baseImg = await loadImage(baseImageUrl);
-  const canvas = document.createElement('canvas');
-  canvas.width = baseImg.naturalWidth || 1200;
-  canvas.height = baseImg.naturalHeight || 1760;
-
-  const ctx = canvas.getContext('2d', { willReadFrequently: true });
-  if (!ctx) throw new Error('Failed to create canvas context for clean base');
-
-  // Draw full original base image
-  ctx.drawImage(baseImg, 0, 0, canvas.width, canvas.height);
-
-  // Read pixel data for inpainting analysis
-  const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-
-  // 1. Inpaint/clear each TextZone to permanently remove original text
-  for (const zone of textZones) {
-    const cx = (zone.x / 100) * canvas.width;
-    const cy = (zone.y / 100) * canvas.height;
-    const estimatedWidth = ((zone.maxWidth || 50) / 100) * canvas.width;
-    const estimatedHeight = Math.max((zone.fontSize || 24) * (canvas.width / 500) * 1.8, canvas.height * 0.04);
-
-    const x = cx - estimatedWidth / 2;
-    const y = cy - estimatedHeight / 2;
-
-    inpaintRegion(ctx, imgData, x, y, estimatedWidth, estimatedHeight, canvas.width, canvas.height);
-  }
-
-  // 2. Mask photo slots with a clean neutral backdrop so underlying demo photos never peek through
-  for (const slot of photoSlots) {
-    const cx = (slot.x / 100) * canvas.width;
-    const cy = (slot.y / 100) * canvas.height;
-    const sw = (slot.width / 100) * canvas.width;
-    const sh = (slot.height / 100) * canvas.height;
-
-    ctx.save();
-    applyShapeClip(ctx, slot.shape, cx, cy, sw, sh);
-    ctx.clip();
-    // Fill slot with clean neutral canvas background so old demo photo is 100% removed
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(cx - sw / 2, cy - sh / 2, sw, sh);
-    ctx.restore();
-  }
-
-  return canvas.toDataURL('image/png', 0.95);
+  // Never destroy the artwork with crude opaque inpaint boxes.
+  // The baseImageUrl itself is the pristine canvas artwork.
+  return baseImageUrl;
 }
 
 /**

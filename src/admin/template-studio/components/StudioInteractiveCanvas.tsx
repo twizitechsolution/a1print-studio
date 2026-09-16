@@ -103,10 +103,11 @@ export const StudioInteractiveCanvas: React.FC<StudioInteractiveCanvasProps> = (
 
   // Pre-load images into state
   useEffect(() => {
-    const activeBase = template.cleanBaseImageUrl || template.baseImageUrl;
+    const activeBase = template.baseImageUrl || template.cleanBaseImageUrl;
     const urlsToLoad = [
       activeBase,
       template.baseImageUrl,
+      template.cleanBaseImageUrl,
       ...template.photoSlots.map((s) => s.defaultPhotoUrl).filter(Boolean) as string[],
     ].filter(Boolean);
 
@@ -143,7 +144,7 @@ export const StudioInteractiveCanvas: React.FC<StudioInteractiveCanvasProps> = (
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
     // 2. Base Poster Artwork (Rendered Cleanly & Pristine)
-    const activeBaseUrl = template.cleanBaseImageUrl || template.baseImageUrl;
+    const activeBaseUrl = template.baseImageUrl || template.cleanBaseImageUrl;
     const baseImg = cachedImages[activeBaseUrl] || cachedImages[template.baseImageUrl];
     if (baseImg) {
       ctx.drawImage(baseImg, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
