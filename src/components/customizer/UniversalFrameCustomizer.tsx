@@ -263,7 +263,21 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
   // Active Angle Image state for multi-angle photo gallery switching
   const [activeAngleImage, setActiveAngleImage] = useState<string | null>(null);
 
-  const baseImg = template.cleanBaseImageUrl || template.baseImageUrl || 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80';
+  const samplePreviewImg =
+    template.baseImageUrl ||
+    template.cleanBaseImageUrl ||
+    'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80';
+
+  const cleanArtworkImg =
+    template.cleanBaseImageUrl ||
+    template.baseImageUrl ||
+    'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80';
+
+  const hasCustomPhotos = Object.values(photoValues).some((v) => Boolean(v && v.trim() !== ''));
+  const hasCustomTexts = Object.values(textValues).some((v) => Boolean(v && v.trim() !== ''));
+  const isCustomized = hasCustomPhotos || hasCustomTexts;
+
+  const baseImg = isCustomized ? cleanArtworkImg : samplePreviewImg;
   const rawAngleImages = 
     (template as any).images || 
     (template as any).angleImages || 
@@ -271,9 +285,9 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
     (template as any).product?.angleImages || 
     [];
   
-  // Uploader 1 (baseImg) MUST ALWAYS be Position 1 (Default Main View), followed by Uploader 2 gallery photos!
+  // Uploader 1 (samplePreviewImg) MUST ALWAYS be Position 1 (Default Main View), followed by Uploader 2 gallery photos!
   const availableAngleImages: string[] = Array.from(
-    new Set([baseImg, ...(Array.isArray(rawAngleImages) ? rawAngleImages.filter(Boolean) : [])])
+    new Set([samplePreviewImg, ...(Array.isArray(rawAngleImages) ? rawAngleImages.filter(Boolean) : [])])
   );
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState<boolean>(false);
   const [compiledPreviewUrl, setCompiledPreviewUrl] = useState<string | null>(null);
@@ -529,94 +543,99 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                 }}
               />
 
-              {/* Dynamic Photo Slot Cutouts Overlay - True Layered Web-to-Print */}
-              {photoSlots.map((slot) => {
-                const photoSrc = photoValues[slot.id] || slot.defaultPhotoUrl;
-                if (!photoSrc) return null;
+              {/* Only render dynamic overlays when user has started customizing! When uncustomized, the sample composite image from PSD already shows the complete pristine artwork! */}
+              {isCustomized && (
+                <>
+                  {/* Dynamic Photo Slot Cutouts Overlay - True Layered Web-to-Print */}
+                  {photoSlots.map((slot) => {
+                    const photoSrc = photoValues[slot.id] || slot.defaultPhotoUrl;
+                    if (!photoSrc) return null;
 
-                const shapeStyles = getFrameShapeStyles(slot.shape);
+                    const shapeStyles = getFrameShapeStyles(slot.shape);
 
-                return (
-                  <div
-                    key={slot.id}
-                    className="absolute overflow-hidden p-0 border-0 shadow-xs bg-transparent"
-                    style={{
-                      left: `${slot.x}%`,
-                      top: `${slot.y}%`,
-                      width: `${slot.width}%`,
-                      height: `${slot.height}%`,
-                      transform: 'translate(-50%, -50%)',
-                      ...shapeStyles,
-                    }}
-                  >
-                    <img src={photoSrc} alt={slot.label} className="w-full h-full object-cover rounded-[inherit]" />
-                  </div>
-                );
-              })}
+                    return (
+                      <div
+                        key={slot.id}
+                        className="absolute overflow-hidden p-0 border-0 shadow-xs bg-transparent"
+                        style={{
+                          left: `${slot.x}%`,
+                          top: `${slot.y}%`,
+                          width: `${slot.width}%`,
+                          height: `${slot.height}%`,
+                          transform: 'translate(-50%, -50%)',
+                          ...shapeStyles,
+                        }}
+                      >
+                        <img src={photoSrc} alt={slot.label} className="w-full h-full object-cover rounded-[inherit]" />
+                      </div>
+                    );
+                  })}
 
-              {/* Dynamic Text Zones Overlay - True Layered Web-to-Print */}
-              {textZones.map((zone) => {
-                const vis = resolveVisibility(zone.visibility);
-                // Skip static designer captions already present in the background artwork
-                if (zone.visibility && vis.userVisible === false) {
-                  return null;
-                }
+                  {/* Dynamic Text Zones Overlay - True Layered Web-to-Print */}
+                  {textZones.map((zone) => {
+                    const vis = resolveVisibility(zone.visibility);
+                    // Skip static designer captions already present in the background artwork
+                    if (zone.visibility && vis.userVisible === false) {
+                      return null;
+                    }
 
-                const customVal = textValues[zone.id];
-                const textToDisplay = (customVal !== undefined && customVal.trim() !== '')
-                  ? customVal
-                  : (zone.defaultValue || '');
+                    const customVal = textValues[zone.id];
+                    const textToDisplay = (customVal !== undefined && customVal.trim() !== '')
+                      ? customVal
+                      : (zone.defaultValue || '');
 
-                if (!textToDisplay || textToDisplay.trim() === '') {
-                  return null;
-                }
+                    if (!textToDisplay || textToDisplay.trim() === '') {
+                      return null;
+                    }
 
-                const isCalendarGrid = zone.type === 'calendar_grid' || zone.isCalendar === true;
-                if (isCalendarGrid) {
-                  return (
-                    <div
-                      key={zone.id}
-                      className="absolute transform -translate-x-1/2 -translate-y-1/2"
-                      style={{
-                        left: `${zone.x}%`,
-                        top: `${zone.y}%`,
-                      }}
-                    >
-                      <InteractiveCalendarZone
-                        dateString={textToDisplay}
-                        color={zone.color || '#160E4B'}
-                      />
-                    </div>
-                  );
-                }
+                    const isCalendarGrid = zone.type === 'calendar_grid' || zone.isCalendar === true;
+                    if (isCalendarGrid) {
+                      return (
+                        <div
+                          key={zone.id}
+                          className="absolute transform -translate-x-1/2 -translate-y-1/2"
+                          style={{
+                            left: `${zone.x}%`,
+                            top: `${zone.y}%`,
+                          }}
+                        >
+                          <InteractiveCalendarZone
+                            dateString={textToDisplay}
+                            color={zone.color || '#160E4B'}
+                          />
+                        </div>
+                      );
+                    }
 
-                const resolvedFont = resolvePSDWebFont(zone.fontFamily);
-                const resolvedSize = resolveResponsiveFontSize(zone);
+                    const resolvedFont = resolvePSDWebFont(zone.fontFamily);
+                    const resolvedSize = resolveResponsiveFontSize(zone);
 
-                return (
-                  <div
-                    key={zone.id}
-                    className="absolute transform -translate-x-1/2 -translate-y-1/2 pointer-events-none select-none tracking-tight whitespace-pre-wrap leading-tight text-center"
-                    style={{
-                      left: `${zone.x}%`,
-                      top: `${zone.y}%`,
-                      maxWidth: (zone as any).maxWidth ? `${(zone as any).maxWidth}%` : '85%',
-                    }}
-                  >
-                    <span
-                      className="inline-block font-bold select-none bg-transparent leading-tight"
-                      style={{
-                        color: zone.color || '#160E4B',
-                        fontFamily: resolvedFont,
-                        fontSize: resolvedSize,
-                        textAlign: (zone.align as any) || 'center',
-                      }}
-                    >
-                      {textToDisplay}
-                    </span>
-                  </div>
-                );
-              })}
+                    return (
+                      <div
+                        key={zone.id}
+                        className="absolute transform -translate-x-1/2 -translate-y-1/2 pointer-events-none select-none tracking-tight whitespace-pre-wrap leading-tight text-center"
+                        style={{
+                          left: `${zone.x}%`,
+                          top: `${zone.y}%`,
+                          maxWidth: (zone as any).maxWidth ? `${(zone as any).maxWidth}%` : '85%',
+                        }}
+                      >
+                        <span
+                          className="inline-block font-bold select-none bg-transparent leading-tight"
+                          style={{
+                            color: zone.color || '#160E4B',
+                            fontFamily: resolvedFont,
+                            fontSize: resolvedSize,
+                            textAlign: (zone.align as any) || 'center',
+                          }}
+                        >
+                          {textToDisplay}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </>
+              )}
 
             </div>
           </div>
@@ -1053,88 +1072,92 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                     className="w-full h-full object-cover absolute inset-0 pointer-events-none"
                   />
 
-                  {photoSlots.map((slot) => {
-                    const photoSrc = photoValues[slot.id] || slot.defaultPhotoUrl;
-                    if (!photoSrc) return null;
-                    const shapeStyles = getFrameShapeStyles(slot.shape);
+                  {isCustomized && (
+                    <>
+                      {photoSlots.map((slot) => {
+                        const photoSrc = photoValues[slot.id] || slot.defaultPhotoUrl;
+                        if (!photoSrc) return null;
+                        const shapeStyles = getFrameShapeStyles(slot.shape);
 
-                    return (
-                      <div
-                        key={slot.id}
-                        className="absolute overflow-hidden p-0 border-0 bg-transparent"
-                        style={{
-                          left: `${slot.x}%`,
-                          top: `${slot.y}%`,
-                          width: `${slot.width}%`,
-                          height: `${slot.height}%`,
-                          transform: 'translate(-50%, -50%)',
-                          ...shapeStyles,
-                        }}
-                      >
-                        <img src={photoSrc} alt={slot.label} className="w-full h-full object-cover rounded-[inherit]" />
-                      </div>
-                    );
-                  })}
+                        return (
+                          <div
+                            key={slot.id}
+                            className="absolute overflow-hidden p-0 border-0 bg-transparent"
+                            style={{
+                              left: `${slot.x}%`,
+                              top: `${slot.y}%`,
+                              width: `${slot.width}%`,
+                              height: `${slot.height}%`,
+                              transform: 'translate(-50%, -50%)',
+                              ...shapeStyles,
+                            }}
+                          >
+                            <img src={photoSrc} alt={slot.label} className="w-full h-full object-cover rounded-[inherit]" />
+                          </div>
+                        );
+                      })}
 
-                  {textZones.map((zone) => {
-                    const vis = resolveVisibility(zone.visibility);
-                    if (zone.visibility && vis.userVisible === false) return null;
+                      {textZones.map((zone) => {
+                        const vis = resolveVisibility(zone.visibility);
+                        if (zone.visibility && vis.userVisible === false) return null;
 
-                    const customVal = textValues[zone.id];
-                    const textToDisplay = (customVal !== undefined && customVal.trim() !== '')
-                      ? customVal
-                      : (zone.defaultValue || '');
+                        const customVal = textValues[zone.id];
+                        const textToDisplay = (customVal !== undefined && customVal.trim() !== '')
+                          ? customVal
+                          : (zone.defaultValue || '');
 
-                    if (!textToDisplay || textToDisplay.trim() === '') return null;
+                        if (!textToDisplay || textToDisplay.trim() === '') return null;
 
-                    const isCalendarGrid = zone.type === 'calendar_grid' || zone.isCalendar === true;
+                        const isCalendarGrid = zone.type === 'calendar_grid' || zone.isCalendar === true;
 
-                    if (isCalendarGrid) {
-                      return (
-                        <div
-                          key={zone.id}
-                          className="absolute transform -translate-x-1/2 -translate-y-1/2"
-                          style={{
-                            left: `${zone.x}%`,
-                            top: `${zone.y}%`,
-                          }}
-                        >
-                          <InteractiveCalendarZone
-                            dateString={textToDisplay}
-                            color={zone.color}
-                            fontFamily={zone.fontFamily}
-                          />
-                        </div>
-                      );
-                    }
+                        if (isCalendarGrid) {
+                          return (
+                            <div
+                              key={zone.id}
+                              className="absolute transform -translate-x-1/2 -translate-y-1/2"
+                              style={{
+                                left: `${zone.x}%`,
+                                top: `${zone.y}%`,
+                              }}
+                            >
+                              <InteractiveCalendarZone
+                                dateString={textToDisplay}
+                                color={zone.color}
+                                fontFamily={zone.fontFamily}
+                              />
+                            </div>
+                          );
+                        }
 
-                    const resolvedFont = resolvePSDWebFont(zone.fontFamily);
-                    const resolvedSize = resolveResponsiveFontSize(zone);
+                        const resolvedFont = resolvePSDWebFont(zone.fontFamily);
+                        const resolvedSize = resolveResponsiveFontSize(zone);
 
-                    return (
-                      <div
-                        key={zone.id}
-                        className="absolute transform -translate-x-1/2 -translate-y-1/2 whitespace-pre-wrap leading-tight text-center pointer-events-none select-none"
-                        style={{
-                          left: `${zone.x}%`,
-                          top: `${zone.y}%`,
-                          maxWidth: (zone as any).maxWidth ? `${(zone as any).maxWidth}%` : '85%',
-                        }}
-                      >
-                        <span
-                          className="inline-block font-bold select-none bg-transparent leading-tight"
-                          style={{
-                            color: zone.color || '#160E4B',
-                            fontFamily: resolvedFont,
-                            fontSize: resolvedSize,
-                            textAlign: (zone.align as any) || 'center',
-                          }}
-                        >
-                          {textToDisplay}
-                        </span>
-                      </div>
-                    );
-                  })}
+                        return (
+                          <div
+                            key={zone.id}
+                            className="absolute transform -translate-x-1/2 -translate-y-1/2 whitespace-pre-wrap leading-tight text-center pointer-events-none select-none"
+                            style={{
+                              left: `${zone.x}%`,
+                              top: `${zone.y}%`,
+                              maxWidth: (zone as any).maxWidth ? `${(zone as any).maxWidth}%` : '85%',
+                            }}
+                          >
+                            <span
+                              className="inline-block font-bold select-none bg-transparent leading-tight"
+                              style={{
+                                color: zone.color || '#160E4B',
+                                fontFamily: resolvedFont,
+                                fontSize: resolvedSize,
+                                textAlign: (zone.align as any) || 'center',
+                              }}
+                            >
+                              {textToDisplay}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </>
+                  )}
                 </>
               )}
 
