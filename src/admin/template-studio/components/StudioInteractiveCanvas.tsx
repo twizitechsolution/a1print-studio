@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { UniversalFrameTemplate, PhotoSlotConfig, TextZoneConfig } from '../../../types/template';
 import { SelectedLayer, ResizeHandle } from '../types';
 import { getSlotBoundingBox, getTextZoneBoundingBox, hitTestHandles, clamp } from '../utils/canvasTransformMath';
+import { renderTemplateComposite } from '../../../utils/templateCompositor';
 
 interface StudioInteractiveCanvasProps {
   template: UniversalFrameTemplate;
@@ -130,74 +131,31 @@ export const StudioInteractiveCanvas: React.FC<StudioInteractiveCanvasProps> = (
 
   const { width: CANVAS_WIDTH, height: CANVAS_HEIGHT } = canvasDimensions;
 
-  // Main Clean Photoshop-Style Render Loop
+  const renderSeqRef = useRef<number>(0);
+
+  // Main Clean Photoshop-Style Render Loop powered by Unified Compositor Engine
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
 
-    ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    const seq = ++renderSeqRef.current;
 
-    // 1. Background Fill (Canvas Workspace)
-    ctx.fillStyle = '#1E293B';
-    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    renderTemplateComposite({
+      canvas,
+      template,
+      targetWidth: CANVAS_WIDTH,
+      targetHeight: CANVAS_HEIGHT,
+      drawFrameBorder: false,
+      mode: previewMode === 'sample' ? 'sample' : 'cutout',
+    }).then(() => {
+      if (seq !== renderSeqRef.current) return;
+      const activeCanvas = canvasRef.current;
+      if (!activeCanvas) return;
+      const ctx = activeCanvas.getContext('2d');
+      if (!ctx) return;
 
-    // 2. Base Poster Artwork (Rendered Cleanly & Pristine)
-    const activeBaseUrl = template.baseImageUrl || template.cleanBaseImageUrl;
-    const baseImg = cachedImages[activeBaseUrl] || cachedImages[template.baseImageUrl];
-    if (baseImg) {
-      ctx.drawImage(baseImg, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-    } else {
-      ctx.fillStyle = '#0F172A';
-      ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-      ctx.fillStyle = '#64748B';
-      ctx.font = 'bold 32px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('Artwork Poster Preview', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
-    }
-
-    // 3. Sample Mode Rendering (Only if previewMode is 'sample')
-    if (previewMode === 'sample') {
-      // Draw sample photos into apertures
-      template.photoSlots.forEach((slot) => {
-        const box = getSlotBoundingBox(slot, CANVAS_WIDTH, CANVAS_HEIGHT);
-        ctx.save();
-        clipShapePath(ctx, slot.shape, box.left, box.top, box.width, box.height);
-        ctx.clip();
-        const sampleImg = slot.defaultPhotoUrl ? cachedImages[slot.defaultPhotoUrl] : null;
-        if (sampleImg) {
-          ctx.drawImage(sampleImg, box.left, box.top, box.width, box.height);
-        } else {
-          ctx.fillStyle = 'rgba(248, 43, 169, 0.25)';
-          ctx.fillRect(box.left, box.top, box.width, box.height);
-        }
-        ctx.restore();
-      });
-
-      // Draw sample text typography
-      template.textZones.forEach((zone) => {
-        const cx = (zone.x / 100) * CANVAS_WIDTH;
-        const cy = (zone.y / 100) * CANVAS_HEIGHT;
-        const scaledSize = Math.round((zone.fontSize || 22) * 2.4);
-
-        ctx.save();
-        ctx.fillStyle = zone.color || '#160E4B';
-        ctx.font = `bold ${scaledSize}px ${zone.fontFamily || 'serif'}, sans-serif`;
-        ctx.textAlign = (zone.align as CanvasTextAlign) || 'center';
-        ctx.textBaseline = 'middle';
-
-        const displayText = zone.type === 'calendar' || zone.isCalendar
-          ? `🗓️ [${zone.defaultValue || '14 Aug 2024'}]`
-          : zone.defaultValue || zone.label;
-
-        ctx.fillText(displayText, cx, cy);
-        ctx.restore();
-      });
-    }
-
-    // 4. Optional Debug Wireframes: ONLY when explicitly toggled ON by admin
-    // Thin, unfilled outlines only — NEVER filled color blocks or center badges!
+      // 4. Optional Debug Wireframes: ONLY when explicitly toggled ON by admin
+      // Thin, unfilled outlines only — NEVER filled color blocks or center badges!
     if (showWireframes) {
       ctx.save();
       // Photo Slots Wireframes (Thin dashed cyan outline)
@@ -333,10 +291,12 @@ export const StudioInteractiveCanvas: React.FC<StudioInteractiveCanvasProps> = (
         ctx.restore();
       }
     }
+    }).catch((err) => {
+      console.warn('Compositor render error in template studio:', err);
+    });
   }, [
     template,
     selectedLayer,
-    cachedImages,
     CANVAS_WIDTH,
     CANVAS_HEIGHT,
     previewMode,

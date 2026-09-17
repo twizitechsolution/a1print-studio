@@ -8,6 +8,8 @@ import { getRandomBirthdayMessage } from '../../data/messageBank';
 import { DeliveryPincodeChecker } from '../cart/DeliveryPincodeChecker';
 import { getFrameShapeStyles } from '../../utils/shapeStyles';
 import { resolveVisibility } from '../../admin/template-studio/utils/templateDefaults';
+import { renderTemplateComposite } from '../../utils/templateCompositor';
+import { useCustomizerSessionStore } from '../../store/useCustomizerSessionStore';
 
 interface UniversalFrameCustomizerProps {
   template: UniversalFrameTemplate;
@@ -193,15 +195,43 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
   template,
   onProceedToCheckout,
 }) => {
-  const [photoValues, setPhotoValues] = useState<Record<string, string>>({});
-  const [textValues, setTextValues] = useState<Record<string, string>>({});
+  const {
+    photoValues,
+    textValues,
+    setTextValue,
+    setPhotoValue,
+    uploadCustomerPhoto,
+    selectedSize,
+    setSelectedSize,
+    initSession,
+  } = useCustomizerSessionStore();
+
+  const liveCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [fontValues, setFontValues] = useState<Record<string, string>>({});
   const [validationError, setValidationError] = useState<string | null>(null);
-  const [selectedSize, setSelectedSize] = useState<string>('A4 (8x12 in)');
 
   useEffect(() => {
-    setTextValues({});
+    initSession(template);
   }, [template.id]);
+
+  useEffect(() => {
+    let active = true;
+    if (liveCanvasRef.current) {
+      renderTemplateComposite({
+        canvas: liveCanvasRef.current,
+        template,
+        customerInputs: { photoValues, textValues },
+        targetWidth: 800,
+        targetHeight: 1100,
+        drawFrameBorder: false,
+      }).catch((err) => {
+        if (active) console.warn('Live canvas render error:', err);
+      });
+    }
+    return () => {
+      active = false;
+    };
+  }, [template, photoValues, textValues]);
 
   const FONT_OPTIONS = [
     'Playfair Display',
@@ -415,10 +445,10 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
   // Handle Crop Confirmation
   const handleCropAndSubmit = (croppedDataUrl: string) => {
     if (activeSlotId) {
-      setPhotoValues((prev) => ({
-        ...prev,
-        [activeSlotId]: croppedDataUrl,
-      }));
+      setPhotoValue(activeSlotId, croppedDataUrl);
+      uploadCustomerPhoto(activeSlotId, croppedDataUrl).catch((err) => {
+        console.warn('Background upload of customer photo to Cloudinary:', err);
+      });
     }
     setCropModalOpen(false);
     setTempUploadedImage(null);
@@ -456,19 +486,13 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
     setValidationError(null);
     setIsExportingCanvas(true);
     try {
-      let compiled = compiledPreviewUrl;
-      if (!compiled) {
-        compiled = await Promise.race([
-          generateHighResPrintFile(template, photoValues, textValues, 1200, 1760),
-          new Promise<string>((res) => setTimeout(() => res(''), 2500)),
-        ]);
-      }
+      const compiled = await generateHighResPrintFile(template, photoValues, textValues, 2400, 3520);
       setIsExportingCanvas(false);
       onProceedToCheckout(photoValues, textValues, selectedSize, compiled || template.cleanBaseImageUrl || template.baseImageUrl);
     } catch (err) {
       console.warn('Canvas export fallback:', err);
       setIsExportingCanvas(false);
-      onProceedToCheckout(photoValues, textValues, selectedSize, compiledPreviewUrl || template.cleanBaseImageUrl || template.baseImageUrl);
+      onProceedToCheckout(photoValues, textValues, selectedSize, template.cleanBaseImageUrl || template.baseImageUrl);
     }
   };
 
@@ -522,121 +546,20 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
               </span>
             </div>
 
-            {/* Interactive Main Frame Template Canvas (Synthetic Black Wood Frame + Photo Slots + Text Zones Overlay) */}
+            {/* Interactive Main Frame Template Canvas (Synthetic Black Wood Frame + Shared HTML5 Canvas Compositor) */}
             <div 
-              id="live-frame-canvas"
               className="relative w-full rounded-xs border-[12px] sm:border-[16px] border-black shadow-[0_25px_60px_rgba(0,0,0,0.6)] bg-white overflow-hidden font-serif select-none transition-all max-w-[360px]"
               style={{
-                containerType: 'inline-size',
                 aspectRatio: template.documentDimensions?.width && template.documentDimensions?.height
                   ? `${template.documentDimensions.width} / ${template.documentDimensions.height}`
                   : ((template.product as any)?.orientation || (template as any).orientation) === 'landscape' ? '4 / 3' : '4 / 5',
               }}
             >
-              {/* Base Frame Poster Image with Bulletproof Fallback & onError Guard */}
-              <img
-                src={baseImg}
-                alt={template.title}
-                className="w-full h-full object-cover absolute inset-0 pointer-events-none"
-                onError={(e) => {
-                  e.currentTarget.src = 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80';
-                }}
+              <canvas
+                id="live-frame-canvas"
+                ref={liveCanvasRef}
+                className="w-full h-full block object-contain"
               />
-
-              {/* Only render dynamic overlays when user has started customizing! When uncustomized, the sample composite image from PSD already shows the complete pristine artwork! */}
-              {isCustomized && (
-                <>
-                  {/* Dynamic Photo Slot Cutouts Overlay - True Layered Web-to-Print */}
-                  {photoSlots.map((slot) => {
-                    const photoSrc = photoValues[slot.id] || slot.defaultPhotoUrl;
-                    if (!photoSrc) return null;
-
-                    const shapeStyles = getFrameShapeStyles(slot.shape);
-
-                    return (
-                      <div
-                        key={slot.id}
-                        className="absolute overflow-hidden p-0 border-0 shadow-xs bg-transparent"
-                        style={{
-                          left: `${slot.x}%`,
-                          top: `${slot.y}%`,
-                          width: `${slot.width}%`,
-                          height: `${slot.height}%`,
-                          transform: 'translate(-50%, -50%)',
-                          ...shapeStyles,
-                        }}
-                      >
-                        <img src={photoSrc} alt={slot.label} className="w-full h-full object-cover rounded-[inherit]" />
-                      </div>
-                    );
-                  })}
-
-                  {/* Dynamic Text Zones Overlay - True Layered Web-to-Print */}
-                  {textZones.map((zone) => {
-                    const vis = resolveVisibility(zone.visibility);
-                    // Skip static designer captions already present in the background artwork
-                    if (zone.visibility && vis.userVisible === false) {
-                      return null;
-                    }
-
-                    const customVal = textValues[zone.id];
-                    const textToDisplay = (customVal !== undefined && customVal.trim() !== '')
-                      ? customVal
-                      : (zone.defaultValue || '');
-
-                    if (!textToDisplay || textToDisplay.trim() === '') {
-                      return null;
-                    }
-
-                    const isCalendarGrid = zone.type === 'calendar_grid' || zone.isCalendar === true;
-                    if (isCalendarGrid) {
-                      return (
-                        <div
-                          key={zone.id}
-                          className="absolute transform -translate-x-1/2 -translate-y-1/2"
-                          style={{
-                            left: `${zone.x}%`,
-                            top: `${zone.y}%`,
-                          }}
-                        >
-                          <InteractiveCalendarZone
-                            dateString={textToDisplay}
-                            color={zone.color || '#160E4B'}
-                          />
-                        </div>
-                      );
-                    }
-
-                    const resolvedFont = resolvePSDWebFont(zone.fontFamily);
-                    const resolvedSize = resolveResponsiveFontSize(zone);
-
-                    return (
-                      <div
-                        key={zone.id}
-                        className="absolute transform -translate-x-1/2 -translate-y-1/2 pointer-events-none select-none tracking-tight whitespace-pre-wrap leading-tight text-center"
-                        style={{
-                          left: `${zone.x}%`,
-                          top: `${zone.y}%`,
-                          maxWidth: (zone as any).maxWidth ? `${(zone as any).maxWidth}%` : '85%',
-                        }}
-                      >
-                        <span
-                          className="inline-block font-bold select-none bg-transparent leading-tight"
-                          style={{
-                            color: zone.color || '#160E4B',
-                            fontFamily: resolvedFont,
-                            fontSize: resolvedSize,
-                            textAlign: (zone.align as any) || 'center',
-                          }}
-                        >
-                          {textToDisplay}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </>
-              )}
-
             </div>
           </div>
         )}
@@ -860,7 +783,7 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                           <DatePickerControl
                             label={`${displayLabel}${vis.required ? ' *' : ''}`}
                             value={textValues[zone.id] !== undefined ? textValues[zone.id] : (zone.defaultValue || '')}
-                            onChange={(val) => isEditable && setTextValues({ ...textValues, [zone.id]: val })}
+                            onChange={(val) => isEditable && setTextValue(zone.id, val)}
                           />
                         </div>
                       );
@@ -872,7 +795,7 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                           <TimePickerControl
                             label={`${displayLabel}${vis.required ? ' *' : ''}`}
                             value={textValues[zone.id] !== undefined ? textValues[zone.id] : (zone.defaultValue || '')}
-                            onChange={(val) => isEditable && setTextValues({ ...textValues, [zone.id]: val })}
+                            onChange={(val) => isEditable && setTextValue(zone.id, val)}
                           />
                         </div>
                       );
@@ -891,7 +814,7 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                                 type="button"
                                 onClick={() => {
                                   const newMsg = getRandomBirthdayMessage(textValues[zone.id] || zone.defaultValue);
-                                  setTextValues({ ...textValues, [zone.id]: newMsg });
+                                  setTextValue(zone.id, newMsg);
                                   setGeneratedZones((prev) => ({ ...prev, [zone.id]: true }));
                                 }}
                                 className="text-[11px] font-extrabold text-[#F82BA9] hover:text-pink-700 bg-pink-50 hover:bg-pink-100 px-3 py-1 rounded-xl border border-pink-200 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
@@ -905,7 +828,7 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                             rows={2}
                             disabled={!isEditable}
                             value={textValues[zone.id] || ''}
-                            onChange={(e) => setTextValues({ ...textValues, [zone.id]: e.target.value })}
+                            onChange={(e) => setTextValue(zone.id, e.target.value)}
                             className="w-full px-3 py-2 text-xs bg-white border border-gray-300 rounded-xl focus:outline-hidden focus:border-[#F82BA9] font-medium disabled:bg-slate-100"
                             placeholder={isEditable ? (zone.defaultValue ? `e.g. ${zone.defaultValue}` : `Type ${displayLabel}...`) : zone.defaultValue}
                           />
@@ -924,7 +847,7 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                           type="text"
                           disabled={!isEditable}
                           value={textValues[zone.id] || ''}
-                          onChange={(e) => setTextValues({ ...textValues, [zone.id]: e.target.value })}
+                          onChange={(e) => setTextValue(zone.id, e.target.value)}
                           className="w-full px-3 py-2 text-xs bg-white border border-gray-300 rounded-xl focus:outline-hidden focus:border-[#F82BA9] font-medium disabled:bg-slate-100"
                           placeholder={isEditable ? samplePlaceholder : zone.defaultValue}
                         />
@@ -1058,107 +981,12 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                   <Loader2 className="w-8 h-8 text-[#F82BA9] animate-spin" />
                   <p className="text-xs font-bold text-gray-700">Compiling 300 DPI High-Res Preview...</p>
                 </div>
-              ) : compiledPreviewUrl ? (
-                <img
-                  src={compiledPreviewUrl}
-                  alt={template.title}
-                  className="w-full h-full object-cover"
-                />
               ) : (
-                <>
-                  <img
-                    src={baseImg}
-                    alt={template.title}
-                    className="w-full h-full object-cover absolute inset-0 pointer-events-none"
-                  />
-
-                  {isCustomized && (
-                    <>
-                      {photoSlots.map((slot) => {
-                        const photoSrc = photoValues[slot.id] || slot.defaultPhotoUrl;
-                        if (!photoSrc) return null;
-                        const shapeStyles = getFrameShapeStyles(slot.shape);
-
-                        return (
-                          <div
-                            key={slot.id}
-                            className="absolute overflow-hidden p-0 border-0 bg-transparent"
-                            style={{
-                              left: `${slot.x}%`,
-                              top: `${slot.y}%`,
-                              width: `${slot.width}%`,
-                              height: `${slot.height}%`,
-                              transform: 'translate(-50%, -50%)',
-                              ...shapeStyles,
-                            }}
-                          >
-                            <img src={photoSrc} alt={slot.label} className="w-full h-full object-cover rounded-[inherit]" />
-                          </div>
-                        );
-                      })}
-
-                      {textZones.map((zone) => {
-                        const vis = resolveVisibility(zone.visibility);
-                        if (zone.visibility && vis.userVisible === false) return null;
-
-                        const customVal = textValues[zone.id];
-                        const textToDisplay = (customVal !== undefined && customVal.trim() !== '')
-                          ? customVal
-                          : (zone.defaultValue || '');
-
-                        if (!textToDisplay || textToDisplay.trim() === '') return null;
-
-                        const isCalendarGrid = zone.type === 'calendar_grid' || zone.isCalendar === true;
-
-                        if (isCalendarGrid) {
-                          return (
-                            <div
-                              key={zone.id}
-                              className="absolute transform -translate-x-1/2 -translate-y-1/2"
-                              style={{
-                                left: `${zone.x}%`,
-                                top: `${zone.y}%`,
-                              }}
-                            >
-                              <InteractiveCalendarZone
-                                dateString={textToDisplay}
-                                color={zone.color}
-                                fontFamily={zone.fontFamily}
-                              />
-                            </div>
-                          );
-                        }
-
-                        const resolvedFont = resolvePSDWebFont(zone.fontFamily);
-                        const resolvedSize = resolveResponsiveFontSize(zone);
-
-                        return (
-                          <div
-                            key={zone.id}
-                            className="absolute transform -translate-x-1/2 -translate-y-1/2 whitespace-pre-wrap leading-tight text-center pointer-events-none select-none"
-                            style={{
-                              left: `${zone.x}%`,
-                              top: `${zone.y}%`,
-                              maxWidth: (zone as any).maxWidth ? `${(zone as any).maxWidth}%` : '85%',
-                            }}
-                          >
-                            <span
-                              className="inline-block font-bold select-none bg-transparent leading-tight"
-                              style={{
-                                color: zone.color || '#160E4B',
-                                fontFamily: resolvedFont,
-                                fontSize: resolvedSize,
-                                textAlign: (zone.align as any) || 'center',
-                              }}
-                            >
-                              {textToDisplay}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </>
-                  )}
-                </>
+                <img
+                  src={compiledPreviewUrl || baseImg}
+                  alt={template.title}
+                  className="w-full h-full object-contain"
+                />
               )}
 
               {/* Anti-Piracy Protection Watermark Overlay */}

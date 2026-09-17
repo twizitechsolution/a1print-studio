@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Product } from '../types';
 import { UniversalFrameCustomizer } from '../components/customizer/UniversalFrameCustomizer';
 import { UniversalFrameTemplate } from '../types/template';
-import { firebaseCloudDb } from '../config/firebase';
+import { firebaseCloudDb, uploadOrderArtwork } from '../config/firebase';
 import { Star, ShieldCheck, Truck, Heart, Award, CheckCircle2, ChevronRight } from 'lucide-react';
 
 interface ProductPageProps {
@@ -180,12 +180,23 @@ export const ProductPage: React.FC<ProductPageProps> = ({
       <UniversalFrameCustomizer
         key={`${currentTemplate.id}-${currentTemplate.textZones?.length || 0}-${(currentTemplate.textZones?.[0] as any)?.label || ''}`}
         template={currentTemplate}
-        onProceedToCheckout={(photos, texts, size, compiledUrl) => {
+        onProceedToCheckout={async (photos, texts, size, compiledUrl) => {
+          let finalPreviewUrl = compiledUrl;
+          if (compiledUrl && compiledUrl.startsWith('data:image')) {
+            try {
+              const cloudUrl = await uploadOrderArtwork('customer_orders', compiledUrl, `order_composite_${Date.now()}.jpg`);
+              if (cloudUrl) {
+                finalPreviewUrl = cloudUrl;
+              }
+            } catch (err) {
+              console.warn('Failed to upload high-res composite to Cloudinary, falling back to local URL:', err);
+            }
+          }
           onProceedToCheckout(
             photos,
             texts,
             size as 'A4' | 'A3',
-            compiledUrl,
+            finalPreviewUrl,
             linkedTemplate?.id || product.linkedFrameTemplateId
           );
         }}

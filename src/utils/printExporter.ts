@@ -1,25 +1,27 @@
 import { UniversalFrameTemplate } from '../types/template';
-import { renderUnifiedTemplateComposite } from './cleanBaseGenerator';
+import { renderTemplateComposite } from './templateCompositor';
 
 export async function generateHighResPrintFile(
   template: UniversalFrameTemplate,
   photoValues: Record<string, string>,
   textValues: Record<string, string>,
-  targetWidth = 1200,
-  targetHeight = 1760
+  targetWidth = 2400,
+  targetHeight = 3520
 ): Promise<string> {
   try {
     const timeoutPromise = new Promise<string>((resolve) => {
       setTimeout(() => {
-        console.warn('Canvas export timed out, proceeding to checkout with standard preview');
+        console.warn('Canvas export timed out, proceeding with fallback preview');
         resolve('');
-      }, 3000);
+      }, 5000);
     });
 
-    const exportPromise = renderUnifiedTemplateComposite({
+    const exportPromise = renderTemplateComposite({
       template,
-      photoValues,
-      textValues,
+      customerInputs: {
+        photoValues,
+        textValues,
+      },
       targetWidth,
       targetHeight,
       drawFrameBorder: true,
