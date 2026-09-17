@@ -259,8 +259,10 @@ export async function renderUnifiedTemplateComposite({
   // 3. Draw Dynamic Text Zones
   for (const zone of template.textZones || []) {
     const vis = resolveVisibility(zone.visibility);
-    const rawVal = textValues[zone.id];
+    // Skip static designer captions already present in the clean base artwork
+    if (zone.visibility && vis.userVisible === false) continue;
 
+    const rawVal = textValues[zone.id];
     if (!rawVal && vis.emptyBehavior === 'hideLayer') continue;
 
     const val = rawVal || zone.defaultValue;

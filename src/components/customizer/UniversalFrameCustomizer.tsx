@@ -30,11 +30,25 @@ const DatePickerControl: React.FC<{
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 50 }, (_, i) => String(currentYear - i));
 
-  // Parse existing formatted date string (e.g. "20 Nov 2023")
-  const parts = (value || '').trim().split(/\s+/);
-  const selectedDay = parts[0] || '';
-  const selectedMonth = parts[1] || '';
-  const selectedYear = parts[2] || '';
+  // Parse existing formatted date string (e.g. "20 Nov 2023" or "16/10/2023")
+  let selectedDay = '';
+  let selectedMonth = '';
+  let selectedYear = '';
+
+  if (value) {
+    const slashMatch = value.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+    if (slashMatch) {
+      selectedDay = slashMatch[1].padStart(2, '0');
+      const mNum = parseInt(slashMatch[2], 10);
+      selectedMonth = months[mNum - 1] || '';
+      selectedYear = slashMatch[3].length === 2 ? `20${slashMatch[3]}` : slashMatch[3];
+    } else {
+      const parts = value.trim().split(/\s+/);
+      selectedDay = parts[0]?.padStart(2, '0') || '';
+      selectedMonth = parts[1] || '';
+      selectedYear = parts[2] || '';
+    }
+  }
 
   const updateDate = (day: string, month: string, year: string) => {
     if (!day && !month && !year) {
@@ -97,11 +111,15 @@ const TimePickerControl: React.FC<{
   const hours = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'));
   const minutes = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'));
 
-  // Parse existing formatted time string (e.g. "08:20 PM")
-  const match = (value || '').match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+  // Parse existing formatted time string (e.g. "08:20 PM" or "04:35.p.m" or "04:35")
+  const match = (value || '').match(/(\d{1,2})[:.](\d{2})\s*(?:([ap]\.?m\.?)|([ap]m))?/i);
   const selectedHour = match ? match[1].padStart(2, '0') : '';
   const selectedMinute = match ? match[2] : '';
-  const selectedPeriod = match ? match[3].toUpperCase() : 'AM';
+  let selectedPeriod = 'AM';
+  if (match && (match[3] || match[4])) {
+    const rawP = (match[3] || match[4]).toLowerCase();
+    selectedPeriod = rawP.includes('p') ? 'PM' : 'AM';
+  }
 
   const updateTime = (hour: string, minute: string, period: string) => {
     if (!hour && !minute) {
@@ -210,7 +228,7 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
   // Active Angle Image state for multi-angle photo gallery switching
   const [activeAngleImage, setActiveAngleImage] = useState<string | null>(null);
 
-  const baseImg = template.baseImageUrl || template.cleanBaseImageUrl || 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80';
+  const baseImg = template.cleanBaseImageUrl || template.baseImageUrl || 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80';
   const rawAngleImages = 
     (template as any).images || 
     (template as any).angleImages || 
@@ -475,10 +493,10 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                 }}
               />
 
-              {/* Dynamic Photo Slot Cutouts Overlay - Transparent by default until customer uploads photo! */}
+              {/* Dynamic Photo Slot Cutouts Overlay - True Layered Web-to-Print */}
               {photoSlots.map((slot) => {
-                const photoSrc = photoValues[slot.id];
-                if (!photoSrc) return null; // Transparent layer: Allows base poster sample artwork to show through!
+                const photoSrc = photoValues[slot.id] || slot.defaultPhotoUrl;
+                if (!photoSrc) return null;
 
                 const shapeStyles = getFrameShapeStyles(slot.shape);
 
@@ -500,16 +518,24 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                 );
               })}
 
-              {/* Dynamic Text Zones Overlay using Saved Coordinates */}
+              {/* Dynamic Text Zones Overlay - True Layered Web-to-Print */}
               {textZones.map((zone) => {
-                const customVal = textValues[zone.id];
-                // Only render when the customer has entered a new custom value!
-                // If not edited, let the designer's original, sharp Photoshop typography show through directly!
-                if (!customVal || customVal.trim() === '' || customVal.trim() === (zone.defaultValue || '').trim()) {
+                const vis = resolveVisibility(zone.visibility);
+                // Skip static designer captions already present in the background artwork
+                if (zone.visibility && vis.userVisible === false) {
                   return null;
                 }
 
-                const isCalendarGrid = zone.type === 'calendar_grid';
+                const customVal = textValues[zone.id];
+                const textToDisplay = (customVal !== undefined && customVal.trim() !== '')
+                  ? customVal
+                  : (zone.defaultValue || '');
+
+                if (!textToDisplay || textToDisplay.trim() === '') {
+                  return null;
+                }
+
+                const isCalendarGrid = zone.type === 'calendar_grid' || zone.isCalendar === true;
                 if (isCalendarGrid) {
                   return (
                     <div
@@ -521,7 +547,7 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                       }}
                     >
                       <InteractiveCalendarZone
-                        dateString={customVal}
+                        dateString={textToDisplay}
                         color={zone.color || '#160E4B'}
                       />
                     </div>
@@ -543,12 +569,12 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                       style={{
                         color: zone.color || '#160E4B',
                         fontFamily: zone.fontFamily || 'serif',
-                        fontSize: 'clamp(9px, 2.5vw, 16px)',
+                        fontSize: zone.fontSize ? `clamp(10px, ${(zone.fontSize / 30).toFixed(1)}vw, ${(zone.fontSize * 0.75).toFixed(0)}px)` : 'clamp(9px, 2.5vw, 16px)',
                         textAlign: (zone.align as any) || 'center',
                         textShadow: '0 1px 2px rgba(255,255,255,0.7)',
                       }}
                     >
-                      {customVal}
+                      {textToDisplay}
                     </span>
                   </div>
                 );
@@ -723,9 +749,9 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                         </div>
 
                         <div className="flex items-center gap-2">
-                          {photoValues[slot.id] && (
+                          {(photoValues[slot.id] || slot.defaultPhotoUrl) && (
                             <div className="w-10 h-10 rounded-lg border border-gray-300 overflow-hidden shrink-0">
-                              <img src={photoValues[slot.id]} alt={displayLabel} className="w-full h-full object-cover" />
+                              <img src={photoValues[slot.id] || slot.defaultPhotoUrl} alt={displayLabel} className="w-full h-full object-cover" />
                             </div>
                           )}
 
@@ -735,7 +761,7 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                               onClick={() => handleOpenCropModal(slot.id)}
                               className="px-2.5 py-1.5 bg-[#F82BA9] hover:bg-[#D61B90] text-white text-[11px] font-extrabold rounded-xl shadow-xs transition-colors flex items-center gap-1 cursor-pointer shrink-0"
                             >
-                              <ImageIcon className="w-3 h-3" /> {photoValues[slot.id] ? 'Change' : 'Upload'}
+                              <ImageIcon className="w-3 h-3" /> {(photoValues[slot.id] || slot.defaultPhotoUrl) ? 'Change' : 'Upload'}
                             </button>
                           ) : (
                             <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded-lg">
@@ -766,7 +792,8 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                     const labelLower = (zone.label || '').toLowerCase();
                     const idLower = (zone.id || '').toLowerCase();
                     
-                    const isDateField = zone.isCalendar || zone.type === 'calendar' || zone.type === 'date' || labelLower.includes('date') || labelLower.includes('dob') || idLower.includes('date');
+                    const isArabicDate = labelLower.includes('arabic') || labelLower.includes('islamic') || idLower.includes('arabic') || idLower.includes('islamic');
+                    const isDateField = !isArabicDate && (zone.isCalendar || zone.type === 'calendar' || zone.type === 'date' || labelLower.includes('date') || labelLower.includes('dob') || idLower.includes('date'));
                     const isTimeField = zone.type === 'time' || labelLower.includes('time') || idLower.includes('time');
                     const isMessageField = zone.type === 'message' || zone.isAIMessage === true;
 
@@ -775,7 +802,7 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                         <div key={zone.id} className={!isEditable ? 'pointer-events-none opacity-80' : ''}>
                           <DatePickerControl
                             label={`${displayLabel}${vis.required ? ' *' : ''}`}
-                            value={textValues[zone.id] || ''}
+                            value={textValues[zone.id] !== undefined ? textValues[zone.id] : (zone.defaultValue || '')}
                             onChange={(val) => isEditable && setTextValues({ ...textValues, [zone.id]: val })}
                           />
                         </div>
@@ -787,7 +814,7 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                         <div key={zone.id} className={!isEditable ? 'pointer-events-none opacity-80' : ''}>
                           <TimePickerControl
                             label={`${displayLabel}${vis.required ? ' *' : ''}`}
-                            value={textValues[zone.id] || ''}
+                            value={textValues[zone.id] !== undefined ? textValues[zone.id] : (zone.defaultValue || '')}
                             onChange={(val) => isEditable && setTextValues({ ...textValues, [zone.id]: val })}
                           />
                         </div>
@@ -823,11 +850,13 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                             value={textValues[zone.id] || ''}
                             onChange={(e) => setTextValues({ ...textValues, [zone.id]: e.target.value })}
                             className="w-full px-3 py-2 text-xs bg-white border border-gray-300 rounded-xl focus:outline-hidden focus:border-[#F82BA9] font-medium disabled:bg-slate-100"
-                            placeholder={isEditable ? `Type ${displayLabel}...` : zone.defaultValue}
+                            placeholder={isEditable ? (zone.defaultValue ? `e.g. ${zone.defaultValue}` : `Type ${displayLabel}...`) : zone.defaultValue}
                           />
                         </div>
                       );
                     }
+
+                    const samplePlaceholder = zone.defaultValue ? `e.g. ${zone.defaultValue}` : `Enter ${displayLabel}...`;
 
                     return (
                       <div key={zone.id} className="space-y-1 sm:col-span-1">
@@ -840,7 +869,7 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                           value={textValues[zone.id] || ''}
                           onChange={(e) => setTextValues({ ...textValues, [zone.id]: e.target.value })}
                           className="w-full px-3 py-2 text-xs bg-white border border-gray-300 rounded-xl focus:outline-hidden focus:border-[#F82BA9] font-medium disabled:bg-slate-100"
-                          placeholder={isEditable ? `Enter ${displayLabel}...` : zone.defaultValue}
+                          placeholder={isEditable ? samplePlaceholder : zone.defaultValue}
                         />
                       </div>
                     );
@@ -980,13 +1009,13 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
               ) : (
                 <>
                   <img
-                    src={template.baseImageUrl}
+                    src={baseImg}
                     alt={template.title}
                     className="w-full h-full object-cover absolute inset-0 pointer-events-none"
                   />
 
                   {photoSlots.map((slot) => {
-                    const photoSrc = photoValues[slot.id];
+                    const photoSrc = photoValues[slot.id] || slot.defaultPhotoUrl;
                     if (!photoSrc) return null;
                     const shapeStyles = getFrameShapeStyles(slot.shape);
 
@@ -1009,12 +1038,17 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                   })}
 
                   {textZones.map((zone) => {
-                    const customVal = textValues[zone.id];
-                    if (!customVal || customVal.trim() === '' || customVal.trim() === (zone.defaultValue || '').trim()) {
-                      return null;
-                    }
+                    const vis = resolveVisibility(zone.visibility);
+                    if (zone.visibility && vis.userVisible === false) return null;
 
-                    const isCalendarGrid = zone.type === 'calendar_grid';
+                    const customVal = textValues[zone.id];
+                    const textToDisplay = (customVal !== undefined && customVal.trim() !== '')
+                      ? customVal
+                      : (zone.defaultValue || '');
+
+                    if (!textToDisplay || textToDisplay.trim() === '') return null;
+
+                    const isCalendarGrid = zone.type === 'calendar_grid' || zone.isCalendar === true;
 
                     if (isCalendarGrid) {
                       return (
@@ -1027,7 +1061,7 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                           }}
                         >
                           <InteractiveCalendarZone
-                            dateString={customVal}
+                            dateString={textToDisplay}
                             color={zone.color}
                             fontFamily={zone.fontFamily}
                           />
@@ -1050,12 +1084,12 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                           style={{
                             color: zone.color || '#160E4B',
                             fontFamily: zone.fontFamily || 'serif',
-                            fontSize: 'clamp(9px, 2.5vw, 16px)',
+                            fontSize: zone.fontSize ? `clamp(10px, ${(zone.fontSize / 30).toFixed(1)}vw, ${(zone.fontSize * 0.75).toFixed(0)}px)` : 'clamp(9px, 2.5vw, 16px)',
                             textAlign: (zone.align as any) || 'center',
                             textShadow: '0 1px 2px rgba(255,255,255,0.7)',
                           }}
                         >
-                          {customVal}
+                          {textToDisplay}
                         </span>
                       </div>
                     );

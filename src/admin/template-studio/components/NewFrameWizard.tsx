@@ -13,6 +13,7 @@ interface NewFrameWizardProps {
     textZones: TextZoneConfig[];
     staticLayers?: StaticLayerConfig[];
     baseImageUrl: string;
+    cleanBaseImageUrl?: string;
     originalUploadUrl?: string;
     documentDimensions?: { width: number; height: number };
   }) => void;
@@ -100,22 +101,65 @@ export const NewFrameWizard: React.FC<NewFrameWizardProps> = ({
 
       // 2. Upload high-resolution composite preview to Cloudinary CDN
       let baseImageUrl = parsedResult.compositePreviewUrl || '';
+      let cleanBaseImageUrl = parsedResult.cleanBaseImageUrl || '';
       let originalUploadUrl: string | undefined = undefined;
+
+      const uploadPrefix = `frame-${Date.now()}`;
 
       if (parsedResult.compositePreviewUrl && parsedResult.compositePreviewUrl.startsWith('data:image')) {
         try {
-          setParseStep('Uploading high-resolution poster artwork to Cloudinary CDN...');
+          setParseStep('Uploading high-resolution sample preview to Cloudinary CDN...');
           const posterBlob = base64ToBlob(parsedResult.compositePreviewUrl);
           const uploadedPosterUrl = await uploadProductImage(
-            `frame-${Date.now()}`,
+            uploadPrefix,
             posterBlob,
-            'poster.jpg'
+            'sample_preview.jpg'
           );
           if (uploadedPosterUrl) {
             baseImageUrl = uploadedPosterUrl;
           }
         } catch (uploadPosterErr) {
           console.warn('Poster Cloudinary upload warning, using local preview in editor:', uploadPosterErr);
+        }
+      }
+
+      // Upload clean base artwork without baked-in text or sample photos
+      if (parsedResult.cleanBaseImageUrl && parsedResult.cleanBaseImageUrl.startsWith('data:image')) {
+        try {
+          setParseStep('Uploading clean artwork background to Cloudinary CDN...');
+          const cleanBlob = base64ToBlob(parsedResult.cleanBaseImageUrl);
+          const uploadedCleanUrl = await uploadProductImage(
+            uploadPrefix,
+            cleanBlob,
+            'clean_base.jpg'
+          );
+          if (uploadedCleanUrl) {
+            cleanBaseImageUrl = uploadedCleanUrl;
+          }
+        } catch (cleanUploadErr) {
+          console.warn('Clean base Cloudinary upload warning, using local preview:', cleanUploadErr);
+        }
+      }
+
+      // Upload aperture default cutout photos to Cloudinary to prevent huge base64 strings in Firestore
+      const processedPhotoSlots = [...parsedResult.photoSlots];
+      for (let i = 0; i < processedPhotoSlots.length; i++) {
+        const slot = processedPhotoSlots[i];
+        if (slot.defaultPhotoUrl && slot.defaultPhotoUrl.startsWith('data:image')) {
+          try {
+            setParseStep(`Uploading aperture sample photo ${i + 1}/${processedPhotoSlots.length}...`);
+            const slotBlob = base64ToBlob(slot.defaultPhotoUrl);
+            const uploadedSlotUrl = await uploadProductImage(
+              uploadPrefix,
+              slotBlob,
+              `slot_${slot.id || i}.png`
+            );
+            if (uploadedSlotUrl) {
+              processedPhotoSlots[i] = { ...slot, defaultPhotoUrl: uploadedSlotUrl };
+            }
+          } catch (slotErr) {
+            console.warn(`Aperture slot photo upload warning for ${slot.id}:`, slotErr);
+          }
         }
       }
 
@@ -150,10 +194,11 @@ export const NewFrameWizard: React.FC<NewFrameWizardProps> = ({
       onComplete({
         title: frameName.trim(),
         category,
-        photoSlots: parsedResult.photoSlots,
+        photoSlots: processedPhotoSlots,
         textZones: parsedResult.textZones,
         staticLayers: parsedResult.staticLayers || [],
         baseImageUrl,
+        cleanBaseImageUrl: cleanBaseImageUrl || baseImageUrl,
         originalUploadUrl,
         documentDimensions: parsedResult.documentDimensions,
       });

@@ -24,6 +24,7 @@ export interface PSDImportResult {
   staticLayers: StaticLayerConfig[];
   detectedLayerCount: number;
   compositePreviewUrl?: string;
+  cleanBaseImageUrl?: string;
 }
 
 /**
@@ -165,6 +166,188 @@ function rgbToHex(color: any): string {
   return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
 }
 
+interface ClassifiedPsdText {
+  label: string;
+  userLabel: string;
+  type: 'text' | 'date' | 'time' | 'number' | 'calendar' | 'message';
+  isCalendar: boolean;
+  userVisible: boolean;
+  defaultValue: string;
+}
+
+/**
+ * Intelligently classifies PSD text layers into human-friendly Field Headings
+ * (e.g. Birth Timing, Birth Weight, Date of Birth, Hospital Name, Baby Name, Parents Name)
+ * and distinguishes between editable customer fields vs. fixed decorative poster captions.
+ */
+function classifyPsdTextLayer(cleanText: string, layerName: string): ClassifiedPsdText {
+  const text = cleanText.trim();
+  const lowerText = text.toLowerCase();
+  const lowerName = (layerName || '').toLowerCase();
+  const combined = `${lowerText} ${lowerName}`;
+
+  // 1. Calendar Grid Table / Matrix
+  if (/calendar_grid|calendar_table|date_grid|month_grid/i.test(combined)) {
+    return {
+      label: 'Calendar Grid',
+      userLabel: 'Milestone Calendar',
+      type: 'calendar',
+      isCalendar: true,
+      userVisible: true,
+      defaultValue: text,
+    };
+  }
+
+  // 2. Pure Decorative Caption / Section Titles (Printed statically on poster, not customer inputs)
+  // e.g. The literal words "Baby Name", "Parants Name", "Blood Group", "Arabic Date", "Date of Birth"
+  if (
+    /^(baby\s*name|name|parants?\s*name|parents?\s*name|father\s*(&|and)?\s*mother|blood\s*group|arabic\s*date|born\s*on|time\s*of\s*birth)$/i.test(text) ||
+    /^(baby\s*name|parants?\s*name|parents?\s*name|blood\s*group|arabic\s*date)$/i.test(lowerName)
+  ) {
+    if (
+      /^(baby\s*name|name|parants?\s*name|parents?\s*name|blood\s*group|arabic\s*date)$/i.test(lowerText)
+    ) {
+      return {
+        label: `${text} (Caption)`,
+        userLabel: text,
+        type: 'text',
+        isCalendar: false,
+        userVisible: false, // Hidden from storefront customer inputs because it's a fixed poster caption
+        defaultValue: text,
+      };
+    }
+  }
+
+  // 3. Time of Birth (e.g. 04:35 PM, 04:35.p.m, 10:30 am, etc.)
+  if (
+    /\b\d{1,2}[:.]\d{2}\s*(am|pm|a\.m|p\.m)?\b/i.test(text) ||
+    /time|timing|birth_time|born_at/i.test(lowerName)
+  ) {
+    let formattedTime = text;
+    const timeMatch = text.match(/(\d{1,2})[:.](\d{2})\s*(am|pm|a\.m|p\.m)?/i);
+    if (timeMatch) {
+      const hh = timeMatch[1].padStart(2, '0');
+      const mm = timeMatch[2];
+      const meridiem = (timeMatch[3] || 'PM').toUpperCase().replace(/\./g, '');
+      formattedTime = `${hh}:${mm} ${meridiem}`;
+    }
+    return {
+      label: 'Birth Timing',
+      userLabel: 'Birth Timing',
+      type: 'time',
+      isCalendar: false,
+      userVisible: true,
+      defaultValue: formattedTime,
+    };
+  }
+
+  // 4. Weight / Metric (e.g. 2.6 Kg, 3.2 kg, 7 lbs, etc.)
+  if (
+    /\b\d+(\.\d+)?\s*(kg|kgs|lbs|pounds|gm|g|grams)\b/i.test(text) ||
+    /weight|birth_weight/i.test(lowerName)
+  ) {
+    return {
+      label: 'Birth Weight',
+      userLabel: 'Birth Weight',
+      type: 'number',
+      isCalendar: false,
+      userVisible: true,
+      defaultValue: text,
+    };
+  }
+
+  // 5. Hospital / Clinic Name
+  if (/hospital|clinic|nursing|maternity|healthcare|born\s+at/i.test(combined)) {
+    return {
+      label: 'Hospital Name',
+      userLabel: 'Hospital Name',
+      type: 'text',
+      isCalendar: false,
+      userVisible: true,
+      defaultValue: text,
+    };
+  }
+
+  // 6. Blood Group (e.g. B+, O+, A-, AB+, etc.)
+  if (/^(A|B|AB|O)[+-]$/i.test(text) || /blood\s*group/i.test(lowerName)) {
+    return {
+      label: 'Blood Group',
+      userLabel: 'Blood Group',
+      type: 'text',
+      isCalendar: false,
+      userVisible: true,
+      defaultValue: text,
+    };
+  }
+
+  // 7. Gregorian Date of Birth (e.g. 16/10/2023, 16-10-2023, 16.10.2023, 20 Nov 2023)
+  if (
+    /\b\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4}\b/.test(text) ||
+    /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2},?\s+\d{4}\b/i.test(text) ||
+    /\b\d{1,2}\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{4}\b/i.test(text) ||
+    /dob|date_of_birth|birth_date|arrival_date/i.test(lowerName)
+  ) {
+    return {
+      label: 'Date of Birth',
+      userLabel: 'Date of Birth',
+      type: 'date',
+      isCalendar: false,
+      userVisible: true,
+      defaultValue: text,
+    };
+  }
+
+  // 8. Islamic / Arabic Date (e.g. Rabial-Awwal 19, Ramadan 14, 19 Shawwal)
+  if (/rabial|awwal|ramadan|muharram|safar|shawwal|zulhijjah|hijri/i.test(combined)) {
+    return {
+      label: 'Islamic / Arabic Date',
+      userLabel: 'Islamic / Arabic Date',
+      type: 'text',
+      isCalendar: false,
+      userVisible: true,
+      defaultValue: text,
+    };
+  }
+
+  // 9. Parents / Couple Names (e.g. Salman & Ahamed, Priya & Rohit)
+  if (/(&|\band\b|\bw\/o\b)/i.test(text) || /parents?|father|mother|couple/i.test(lowerName)) {
+    return {
+      label: 'Parents Name',
+      userLabel: 'Parents Name',
+      type: 'text',
+      isCalendar: false,
+      userVisible: true,
+      defaultValue: text,
+    };
+  }
+
+  // 10. Baby Name / Single Person Name (e.g. Noor Aysha, Baby Aarav)
+  if (/baby\s*name/i.test(lowerName) || /^(baby|master|miss)\b/i.test(text)) {
+    return {
+      label: 'Baby Name',
+      userLabel: 'Baby Name',
+      type: 'text',
+      isCalendar: false,
+      userVisible: true,
+      defaultValue: text,
+    };
+  }
+
+  // 11. Generic fallback: If layerName has a friendly name, use it; otherwise use text
+  const cleanLabel = (layerName && !layerName.startsWith('Layer ')) 
+    ? layerName.replace(/[_-]/g, ' ') 
+    : text.substring(0, 24);
+
+  return {
+    label: cleanLabel,
+    userLabel: cleanLabel,
+    type: 'text',
+    isCalendar: false,
+    userVisible: true,
+    defaultValue: text,
+  };
+}
+
 /**
  * Parses a Photoshop (.PSD) file using ag-psd engine to extract:
  * 1. Pixel-perfect composite artwork preview (`baseImageUrl`)
@@ -243,22 +426,18 @@ export async function parsePSDFileBinary(file: File): Promise<PSDImportResult> {
           const rawText = layer.text.text.trim();
           const cleanText = rawText.replace(/\r?\n/g, ' ');
 
-          // Infer calendar / date type
-          const isCalendarGrid = /calendar_grid|calendar_table|date_grid|month_grid/i.test(layerName);
-          const isDateOrTime =
-            /calendar|date|month|year|birth|dob|milestone|time/i.test(layerName) ||
-            /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})\b/i.test(cleanText);
-
           // Extract styling if available
           const textStyle = layer.text.style || {};
-          const fontSize = textStyle.fontSize ? Math.round(textStyle.fontSize) : (isDateOrTime ? 18 : 26);
-          const fontFamily = textStyle.font?.name || (isDateOrTime ? 'Jost' : 'Playfair Display');
+          const fontSize = textStyle.fontSize ? Math.round(textStyle.fontSize) : 24;
+          const fontFamily = textStyle.font?.name || 'Playfair Display';
           const color = textStyle.fillColor ? rgbToHex(textStyle.fillColor) : '#160E4B';
+
+          const classified = classifyPsdTextLayer(cleanText, layerName);
 
           textZones.push({
             id: `text-psd-${Date.now().toString(36)}-${textCounter}`,
-            label: layerName || `Text Zone ${textCounter}`,
-            defaultValue: cleanText,
+            label: classified.label,
+            defaultValue: classified.defaultValue,
             x: xPct,
             y: yPct,
             maxWidth: Math.min(90, Math.max(30, wPct + 10)),
@@ -266,11 +445,13 @@ export async function parsePSDFileBinary(file: File): Promise<PSDImportResult> {
             fontFamily,
             color,
             align: 'center',
-            type: isCalendarGrid ? 'calendar' : (isDateOrTime ? 'date' : 'text'),
-            isCalendar: isCalendarGrid,
+            type: classified.type,
+            isCalendar: classified.isCalendar,
             visibility: {
               ...DEFAULT_VISIBILITY,
-              userLabel: isDateOrTime ? (layerName.includes('time') || cleanText.includes(':') ? 'Birth Time' : 'Milestone Date') : layerName.replace(/[_-]/g, ' '),
+              userVisible: classified.userVisible,
+              userEditable: classified.userVisible,
+              userLabel: classified.userLabel,
             },
             sourceLayerName: layerName,
           });
@@ -558,6 +739,99 @@ export async function parsePSDFileBinary(file: File): Promise<PSDImportResult> {
         }
       });
 
+      // ⚡ AUTOMATED CLEAN BASE ARTWORK GENERATOR:
+      // Decomposes PSD layers to render backgrounds, clipart cartoons, borders, and static caption titles,
+      // while completely omitting editable customer text layers and aperture sample photos.
+      let cleanBaseImageUrl = '';
+      if (typeof document !== 'undefined') {
+        try {
+          const cleanCanvas = document.createElement('canvas');
+          cleanCanvas.width = docWidth;
+          cleanCanvas.height = docHeight;
+          const cleanCtx = cleanCanvas.getContext('2d');
+
+          if (cleanCtx) {
+            // Collect names/labels of layers to skip
+            const skipTextLayerNames = new Set<string>();
+            textZones.forEach((z) => {
+              const vis = z.visibility;
+              if (!vis || vis.userVisible !== false) {
+                if (z.sourceLayerName) skipTextLayerNames.add(z.sourceLayerName.trim().toLowerCase());
+                if (z.defaultValue) skipTextLayerNames.add(z.defaultValue.trim().toLowerCase());
+              }
+            });
+
+            // Identify sample photos in photo apertures
+            const aperturePhotoLayerNames = new Set<string>();
+            selectedApertures.forEach((aperture) => {
+              const clusterLayers = aperture.cluster?.layers || [];
+              let largestImgLayer: any = null;
+              let maxPixelCount = 0;
+              clusterLayers.forEach((l: any) => {
+                const w = (l.right || 0) - (l.left || 0);
+                const h = (l.bottom || 0) - (l.top || 0);
+                const area = w * h;
+                const lName = (l.name || '').toLowerCase();
+                const isLikelyPhoto = /photo|image|picture|pic|layer\s*1[78]/i.test(lName) || l.mask || l.clipping;
+                if (isLikelyPhoto || area > maxPixelCount) {
+                  maxPixelCount = area;
+                  largestImgLayer = l;
+                }
+              });
+              if (largestImgLayer && largestImgLayer.name) {
+                aperturePhotoLayerNames.add(largestImgLayer.name.trim().toLowerCase());
+              }
+            });
+
+            // Draw all layers from bottom to top
+            allLayers.forEach((layer) => {
+              if (!layer || layer.hidden) return;
+              const lName = (layer.name || '').trim().toLowerCase();
+
+              // Skip editable customer text layers
+              if (layer.text && skipTextLayerNames.has(lName)) return;
+              if (layer.text && textZones.some((z) => (z.sourceLayerName || '').toLowerCase() === lName && (!z.visibility || z.visibility.userVisible !== false))) {
+                return;
+              }
+
+              // Skip sample photos inside apertures
+              if (aperturePhotoLayerNames.has(lName)) return;
+
+              if (layer.canvas) {
+                cleanCtx.save();
+                if (layer.opacity !== undefined) {
+                  cleanCtx.globalAlpha = layer.opacity;
+                }
+                if (layer.blendMode && layer.blendMode !== 'normal') {
+                  const modeMap: Record<string, GlobalCompositeOperation> = {
+                    'screen': 'screen',
+                    'multiply': 'multiply',
+                    'overlay': 'overlay',
+                    'darken': 'darken',
+                    'lighten': 'lighten',
+                    'color-dodge': 'color-dodge',
+                    'color-burn': 'color-burn',
+                    'hard-light': 'hard-light',
+                    'soft-light': 'soft-light',
+                    'difference': 'difference',
+                    'exclusion': 'exclusion',
+                  };
+                  if (modeMap[layer.blendMode]) {
+                    cleanCtx.globalCompositeOperation = modeMap[layer.blendMode];
+                  }
+                }
+                cleanCtx.drawImage(layer.canvas, layer.left || 0, layer.top || 0);
+                cleanCtx.restore();
+              }
+            });
+
+            cleanBaseImageUrl = cleanCanvas.toDataURL('image/jpeg', 0.94);
+          }
+        } catch (cleanCanvasErr) {
+          console.warn('Automated clean base generation notice:', cleanCanvasErr);
+        }
+      }
+
       // If at least some discrete zones or composite were extracted, return parsed result!
       if (photoSlots.length > 0 || textZones.length > 0 || staticLayers.length > 0 || compositePreviewUrl) {
         return {
@@ -567,6 +841,7 @@ export async function parsePSDFileBinary(file: File): Promise<PSDImportResult> {
           staticLayers,
           detectedLayerCount: photoSlots.length + textZones.length + staticLayers.length,
           compositePreviewUrl: compositePreviewUrl || undefined,
+          cleanBaseImageUrl: cleanBaseImageUrl || compositePreviewUrl || undefined,
         };
       }
     }
@@ -714,23 +989,25 @@ export async function parsePSDFileBinary(file: File): Promise<PSDImportResult> {
       });
       sCount++;
     } else {
-      const isCalendar = layer.type === 'calendar';
+      const classified = classifyPsdTextLayer(layer.textValue || 'Custom Text', layer.name || '');
       fallbackTextZones.push({
         id: `text-psd-${Date.now().toString(36)}-${tCount}`,
-        label: layer.name || (isCalendar ? `Calendar Zone ${tCount}` : `Text Zone ${tCount}`),
-        defaultValue: layer.textValue || (isCalendar ? '14 Feb 2026' : 'Custom Text'),
+        label: classified.label,
+        defaultValue: classified.defaultValue,
         x: Math.max(10, Math.min(90, xPct)),
         y: Math.max(10, Math.min(90, yPct)),
         maxWidth: Math.min(90, Math.max(40, wPct + 10)),
-        fontSize: isCalendar ? 16 : 26,
-        fontFamily: isCalendar ? 'Jost' : 'Playfair Display',
+        fontSize: layer.type === 'calendar' ? 16 : 26,
+        fontFamily: layer.type === 'calendar' ? 'Jost' : 'Playfair Display',
         color: '#160E4B',
         align: 'center',
-        type: isCalendar ? 'calendar' : 'text',
-        isCalendar,
+        type: classified.type,
+        isCalendar: classified.isCalendar,
         visibility: {
           ...DEFAULT_VISIBILITY,
-          userLabel: isCalendar ? 'Milestone Date' : layer.name.replace(/[_-]/g, ' '),
+          userVisible: classified.userVisible,
+          userEditable: classified.userVisible,
+          userLabel: classified.userLabel,
         },
         sourceLayerName: layer.name,
       });

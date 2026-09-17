@@ -78,14 +78,28 @@ export const StudioPropertiesPanel: React.FC<StudioPropertiesPanelProps> = ({
           </span>
         </div>
 
-        {/* Slot Label */}
+        {/* Slot Heading / Customer Label */}
         <div className="space-y-1">
-          <label className="font-bold text-slate-300">Internal Admin Label:</label>
+          <label className="font-bold text-slate-200 text-xs flex items-center justify-between">
+            <span>Photo Slot Heading / Label:</span>
+            <span className="text-[10px] text-pink-400 font-normal">Shown on storefront</span>
+          </label>
           <input
             type="text"
-            value={slot.label}
-            onChange={(e) => onUpdateSlot({ ...slot, label: e.target.value })}
-            className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl focus:border-pink-500 focus:outline-hidden"
+            value={slot.visibility?.userLabel !== undefined ? slot.visibility.userLabel : slot.label}
+            onChange={(e) => {
+              const newLabel = e.target.value;
+              onUpdateSlot({
+                ...slot,
+                label: newLabel,
+                visibility: {
+                  ...resolveVisibility(slot.visibility),
+                  userLabel: newLabel,
+                },
+              });
+            }}
+            placeholder="e.g. Baby Photo Slot, Couple Photo..."
+            className="w-full px-3 py-2 bg-slate-950 border border-pink-500/40 rounded-xl focus:border-pink-400 focus:outline-hidden font-bold text-white text-xs"
           />
         </div>
 
@@ -240,9 +254,73 @@ export const StudioPropertiesPanel: React.FC<StudioPropertiesPanelProps> = ({
           </span>
         </div>
 
+        {/* Field Heading / Customer Label */}
+        <div className="space-y-1">
+          <label className="font-bold text-slate-200 text-xs flex items-center justify-between">
+            <span>Field Heading / Customer Label:</span>
+            <span className="text-[10px] text-purple-400 font-normal">Shown to customer on storefront</span>
+          </label>
+          <input
+            type="text"
+            value={zone.visibility?.userLabel !== undefined ? zone.visibility.userLabel : zone.label}
+            onChange={(e) => {
+              const newLabel = e.target.value;
+              onUpdateZone({
+                ...zone,
+                label: newLabel,
+                visibility: {
+                  ...resolveVisibility(zone.visibility),
+                  userLabel: newLabel,
+                },
+              });
+            }}
+            placeholder="e.g. Birth Timing, Baby Name, Father's Name..."
+            className="w-full px-3 py-2 bg-slate-950 border border-purple-500/40 rounded-xl focus:border-purple-400 focus:outline-hidden font-bold text-white text-xs"
+          />
+        </div>
+
+        {/* Default Text Value */}
+        <div className="space-y-1">
+          <label className="font-bold text-slate-300 text-xs flex items-center justify-between">
+            <span>Default Value / Sample:</span>
+            <span className="text-[10px] text-slate-500 font-normal">Original poster text</span>
+          </label>
+          <input
+            type="text"
+            value={zone.defaultValue}
+            onChange={(e) => onUpdateZone({ ...zone, defaultValue: e.target.value })}
+            placeholder="e.g. 04:35 PM, 2.6 Kg..."
+            className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl focus:border-purple-500 focus:outline-hidden font-medium text-xs text-white"
+          />
+        </div>
+
+        {/* Quick Expose / Hide Toggle */}
+        <label className="flex items-center justify-between p-2.5 bg-slate-950/80 rounded-xl border border-slate-800 cursor-pointer hover:border-slate-700 transition-colors">
+          <div className="space-y-0.5">
+            <span className="font-bold block text-slate-200 text-xs">Expose as Customer Input</span>
+            <span className="text-[10px] text-slate-500">Uncheck if this is just a decorative caption on the frame</span>
+          </div>
+          <input
+            type="checkbox"
+            checked={zone.visibility?.userVisible !== false}
+            onChange={(e) => {
+              const checked = e.target.checked;
+              onUpdateZone({
+                ...zone,
+                visibility: {
+                  ...resolveVisibility(zone.visibility),
+                  userVisible: checked,
+                  userEditable: checked,
+                },
+              });
+            }}
+            className="w-4 h-4 rounded-xs accent-purple-500 cursor-pointer"
+          />
+        </label>
+
         {/* Text Zone Type */}
         <div className="space-y-1">
-          <label className="font-bold text-slate-300">Zone Type:</label>
+          <label className="font-bold text-slate-300 text-xs">Zone Type:</label>
           <select
             value={zone.type}
             onChange={(e) => {
@@ -253,7 +331,7 @@ export const StudioPropertiesPanel: React.FC<StudioPropertiesPanelProps> = ({
                 isCalendar: newType === 'calendar',
               });
             }}
-            className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl focus:border-purple-500 focus:outline-hidden font-bold cursor-pointer"
+            className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl focus:border-purple-500 focus:outline-hidden font-bold cursor-pointer text-xs"
           >
             <option value="text">General Text</option>
             <option value="date">Date (e.g. 14 Feb 2026)</option>
@@ -262,17 +340,6 @@ export const StudioPropertiesPanel: React.FC<StudioPropertiesPanelProps> = ({
             <option value="calendar">🗓️ Interactive Calendar Grid</option>
             <option value="message">Personal Message / Wishes</option>
           </select>
-        </div>
-
-        {/* Default Text Value */}
-        <div className="space-y-1">
-          <label className="font-bold text-slate-300">Default Value / Sample:</label>
-          <input
-            type="text"
-            value={zone.defaultValue}
-            onChange={(e) => onUpdateZone({ ...zone, defaultValue: e.target.value })}
-            className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl focus:border-purple-500 focus:outline-hidden font-medium"
-          />
         </div>
 
         {/* Typography: Font Family & Size */}

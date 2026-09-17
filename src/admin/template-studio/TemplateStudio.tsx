@@ -128,17 +128,20 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
     photoSlots,
     textZones,
     baseImageUrl,
+    cleanBaseImageUrl,
     originalUploadUrl,
   }: {
     photoSlots: PhotoSlotConfig[];
     textZones: TextZoneConfig[];
     baseImageUrl?: string;
+    cleanBaseImageUrl?: string;
     originalUploadUrl?: string;
   }) => {
     pushHistory(template);
     setTemplate((prev) => ({
       ...prev,
       ...(baseImageUrl ? { baseImageUrl } : {}),
+      ...(cleanBaseImageUrl ? { cleanBaseImageUrl } : {}),
       originalUploadUrl: originalUploadUrl || prev.originalUploadUrl,
       importSource: 'psd',
       photoSlots,
@@ -377,12 +380,12 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
     setSaveMessage(null);
     try {
       let cleanBase = template.cleanBaseImageUrl || template.baseImageUrl || '';
+      let samplePreview = template.baseImageUrl || cleanBase || '';
 
-      // CRITICAL GUARANTEE: If cleanBase is a Base64 data URI (e.g. offline/fallback),
-      // upload it directly to Cloudinary now so Firestore never strips it to empty string!
+      // Upload clean artwork background to Cloudinary if needed
       if (cleanBase && cleanBase.startsWith('data:image')) {
         setSaveMessage({
-          text: 'Uploading poster artwork to Cloudinary CDN...',
+          text: 'Uploading clean poster background to Cloudinary CDN...',
           type: 'info',
         });
         try {
@@ -390,20 +393,38 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
           const uploadedUrl = await uploadProductImage(
             template.id,
             blob,
-            `poster-${Date.now()}.jpg`
+            `clean_base-${Date.now()}.jpg`
           );
           if (uploadedUrl) {
             cleanBase = uploadedUrl;
-            setTemplate((prev) => ({
-              ...prev,
-              baseImageUrl: uploadedUrl,
-              cleanBaseImageUrl: uploadedUrl,
-            }));
           }
         } catch (uploadErr) {
-          console.error('Failed to upload base image to Cloudinary during save:', uploadErr);
+          console.error('Failed to upload clean base image to Cloudinary during save:', uploadErr);
         }
       }
+
+      // Upload sample composite preview to Cloudinary if needed
+      if (samplePreview && samplePreview.startsWith('data:image')) {
+        try {
+          const blob = base64ToBlob(samplePreview);
+          const uploadedUrl = await uploadProductImage(
+            template.id,
+            blob,
+            `sample_preview-${Date.now()}.jpg`
+          );
+          if (uploadedUrl) {
+            samplePreview = uploadedUrl;
+          }
+        } catch (uploadErr) {
+          console.error('Failed to upload sample preview to Cloudinary during save:', uploadErr);
+        }
+      }
+
+      setTemplate((prev) => ({
+        ...prev,
+        baseImageUrl: samplePreview,
+        cleanBaseImageUrl: cleanBase,
+      }));
 
       // Safeguard slot thumbnails so they never exceed Firestore quota (< 100KB)
       const sanitizedPhotoSlots = (template.photoSlots || []).map((slot) => {
@@ -418,7 +439,7 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
 
       const templateToSave: UniversalFrameTemplate = {
         ...template,
-        baseImageUrl: cleanBase,
+        baseImageUrl: samplePreview,
         cleanBaseImageUrl: cleanBase,
         photoSlots: sanitizedPhotoSlots,
         status: template.status || 'published',
@@ -431,15 +452,21 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
 
       // 2. If linked to a product, sync to products collection and store
       if (templateToSave.productId) {
+        const existingProd = await firebaseCloudDb.getDocument<any>('products', templateToSave.productId);
+
         const productUpdate: any = {
+          ...(existingProd || {}),
+          id: templateToSave.productId,
           linkedFrameTemplateId: templateToSave.id,
-          baseImageUrl: cleanBase,
-          thumbnail: cleanBase,
-          image: cleanBase,
-          images: [cleanBase],
+          baseImageUrl: samplePreview,
+          cleanBaseImageUrl: cleanBase,
+          thumbnail: samplePreview,
+          image: samplePreview,
+          images: [samplePreview],
           photoSlots: templateToSave.photoSlots,
           textZones: templateToSave.textZones,
-          templateConfig: templateToSave,
+          version: ((existingProd?.version || 1) + 1),
+          updatedAt: new Date().toISOString(),
         };
 
         try {
@@ -521,7 +548,7 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
       <div className="relative">
         <NewFrameWizard
           onBack={() => setCurrentView('library')}
-          onComplete={async ({ title, category, photoSlots, textZones, staticLayers, baseImageUrl, originalUploadUrl, documentDimensions }) => {
+          onComplete={async ({ title, category, photoSlots, textZones, staticLayers, baseImageUrl, cleanBaseImageUrl, originalUploadUrl, documentDimensions }) => {
             const uniqueId = `tmpl-${Date.now()}`;
             // For PSD templates, preserve the pure, crystal-clear artwork directly from Photoshop!
             const newTemplate: UniversalFrameTemplate = {
@@ -532,7 +559,7 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
               basePrice: 699,
               originalPrice: 999,
               baseImageUrl,
-              cleanBaseImageUrl: baseImageUrl,
+              cleanBaseImageUrl: cleanBaseImageUrl || baseImageUrl,
               originalUploadUrl,
               photoSlots,
               textZones,

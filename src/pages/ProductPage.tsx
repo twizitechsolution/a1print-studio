@@ -138,6 +138,11 @@ export const ProductPage: React.FC<ProductPageProps> = ({
     (product.images && product.images[0] && !product.images[0].includes('[COMPRESSED_FIRESTORE_PREVIEW]') ? product.images[0] : null) ||
     'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80';
 
+  const effectiveConfig = 
+    linkedTemplate || 
+    (product as any).universalTemplateConfig || 
+    (product as any).templateConfig;
+
   const currentTemplate: UniversalFrameTemplate = {
     id: linkedTemplate?.id || (product.linkedFrameTemplateId || `tmpl-${product.id}`),
     productId: product.id,
@@ -147,8 +152,8 @@ export const ProductPage: React.FC<ProductPageProps> = ({
     originalPrice: safeSizes[0]?.originalPrice || 999,
     baseImageUrl: baseImg,
     cleanBaseImageUrl: cleanBase,
-    photoSlots: (linkedTemplate?.photoSlots && linkedTemplate.photoSlots.length > 0) ? linkedTemplate.photoSlots : (product.photoSlots || []),
-    textZones: (linkedTemplate?.textZones && linkedTemplate.textZones.length > 0) ? linkedTemplate.textZones : (product.textZones || []),
+    photoSlots: (effectiveConfig?.photoSlots && effectiveConfig.photoSlots.length > 0) ? effectiveConfig.photoSlots : (product.photoSlots || []),
+    textZones: (effectiveConfig?.textZones && effectiveConfig.textZones.length > 0) ? effectiveConfig.textZones : (product.textZones || []),
     images: (product as any).angleImages || product.images || (baseImg ? [baseImg] : []),
     product: {
       ...product,
@@ -173,6 +178,7 @@ export const ProductPage: React.FC<ProductPageProps> = ({
 
       {/* Main Interactive Universal Customizer Workspace */}
       <UniversalFrameCustomizer
+        key={`${currentTemplate.id}-${currentTemplate.textZones?.length || 0}-${(currentTemplate.textZones?.[0] as any)?.label || ''}`}
         template={currentTemplate}
         onProceedToCheckout={(photos, texts, size, compiledUrl) => {
           onProceedToCheckout(

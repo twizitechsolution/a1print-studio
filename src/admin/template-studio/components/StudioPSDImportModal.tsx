@@ -12,6 +12,7 @@ interface StudioPSDImportModalProps {
     photoSlots: PhotoSlotConfig[];
     textZones: TextZoneConfig[];
     baseImageUrl?: string;
+    cleanBaseImageUrl?: string;
     originalUploadUrl?: string;
   }) => void;
 }
@@ -108,6 +109,8 @@ export const StudioPSDImportModal: React.FC<StudioPSDImportModalProps> = ({
     onApplyPSDLayers({
       photoSlots: approvedSlots,
       textZones: approvedZones,
+      baseImageUrl: psdResult.compositePreviewUrl,
+      cleanBaseImageUrl: psdResult.cleanBaseImageUrl,
       originalUploadUrl: originalUrl,
     });
 
