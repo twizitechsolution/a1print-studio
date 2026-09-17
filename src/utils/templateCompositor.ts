@@ -267,7 +267,8 @@ export function applyShapeClip(
 
   ctx.beginPath();
   if (shapeLower === 'circle') {
-    ctx.arc(centerX, centerY, Math.min(width, height) / 2, 0, Math.PI * 2);
+    const radius = Math.max(width, height) / 2;
+    ctx.arc(centerX, centerY, radius + 1, 0, Math.PI * 2);
   } else if (shapeLower === 'oval') {
     ctx.ellipse(centerX, centerY, width / 2, height / 2, 0, 0, Math.PI * 2);
   } else if (shapeLower === 'arch') {
@@ -495,17 +496,16 @@ export async function renderTemplateComposite({
   const hasCustomPhotos = Object.values(photoMap).some((v) => Boolean(v && v.trim() !== ''));
   const hasCustomTexts = Object.values(textMap).some((v) => Boolean(v && v.trim() !== ''));
 
-  // 2. Resolve Dynamic Canvas Dimensions
+  // 2. Resolve Dynamic Canvas Dimensions (Preserve strict frame poster aspect ratio)
   let finalWidth = targetWidth;
   let finalHeight = targetHeight;
 
   if (template.documentDimensions?.width && template.documentDimensions?.height) {
     const docAspect = template.documentDimensions.width / template.documentDimensions.height;
-    if (finalWidth && !finalHeight) {
-      finalHeight = Math.round(finalWidth / docAspect);
-    } else if (finalHeight && !finalWidth) {
-      finalWidth = Math.round(finalHeight * docAspect);
-    }
+    finalHeight = Math.round(finalWidth / docAspect);
+  } else {
+    // Default 4:5 frame poster ratio (2400:3000)
+    finalHeight = Math.round(finalWidth / 0.8);
   }
 
   const canvas = targetCanvas || document.createElement('canvas');
@@ -556,6 +556,14 @@ export async function renderTemplateComposite({
   if (baseSrc) {
     try {
       const baseImg = await loadImage(baseSrc);
+      if (baseImg.naturalWidth && baseImg.naturalHeight) {
+        const naturalAspect = baseImg.naturalWidth / baseImg.naturalHeight;
+        const targetH = Math.round(finalWidth / naturalAspect);
+        if (canvas.height !== targetH) {
+          canvas.height = targetH;
+          finalHeight = targetH;
+        }
+      }
       drawImageCover(ctx, baseImg, 0, 0, finalWidth, finalHeight);
     } catch (e) {
       console.warn('Failed to load base image in compositor:', e);
@@ -631,17 +639,11 @@ export async function renderTemplateComposite({
       if (isCalendarZone) {
         drawCalendarGrid(ctx, String(val), textX, textY, maxAllowedW, zone.color || '#160E4B', fontSpec.cssFamily);
       } else {
-        const refWidth = template.documentDimensions?.width || 1200;
+        const refWidth = 800; // Base reference width for typography points
         const scaleRatio = finalWidth / refWidth;
 
         let baseSize = zone.fontSize || 26;
-        if (baseSize > 48 && !fontSpec.isScript) {
-          baseSize = 36;
-        } else if (baseSize > 56 && fontSpec.isScript) {
-          baseSize = 44;
-        }
-
-        let currentFontSize = Math.max(11, Math.round(baseSize * scaleRatio * fontSpec.scaleModifier));
+        let currentFontSize = Math.max(12, Math.round(baseSize * scaleRatio * fontSpec.scaleModifier));
 
         ctx.save();
         ctx.textAlign = align;
@@ -663,9 +665,9 @@ export async function renderTemplateComposite({
           ctx.font = `${fontSpec.weight} ${currentFontSize}px ${fontSpec.cssFamily}`;
           let measuredW = ctx.measureText(String(val)).width;
 
-          if (measuredW > maxAllowedW && maxAllowedW > 20) {
+          if (measuredW > maxAllowedW && maxAllowedW > 30) {
             const fitRatio = maxAllowedW / measuredW;
-            currentFontSize = Math.max(9, Math.floor(currentFontSize * fitRatio * 0.96));
+            currentFontSize = Math.max(Math.round(currentFontSize * 0.72), Math.floor(currentFontSize * fitRatio * 0.98));
             ctx.font = `${fontSpec.weight} ${currentFontSize}px ${fontSpec.cssFamily}`;
           }
 

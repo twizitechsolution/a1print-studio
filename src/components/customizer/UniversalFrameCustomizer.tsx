@@ -222,7 +222,7 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
         template,
         customerInputs: { photoValues, textValues },
         targetWidth: 800,
-        targetHeight: 1100,
+        targetHeight: 1000,
         drawFrameBorder: false,
       }).catch((err) => {
         if (active) console.warn('Live canvas render error:', err);

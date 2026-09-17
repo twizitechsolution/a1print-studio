@@ -48,8 +48,8 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
   // Selection
   const [selectedLayer, setSelectedLayer] = useState<SelectedLayer | null>(null);
 
-  // Preview Mode: 'cutout' (clean transparent aperture guides) or 'sample' (mock preview photos)
-  const [previewMode, setPreviewMode] = useState<'cutout' | 'sample'>('cutout');
+  // Preview Mode: 'sample' (live sample photos & typography) or 'cutout' (clean cutouts)
+  const [previewMode, setPreviewMode] = useState<'cutout' | 'sample'>('sample');
 
   // Debug wireframe toggle (defaults to false / clean Photoshop view)
   const [showWireframes, setShowWireframes] = useState<boolean>(false);
