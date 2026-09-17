@@ -38,48 +38,186 @@ export function loadImage(src: string): Promise<HTMLImageElement> {
   return p;
 }
 
+export interface ResolvedFontSpec {
+  family: string;
+  cssFamily: string;
+  weight: string;
+  isScript: boolean;
+  scaleModifier: number;
+}
+
+// In-memory cache of loaded font signatures to prevent duplicate network calls
+const loadedFontSignatures = new Set<string>();
+
 /**
- * Maps PSD embedded font names to available Google Fonts with cursive/serif fallbacks.
+ * Ensures all required web fonts are loaded into the browser before canvas operations.
  */
-export function resolvePSDWebFont(fontFamily?: string): string {
-  if (!fontFamily) return "'Jost', sans-serif";
+export async function ensureWebFontsReady(customFonts?: Array<{ family: string; weight: string }>): Promise<void> {
+  if (typeof document === 'undefined' || !document.fonts) return;
+
+  const standardFonts = [
+    { family: 'Great Vibes', weight: '400' },
+    { family: 'Dancing Script', weight: '700' },
+    { family: 'Playfair Display', weight: '900' },
+    { family: 'Montserrat', weight: '700' },
+    { family: 'Cinzel', weight: '700' },
+    { family: 'Jost', weight: '600' },
+    { family: 'Poppins', weight: '600' },
+    { family: 'Alex Brush', weight: '400' },
+    { family: 'Caveat', weight: '700' },
+  ];
+
+  const targets = [...standardFonts, ...(customFonts || [])];
+
+  const promises = targets.map(async (f) => {
+    const sig = `${f.weight} 16px "${f.family}"`;
+    if (loadedFontSignatures.has(sig)) return;
+    try {
+      await document.fonts.load(sig);
+      loadedFontSignatures.add(sig);
+    } catch {
+      // Non-critical fallback
+    }
+  });
+
+  try {
+    await Promise.race([
+      Promise.all([document.fonts.ready, Promise.all(promises)]),
+      new Promise((resolve) => setTimeout(resolve, 800)),
+    ]);
+  } catch (err) {
+    console.warn('Web font readiness notice:', err);
+  }
+}
+
+/**
+ * Maps PSD embedded font names to available Google Fonts with exact weight and styling specs.
+ */
+export function resolvePSDWebFontSpec(fontFamily?: string): ResolvedFontSpec {
+  if (!fontFamily) {
+    return {
+      family: 'Jost',
+      cssFamily: "'Jost', sans-serif",
+      weight: '600',
+      isScript: false,
+      scaleModifier: 1.0,
+    };
+  }
+
   const f = fontFamily.toLowerCase();
+
+  // 1. Script / Cursive fonts (Floryfic, Cinderella, Great Vibes, Dancing Script, etc.)
   if (
     f.includes('floryfic') ||
     f.includes('cinderella') ||
-    f.includes('script') ||
     f.includes('great vibes') ||
-    f.includes('dancing') ||
-    f.includes('cursive') ||
-    f.includes('calligraph')
+    f.includes('alex brush') ||
+    f.includes('calligraph') ||
+    f.includes('script') ||
+    f.includes('cursive')
   ) {
-    return "'Great Vibes', 'Dancing Script', cursive";
+    // Great Vibes only exists in 400 (normal) weight. Normal weight ensures Canvas API matches it!
+    return {
+      family: 'Great Vibes',
+      cssFamily: "'Great Vibes', 'Dancing Script', cursive",
+      weight: 'normal',
+      isScript: true,
+      scaleModifier: 1.25,
+    };
   }
+
+  if (f.includes('dancing')) {
+    return {
+      family: 'Dancing Script',
+      cssFamily: "'Dancing Script', 'Great Vibes', cursive",
+      weight: 'bold',
+      isScript: true,
+      scaleModifier: 1.15,
+    };
+  }
+
+  if (f.includes('caveat')) {
+    return {
+      family: 'Caveat',
+      cssFamily: "'Caveat', cursive",
+      weight: 'bold',
+      isScript: true,
+      scaleModifier: 1.1,
+    };
+  }
+
+  if (f.includes('pacifico')) {
+    return {
+      family: 'Pacifico',
+      cssFamily: "'Pacifico', cursive",
+      weight: 'normal',
+      isScript: true,
+      scaleModifier: 1.0,
+    };
+  }
+
+  // 2. Heavy Slab Serif / Clarendon (Playfair Display 900 weight is a great match for ClarendonBT-Black)
   if (
     f.includes('clarendon') ||
+    f.includes('playfair') ||
     f.includes('times') ||
     f.includes('georgia') ||
-    f.includes('playfair') ||
     f.includes('serif')
   ) {
-    return "'Playfair Display', serif";
+    return {
+      family: 'Playfair Display',
+      cssFamily: "'Playfair Display', Georgia, serif",
+      weight: '900',
+      isScript: false,
+      scaleModifier: 1.0,
+    };
   }
+
   if (f.includes('cinzel')) {
-    return "'Cinzel', serif";
+    return {
+      family: 'Cinzel',
+      cssFamily: "'Cinzel', serif",
+      weight: '700',
+      isScript: false,
+      scaleModifier: 1.0,
+    };
   }
+
+  // 3. Sans-serif fonts
   if (f.includes('montserrat')) {
-    return "'Montserrat', sans-serif";
+    return {
+      family: 'Montserrat',
+      cssFamily: "'Montserrat', sans-serif",
+      weight: 'bold',
+      isScript: false,
+      scaleModifier: 1.0,
+    };
   }
+
   if (f.includes('poppins')) {
-    return "'Poppins', sans-serif";
+    return {
+      family: 'Poppins',
+      cssFamily: "'Poppins', sans-serif",
+      weight: '600',
+      isScript: false,
+      scaleModifier: 1.0,
+    };
   }
-  if (f.includes('caveat')) {
-    return "'Caveat', cursive";
-  }
-  if (f.includes('pacifico')) {
-    return "'Pacifico', cursive";
-  }
-  return `'${fontFamily}', 'Jost', sans-serif`;
+
+  return {
+    family: fontFamily,
+    cssFamily: `'${fontFamily}', 'Jost', sans-serif`,
+    weight: 'bold',
+    isScript: false,
+    scaleModifier: 1.0,
+  };
+}
+
+/**
+ * Backwards-compatible helper returning css font family string
+ */
+export function resolvePSDWebFont(fontFamily?: string): string {
+  return resolvePSDWebFontSpec(fontFamily).cssFamily;
 }
 
 /**
@@ -384,6 +522,9 @@ export async function renderTemplateComposite({
   ctx.fillStyle = '#FFFFFF';
   ctx.fillRect(0, 0, finalWidth, finalHeight);
 
+  // Ensure web fonts are loaded into DOM before calculating metrics or drawing
+  await ensureWebFontsReady();
+
   // 3. Determine Background Image Source & Render Strategy
   const sampleCompositeUrl = template.baseImageUrl || template.cleanBaseImageUrl;
   const cleanBaseUrl = template.cleanBaseImageUrl || template.baseImageUrl;
@@ -393,7 +534,7 @@ export async function renderTemplateComposite({
 
   if (mode === 'cutout') {
     baseSrc = cleanBaseUrl;
-    shouldRenderLayers = false;
+    shouldRenderLayers = true;
   } else if (mode === 'sample') {
     baseSrc = cleanBaseUrl;
     shouldRenderLayers = true;
@@ -423,8 +564,6 @@ export async function renderTemplateComposite({
     }
   }
 
-
-
   if (shouldRenderLayers) {
     // A. Draw Photo Apertures (Replace-Not-Overlay)
     for (const slot of template.photoSlots || []) {
@@ -433,7 +572,8 @@ export async function renderTemplateComposite({
 
       let photoSrc = photoMap[slot.id];
       if (!photoSrc) {
-        if (vis.emptyBehavior === 'hideLayer') continue;
+        // In cutout mode, keep the apertures empty/clean unless a custom customer photo was provided!
+        if (mode === 'cutout' || vis.emptyBehavior === 'hideLayer') continue;
         photoSrc = slot.defaultPhotoUrl || '';
       }
 
@@ -456,7 +596,7 @@ export async function renderTemplateComposite({
       }
     }
 
-    // B. Draw Dynamic Text Zones (Replace-Not-Overlay)
+    // B. Draw Dynamic Text Zones (Replace-Not-Overlay with Single-Line Auto-Fitting)
     for (const zone of template.textZones || []) {
       const vis = resolveVisibility(zone.visibility);
       if (zone.visibility && vis.userVisible === false) continue;
@@ -469,46 +609,93 @@ export async function renderTemplateComposite({
 
       const textX = (zone.x / 100) * finalWidth;
       const textY = (zone.y / 100) * finalHeight;
-      const maxBoxWidth = ((zone.maxWidth || 85) / 100) * finalWidth;
-      const isCalendarZone = zone.type === 'calendar_grid' || zone.type === 'calendar' || zone.isCalendar === true;
+      const margin = Math.max(16, finalWidth * 0.035);
+      const zoneMaxBoxW = ((zone.maxWidth || 75) / 100) * finalWidth;
 
-      const resolvedFontFamily = resolvePSDWebFont(zone.fontFamily);
+      const align = (zone.align as CanvasTextAlign) || 'center';
+      let maxAllowedW = zoneMaxBoxW;
+      if (align === 'center') {
+        const distFromLeft = textX - margin;
+        const distFromRight = finalWidth - margin - textX;
+        const maxSymmetricW = Math.min(distFromLeft, distFromRight) * 2;
+        maxAllowedW = Math.min(zoneMaxBoxW, Math.max(40, maxSymmetricW));
+      } else if (align === 'left') {
+        maxAllowedW = Math.min(zoneMaxBoxW, Math.max(40, finalWidth - margin - textX));
+      } else if (align === 'right') {
+        maxAllowedW = Math.min(zoneMaxBoxW, Math.max(40, textX - margin));
+      }
+
+      const isCalendarZone = zone.type === 'calendar_grid' || zone.type === 'calendar' || zone.isCalendar === true;
+      const fontSpec = resolvePSDWebFontSpec(zone.fontFamily);
 
       if (isCalendarZone) {
-        drawCalendarGrid(ctx, String(val), textX, textY, maxBoxWidth, zone.color || '#160E4B', resolvedFontFamily);
+        drawCalendarGrid(ctx, String(val), textX, textY, maxAllowedW, zone.color || '#160E4B', fontSpec.cssFamily);
       } else {
-        // Compute responsive font size based on target width
-        const basePt = zone.fontSize || 24;
-        const scaledFontSize = Math.max(10, Math.round(basePt * (finalWidth / 600)));
+        const refWidth = template.documentDimensions?.width || 1200;
+        const scaleRatio = finalWidth / refWidth;
+
+        let baseSize = zone.fontSize || 26;
+        if (baseSize > 48 && !fontSpec.isScript) {
+          baseSize = 36;
+        } else if (baseSize > 56 && fontSpec.isScript) {
+          baseSize = 44;
+        }
+
+        let currentFontSize = Math.max(11, Math.round(baseSize * scaleRatio * fontSpec.scaleModifier));
 
         ctx.save();
-        ctx.font = `bold ${scaledFontSize}px ${resolvedFontFamily}`;
-        ctx.fillStyle = zone.color || '#160E4B';
-        ctx.textAlign = (zone.align as CanvasTextAlign) || 'center';
+        ctx.textAlign = align;
         ctx.textBaseline = 'middle';
 
-        const words = String(val).split(' ');
-        const lines: string[] = [];
-        let currentLine = '';
-
-        for (const word of words) {
-          const testLine = currentLine ? `${currentLine} ${word}` : word;
-          const metrics = ctx.measureText(testLine);
-          if (metrics.width > maxBoxWidth && currentLine) {
-            lines.push(currentLine);
-            currentLine = word;
-          } else {
-            currentLine = testLine;
-          }
+        // Blood Group "B+" on blood drop should be crisp white (#FFFFFF)
+        const isBloodDropVal =
+          zone.label.toLowerCase().includes('blood') || /^(A|B|AB|O)[+-]$/i.test(String(val).trim());
+        if (isBloodDropVal && (!zone.color || zone.color === '#160E4B' || zone.color.toLowerCase() === '#ffffff')) {
+          ctx.fillStyle = '#FFFFFF';
+        } else {
+          ctx.fillStyle = zone.color || '#160E4B';
         }
-        if (currentLine) lines.push(currentLine);
 
-        const lineHeight = scaledFontSize * 1.22;
-        const startY = textY - ((lines.length - 1) * lineHeight) / 2;
+        const isMultiline = (zone as any).multiline === true || zone.type === 'textarea';
 
-        lines.forEach((line, idx) => {
-          ctx.fillText(line, textX, startY + idx * lineHeight);
-        });
+        if (!isMultiline) {
+          // SINGLE-LINE AUTO-FIT: Names, dates, times, weights must NEVER wrap or collide!
+          ctx.font = `${fontSpec.weight} ${currentFontSize}px ${fontSpec.cssFamily}`;
+          let measuredW = ctx.measureText(String(val)).width;
+
+          if (measuredW > maxAllowedW && maxAllowedW > 20) {
+            const fitRatio = maxAllowedW / measuredW;
+            currentFontSize = Math.max(9, Math.floor(currentFontSize * fitRatio * 0.96));
+            ctx.font = `${fontSpec.weight} ${currentFontSize}px ${fontSpec.cssFamily}`;
+          }
+
+          ctx.fillText(String(val), textX, textY);
+        } else {
+          // MULTI-LINE AUTO-FIT: For address, letters, quotes
+          ctx.font = `${fontSpec.weight} ${currentFontSize}px ${fontSpec.cssFamily}`;
+          const words = String(val).split(' ');
+          const lines: string[] = [];
+          let currentLine = '';
+
+          for (const word of words) {
+            const testLine = currentLine ? `${currentLine} ${word}` : word;
+            const metrics = ctx.measureText(testLine);
+            if (metrics.width > maxAllowedW && currentLine) {
+              lines.push(currentLine);
+              currentLine = word;
+            } else {
+              currentLine = testLine;
+            }
+          }
+          if (currentLine) lines.push(currentLine);
+
+          const lineHeight = currentFontSize * 1.25;
+          const startY = textY - ((lines.length - 1) * lineHeight) / 2;
+
+          lines.forEach((line, idx) => {
+            ctx.fillText(line, textX, startY + idx * lineHeight);
+          });
+        }
 
         ctx.restore();
       }

@@ -428,11 +428,20 @@ export async function parsePSDFileBinary(file: File): Promise<PSDImportResult> {
 
           // Extract styling if available
           const textStyle = layer.text.style || {};
-          const fontSize = textStyle.fontSize ? Math.round(textStyle.fontSize) : 24;
+          const rawFontSize = textStyle.fontSize ? Math.round(textStyle.fontSize) : 28;
           const fontFamily = textStyle.font?.name || 'Playfair Display';
           const color = textStyle.fillColor ? rgbToHex(textStyle.fillColor) : '#160E4B';
 
           const classified = classifyPsdTextLayer(cleanText, layerName);
+
+          // Normalize font size to 1200px reference canvas width
+          const normalizedFontSize = docWidth > 0 
+            ? Math.min(52, Math.max(14, Math.round((rawFontSize / docWidth) * 1200)))
+            : Math.min(52, Math.max(14, rawFontSize));
+
+          // Blood Group on blood drop should be crisp white (#FFFFFF)
+          const isBloodDropVal = classified.label.toLowerCase().includes('blood') || /^(A|B|AB|O)[+-]$/i.test(cleanText);
+          const resolvedColor = isBloodDropVal ? '#FFFFFF' : color;
 
           textZones.push({
             id: `text-psd-${Date.now().toString(36)}-${textCounter}`,
@@ -441,9 +450,9 @@ export async function parsePSDFileBinary(file: File): Promise<PSDImportResult> {
             x: xPct,
             y: yPct,
             maxWidth: Math.min(90, Math.max(30, wPct + 10)),
-            fontSize: Math.min(64, Math.max(12, fontSize)),
+            fontSize: normalizedFontSize,
             fontFamily,
-            color,
+            color: resolvedColor,
             align: 'center',
             type: classified.type,
             isCalendar: classified.isCalendar,
