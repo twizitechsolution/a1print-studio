@@ -220,6 +220,41 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
     'Baloo 2',
     'Jost',
   ];
+
+  // Helper to map PSD embedded font names to available Google Fonts with cursive/serif fallbacks
+  const resolvePSDWebFont = (fontFamily?: string) => {
+    if (!fontFamily) return "'Jost', sans-serif";
+    const f = fontFamily.toLowerCase();
+    if (f.includes('floryfic') || f.includes('cinderella') || f.includes('script') || f.includes('great vibes') || f.includes('dancing') || f.includes('cursive') || f.includes('calligraph')) {
+      return "'Great Vibes', 'Dancing Script', cursive";
+    }
+    if (f.includes('clarendon') || f.includes('times') || f.includes('georgia') || f.includes('serif')) {
+      return "'Playfair Display', serif";
+    }
+    if (f.includes('cinzel')) {
+      return "'Cinzel', serif";
+    }
+    if (f.includes('montserrat')) {
+      return "'Montserrat', sans-serif";
+    }
+    if (f.includes('poppins')) {
+      return "'Poppins', sans-serif";
+    }
+    return `'${fontFamily}', 'Jost', sans-serif`;
+  };
+
+  // Responsive font size calculation based on container width query
+  const resolveResponsiveFontSize = (zone: TextZoneConfig) => {
+    const baseSize = zone.fontSize || 24;
+    if (baseSize >= 50) {
+      return 'clamp(12px, 4.2cqw, 18px)';
+    }
+    if (baseSize >= 25) {
+      return 'clamp(11px, 3.2cqw, 15px)';
+    }
+    return 'clamp(9px, 2.6cqw, 12px)';
+  };
+
   const [activeSlotForCrop, setActiveSlotForCrop] = useState<any | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
@@ -478,6 +513,7 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
               id="live-frame-canvas"
               className="relative w-full rounded-xs border-[12px] sm:border-[16px] border-black shadow-[0_25px_60px_rgba(0,0,0,0.6)] bg-white overflow-hidden font-serif select-none transition-all max-w-[360px]"
               style={{
+                containerType: 'inline-size',
                 aspectRatio: template.documentDimensions?.width && template.documentDimensions?.height
                   ? `${template.documentDimensions.width} / ${template.documentDimensions.height}`
                   : ((template.product as any)?.orientation || (template as any).orientation) === 'landscape' ? '4 / 3' : '4 / 5',
@@ -554,6 +590,9 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                   );
                 }
 
+                const resolvedFont = resolvePSDWebFont(zone.fontFamily);
+                const resolvedSize = resolveResponsiveFontSize(zone);
+
                 return (
                   <div
                     key={zone.id}
@@ -568,10 +607,9 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                       className="inline-block font-bold select-none bg-transparent leading-tight"
                       style={{
                         color: zone.color || '#160E4B',
-                        fontFamily: zone.fontFamily || 'serif',
-                        fontSize: zone.fontSize ? `clamp(10px, ${(zone.fontSize / 30).toFixed(1)}vw, ${(zone.fontSize * 0.75).toFixed(0)}px)` : 'clamp(9px, 2.5vw, 16px)',
+                        fontFamily: resolvedFont,
+                        fontSize: resolvedSize,
                         textAlign: (zone.align as any) || 'center',
-                        textShadow: '0 1px 2px rgba(255,255,255,0.7)',
                       }}
                     >
                       {textToDisplay}
@@ -993,6 +1031,7 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                 aspectRatio: template.documentDimensions?.width && template.documentDimensions?.height
                   ? `${template.documentDimensions.width} / ${template.documentDimensions.height}`
                   : ((template.product as any)?.orientation || (template as any).orientation) === 'landscape' ? '4 / 3' : '4 / 5',
+                containerType: 'inline-size',
               }}
             >
               {isLoadingPreview ? (
@@ -1069,6 +1108,9 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                       );
                     }
 
+                    const resolvedFont = resolvePSDWebFont(zone.fontFamily);
+                    const resolvedSize = resolveResponsiveFontSize(zone);
+
                     return (
                       <div
                         key={zone.id}
@@ -1083,10 +1125,9 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                           className="inline-block font-bold select-none bg-transparent leading-tight"
                           style={{
                             color: zone.color || '#160E4B',
-                            fontFamily: zone.fontFamily || 'serif',
-                            fontSize: zone.fontSize ? `clamp(10px, ${(zone.fontSize / 30).toFixed(1)}vw, ${(zone.fontSize * 0.75).toFixed(0)}px)` : 'clamp(9px, 2.5vw, 16px)',
+                            fontFamily: resolvedFont,
+                            fontSize: resolvedSize,
                             textAlign: (zone.align as any) || 'center',
-                            textShadow: '0 1px 2px rgba(255,255,255,0.7)',
                           }}
                         >
                           {textToDisplay}
