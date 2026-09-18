@@ -605,12 +605,23 @@ export async function renderTemplateComposite({
     }
 
     // B. Draw Dynamic Text Zones (Replace-Not-Overlay with Single-Line Auto-Fitting)
-    for (const zone of template.textZones || []) {
-      const vis = resolveVisibility(zone.visibility);
-      if (zone.visibility && vis.userVisible === false) continue;
+    // Draw shadow layers first so primary text layers stack cleanly on top
+    const sortedTextZones = [...(template.textZones || [])].sort((a, b) => {
+      if (a.pairedWithId === b.id) return -1;
+      if (b.pairedWithId === a.id) return 1;
+      return 0;
+    });
 
-      const rawVal = textMap[zone.id];
-      if (!rawVal && vis.emptyBehavior === 'hideLayer') continue;
+    for (const zone of sortedTextZones) {
+      const vis = resolveVisibility(zone.visibility);
+      const isPairedShadow = Boolean(zone.pairedWithId);
+      if (zone.visibility && vis.userVisible === false && !isPairedShadow) continue;
+
+      let rawVal = textMap[zone.id];
+      if ((!rawVal || rawVal.trim() === '') && isPairedShadow && zone.pairedWithId) {
+        rawVal = textMap[zone.pairedWithId];
+      }
+      if (!rawVal && vis.emptyBehavior === 'hideLayer' && !isPairedShadow) continue;
 
       const val = (rawVal !== undefined && rawVal.trim() !== '') ? rawVal : (zone.defaultValue || '');
       if (!val || val.trim() === '' || val.startsWith('data:image')) continue;
@@ -658,7 +669,11 @@ export async function renderTemplateComposite({
           ctx.fillStyle = zone.color || '#160E4B';
         }
 
-        const isMultiline = (zone as any).multiline === true || zone.type === 'textarea';
+        const isMultiline =
+          zone.multiline === true ||
+          zone.type === 'textarea' ||
+          zone.type === 'message' ||
+          (zone.defaultValue && zone.defaultValue.length > 60);
 
         if (!isMultiline) {
           // SINGLE-LINE AUTO-FIT: Names, dates, times, weights must NEVER wrap or collide!

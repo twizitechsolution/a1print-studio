@@ -398,7 +398,14 @@ function extractTextFromTypeToolBlock(slice: Uint8Array): string {
 
   const textMatch = str.match(/\/Text\s*\(([^)]+)\)/i) || str.match(/\/Txt\s*\(([^)]+)\)/i);
   if (textMatch && textMatch[1]) {
-    return textMatch[1].replace(/\\([()\\])/g, '$1').trim();
+    const raw = textMatch[1].replace(/\\([()\\])/g, '$1');
+    return raw
+      .replace(/^[þÿ\uFEFF\uFFFE\xFE\xFF]+/, '')
+      .replace(/[\u001c\u001d]/g, '"')
+      .replace(/\x00/g, '')
+      .replace(/[\r\n]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 
   for (let i = 0; i < slice.length - 4; i++) {
@@ -412,7 +419,10 @@ function extractTextFromTypeToolBlock(slice: Uint8Array): string {
         }
       }
       if (utf16Str.trim().length > 0) {
-        return utf16Str.trim();
+        return utf16Str
+          .replace(/[\u001c\u001d]/g, '"')
+          .replace(/\s+/g, ' ')
+          .trim();
       }
     }
   }
@@ -434,15 +444,38 @@ function parsePhotoshopLayerRecords(
 
   if (layrBytes.byteLength < 6) return detectedLayers;
 
-  let offset = 0;
-  offset += 4; // layerInfoLen
+  // Auto-detect start offset:
+  // In TIFF Tag 37724, the Layr block directly begins with int16 layerCount at offset 0.
+  // In standard PSD files, the section begins with a 4-byte layerInfoLen before int16 layerCount at offset 4.
+  let rawCount = view.getInt16(0, isLE);
+  let layerCount = Math.abs(rawCount);
+  let cur = 2;
 
-  if (offset + 2 > layrBytes.byteLength) return detectedLayers;
-  const rawCount = view.getInt16(offset, isLE);
-  const layerCount = Math.abs(rawCount);
-  offset += 2;
+  let validAt0 = false;
+  if (layerCount > 0 && layerCount < 500) {
+    const ch0 = view.getUint16(18, isLE);
+    if (ch0 >= 1 && ch0 <= 56) {
+      const sigPos = 20 + ch0 * 6;
+      if (sigPos + 4 <= layrBytes.byteLength) {
+        const sig = String.fromCharCode(
+          view.getUint8(sigPos),
+          view.getUint8(sigPos + 1),
+          view.getUint8(sigPos + 2),
+          view.getUint8(sigPos + 3)
+        );
+        if (sig === '8BIM' || sig === 'MIB8') {
+          validAt0 = true;
+        }
+      }
+    }
+  }
 
-  let cur = offset;
+  if (!validAt0) {
+    rawCount = view.getInt16(4, isLE);
+    layerCount = Math.abs(rawCount);
+    cur = 6;
+  }
+
   for (let i = 0; i < layerCount && cur + 16 < layrBytes.byteLength; i++) {
     const top = view.getInt32(cur, isLE);
     const left = view.getInt32(cur + 4, isLE);
@@ -550,25 +583,35 @@ function parsePhotoshopLayerRecords(
 
     cur = extraEnd;
 
-    const width = Math.max(10, right - left);
-    const height = Math.max(10, bottom - top);
+    const width = Math.max(1, right - left);
+    const height = Math.max(1, bottom - top);
+    const isFullCanvas = left <= 25 && top <= 25 && right >= docWidth - 25 && bottom >= docHeight - 25;
 
     if (layerName && (right > left || bottom > top)) {
-      const layerClassification = classifyPSDLayer(layerName);
+      let layerType: 'photo' | 'text' | 'calendar' | 'background' | 'pixel' = 'pixel';
+      if (textValue) {
+        layerType = 'text';
+      } else if (isFullCanvas) {
+        layerType = 'background';
+      } else {
+        const layerClassification = classifyPSDLayer(layerName);
+        layerType = layerClassification.type === 'photo' ? 'photo' : 'pixel';
+      }
+
       detectedLayers.push({
-        name: layerName,
+        name: layerName.trim(),
         top,
         left,
         bottom,
         right,
         width,
         height,
-        type: textValue ? 'text' : layerClassification.type,
+        type: layerType as any,
         textValue: textValue || undefined,
         shape: inferShapeFromLayerName(layerName),
         fontFamily: 'Playfair Display',
         fontSize: 28,
-        color: '#160E4B',
+        color: /white/i.test(layerName) ? '#FFFFFF' : (/black/i.test(layerName) ? '#000000' : '#160E4B'),
       });
     }
   }
@@ -825,9 +868,8 @@ export function processAgPsdResult(psd: any, overrideCompositeUrl?: string): PSD
         const layerHeight = Math.max(1, b - t);
 
         // Check if layer is full-bleed background
-        const isFullCanvas = l <= 5 && t <= 5 && r >= docWidth - 5 && b >= docHeight - 5;
-        const isNamedBackground = /background|bg|artboard|base_frame|canvas_bg/i.test(layerName);
-        if (isFullCanvas && (isNamedBackground || i === 0)) {
+        const isFullCanvas = l <= 15 && t <= 15 && r >= docWidth - 15 && b >= docHeight - 15;
+        if (isFullCanvas && !layer.text) {
           // Keep as base artwork background, do not turn into an editable cutout
           continue;
         }
@@ -1055,9 +1097,9 @@ export function processAgPsdResult(psd: any, overrideCompositeUrl?: string): PSD
         else if (distCenterX > 35) score -= 25; // Peripheral corner icons
 
         // 5. Proportional aperture dimensions
-        if (c.wPct >= 18 && c.wPct <= 75 && c.hPct >= 15 && c.hPct <= 70) {
+        if (c.wPct >= 18 && c.wPct <= 88 && c.hPct >= 15 && c.hPct <= 85) {
           score += 25;
-        } else if (c.wPct > 85 || c.hPct > 85) {
+        } else if (c.wPct > 95 || c.hPct > 95) {
           score -= 50; // Full-bleed canvas element
         } else if (c.wPct < 15 || c.hPct < 15) {
           score -= 30; // Small icons/stickers
@@ -1270,7 +1312,7 @@ export function processAgPsdResult(psd: any, overrideCompositeUrl?: string): PSD
 }
 
 /**
- * Converts parsed raw layers into a structured PSDImportResult
+ * Converts parsed raw layers into a structured PSDImportResult with intelligent aperture clustering and drop-shadow pairing
  */
 export function convertParsedLayersToImportResult(
   detectedLayers: PSDParsedLayer[],
@@ -1278,70 +1320,230 @@ export function convertParsedLayersToImportResult(
   docHeight: number,
   compositePreviewUrl?: string
 ): PSDImportResult {
-  const fallbackPhotoSlots: PhotoSlotConfig[] = [];
-  const fallbackTextZones: TextZoneConfig[] = [];
+  const photoSlots: PhotoSlotConfig[] = [];
+  const textZones: TextZoneConfig[] = [];
+  const staticLayers: StaticLayerConfig[] = [];
 
-  let sCount = 1;
-  let tCount = 1;
+  // 1. Filter background vs pixel content vs text layers
+  const pixelLayers = detectedLayers.filter((l) => {
+    if (l.type === 'text' || Boolean(l.textValue)) return false;
+    const isFull = l.left <= 25 && l.top <= 25 && l.right >= docWidth - 25 && l.bottom >= docHeight - 25;
+    const isNamedBg = /background|bg|artboard|base_frame|canvas_bg/i.test(l.name || '');
+    return !(isFull || isNamedBg || l.name === 'Layer 0');
+  });
 
-  for (const layer of detectedLayers) {
-    if (layer.type === 'background') continue;
+  // 2. Intelligent Aperture Clustering
+  interface ApertureCluster {
+    left: number;
+    top: number;
+    right: number;
+    bottom: number;
+    cxPct: number;
+    cyPct: number;
+    wPct: number;
+    hPct: number;
+    w: number;
+    h: number;
+    layers: PSDParsedLayer[];
+  }
 
-    const xPct = Math.round((((layer.left + layer.right) / 2) / docWidth) * 100);
-    const yPct = Math.round((((layer.top + layer.bottom) / 2) / docHeight) * 100);
-    const wPct = Math.min(95, Math.max(10, Math.round((layer.width / docWidth) * 100)));
-    const hPct = Math.min(95, Math.max(5, Math.round((layer.height / docHeight) * 100)));
+  const clusters: ApertureCluster[] = [];
+  pixelLayers.forEach((l) => {
+    const w = Math.max(1, l.width);
+    const h = Math.max(1, l.height);
+    const cx = (l.left + l.right) / 2;
+    const cy = (l.top + l.bottom) / 2;
+    const cxPct = (cx / docWidth) * 100;
+    const cyPct = (cy / docHeight) * 100;
+    const wPct = (w / docWidth) * 100;
+    const hPct = (h / docHeight) * 100;
 
-    if (layer.type === 'photo') {
-      fallbackPhotoSlots.push({
-        id: `slot-psd-${Date.now().toString(36)}-${sCount}`,
-        label: layer.name || `Photo Slot ${sCount}`,
-        shape: layer.shape || inferShapeFromLayerName(layer.name),
-        x: Math.max(10, Math.min(90, xPct)),
-        y: Math.max(10, Math.min(90, yPct)),
-        width: wPct,
-        height: hPct,
-        defaultPhotoUrl: 'https://images.unsplash.com/photo-1519689680058-324335c77eba?auto=format&fit=crop&q=80&w=600',
-        visibility: {
-          ...DEFAULT_VISIBILITY,
-          userLabel: `Upload ${layer.name.replace(/[_-]/g, ' ')}`,
-        },
-        sourceLayerName: layer.name,
-      });
-      sCount++;
+    const match = clusters.find(
+      (c) =>
+        Math.abs(c.cxPct - cxPct) < 5 &&
+        Math.abs(c.cyPct - cyPct) < 5
+    );
+
+    if (match) {
+      match.layers.push(l);
     } else {
-      const classified = classifyPsdTextLayer(layer.textValue || 'Custom Text', layer.name || '');
-      fallbackTextZones.push({
-        id: `text-psd-${Date.now().toString(36)}-${tCount}`,
-        label: classified.label,
-        defaultValue: classified.defaultValue,
-        x: Math.max(10, Math.min(90, xPct)),
-        y: Math.max(10, Math.min(90, yPct)),
-        maxWidth: Math.min(90, Math.max(40, wPct + 10)),
-        fontSize: layer.type === 'calendar' ? 16 : (layer.fontSize || 26),
-        fontFamily: layer.type === 'calendar' ? 'Jost' : (layer.fontFamily || 'Playfair Display'),
-        color: layer.color || '#160E4B',
-        align: 'center',
-        type: classified.type,
-        isCalendar: classified.isCalendar,
-        visibility: {
-          ...DEFAULT_VISIBILITY,
-          userVisible: classified.userVisible,
-          userEditable: classified.userVisible,
-          userLabel: classified.userLabel,
-        },
-        sourceLayerName: layer.name,
+      clusters.push({
+        left: l.left,
+        top: l.top,
+        right: l.right,
+        bottom: l.bottom,
+        cxPct,
+        cyPct,
+        wPct,
+        hPct,
+        w,
+        h,
+        layers: [l],
       });
-      tCount++;
+    }
+  });
+
+  const scoredCandidates = clusters.map((c) => {
+    let score = 0;
+    const combinedNames = c.layers.map((l) => (l.name || '').toLowerCase()).join(' ');
+
+    if (/photo|slot|image|pic|portrait|couple|baby|insert|cutout|placeholder|user_photo|aperture/i.test(combinedNames)) {
+      score += 100;
+    }
+    if (c.layers.length > 1) score += 40;
+
+    const distCenterX = Math.abs(c.cxPct - 50);
+    if (distCenterX < 10) score += 30;
+    else if (distCenterX < 20) score += 15;
+    else if (distCenterX > 35) score -= 25;
+
+    if (c.wPct >= 18 && c.wPct <= 88 && c.hPct >= 15 && c.hPct <= 85) score += 25;
+    else if (c.wPct > 95 || c.hPct > 95) score -= 50;
+    else if (c.wPct < 15 || c.hPct < 15) score -= 30;
+
+    const aspect = c.w / c.h;
+    const isSquareOrCircle = Math.abs(aspect - 1.0) < 0.18;
+    if (isSquareOrCircle) score += 20;
+
+    const shape: FrameCutoutShape = isSquareOrCircle ? 'circle' : (inferShapeFromLayerName(combinedNames) as FrameCutoutShape);
+    return { cluster: c, score, shape, names: combinedNames };
+  });
+
+  scoredCandidates.sort((a, b) => b.score - a.score);
+
+  const selectedApertures: typeof scoredCandidates = [];
+  for (const cand of scoredCandidates) {
+    if (cand.score < 35) continue;
+    const c = cand.cluster;
+    const overlaps = selectedApertures.some((ex) => {
+      const ec = ex.cluster;
+      return Math.abs(ec.cxPct - c.cxPct) < 15 && Math.abs(ec.cyPct - c.cyPct) < 25;
+    });
+    if (!overlaps) selectedApertures.push(cand);
+  }
+
+  if (selectedApertures.length === 0 && scoredCandidates.length > 0 && scoredCandidates[0].score >= 20) {
+    selectedApertures.push(scoredCandidates[0]);
+  }
+
+  selectedApertures.forEach((ap, idx) => {
+    const c = ap.cluster;
+    const slotNumber = idx + 1;
+    photoSlots.push({
+      id: `slot-psd-${Date.now().toString(36)}-${slotNumber}`,
+      label: selectedApertures.length === 1 ? 'Baby Photo Slot' : `Photo Slot ${slotNumber}`,
+      shape: ap.shape,
+      x: Math.round(c.cxPct),
+      y: Math.round(c.cyPct),
+      width: Math.round(c.wPct),
+      height: Math.round(c.hPct),
+      defaultPhotoUrl: 'https://images.unsplash.com/photo-1519689680058-324335c77eba?auto=format&fit=crop&q=80&w=600',
+      visibility: {
+        ...DEFAULT_VISIBILITY,
+        userLabel: selectedApertures.length === 1 ? 'Upload Baby Photo' : `Upload Photo ${slotNumber}`,
+      },
+      sourceLayerName: c.layers.map((l) => l.name).join(', '),
+    });
+  });
+
+  // 3. Text Zones with Drop-Shadow Pairing
+  const textLayers = detectedLayers.filter((l) => l.type === 'text' && Boolean(l.textValue));
+  const primaryTextLayers: PSDParsedLayer[] = [];
+  const shadowTextLayers: PSDParsedLayer[] = [];
+
+  for (const l of textLayers) {
+    const lowerName = (l.name || '').toLowerCase();
+    const isShadow = /black|shadow|drop|copy/i.test(lowerName) && !/white/i.test(lowerName);
+    if (isShadow) {
+      shadowTextLayers.push(l);
+    } else {
+      primaryTextLayers.push(l);
     }
   }
 
+  let tCount = 1;
+  primaryTextLayers.forEach((l) => {
+    const textVal = l.textValue || '';
+    const xPct = Math.round((((l.left + l.right) / 2) / docWidth) * 100);
+    const yPct = Math.round((((l.top + l.bottom) / 2) / docHeight) * 100);
+    const wPct = Math.round((l.width / docWidth) * 100);
+    const isLongText = textVal.length > 50;
+
+    let label = (l.name || '').replace(/[_-]/g, ' ').replace(/\b(white|black|layer)\b/gi, '').trim();
+    if (/happy\s*birthday/i.test(textVal)) label = 'Title';
+    else if (/anahitha/i.test(textVal)) label = 'Baby Name';
+    else if (isLongText) label = 'Birthday Quote';
+    if (!label) label = `Text Zone ${tCount}`;
+
+    const normalizedFontSize = isLongText ? 18 : (label === 'Baby Name' ? 44 : 36);
+
+    const zoneId = `text-psd-${Date.now().toString(36)}-${tCount}`;
+    const zone: TextZoneConfig = {
+      id: zoneId,
+      label,
+      defaultValue: textVal,
+      x: xPct,
+      y: yPct,
+      maxWidth: Math.min(90, Math.max(30, wPct + 10)),
+      fontSize: normalizedFontSize,
+      fontFamily: 'Playfair Display',
+      color: /white/i.test(l.name || '') ? '#FFFFFF' : '#160E4B',
+      align: 'center',
+      type: isLongText ? 'message' : 'text',
+      multiline: isLongText,
+      visibility: {
+        ...DEFAULT_VISIBILITY,
+        userVisible: true,
+        userEditable: true,
+        userLabel: label,
+      },
+      sourceLayerName: l.name,
+    };
+    textZones.push(zone);
+
+    // Find matching shadow layer
+    const shadowMatch = shadowTextLayers.find(
+      (s) =>
+        s.textValue?.toLowerCase() === textVal.toLowerCase() ||
+        Math.abs(((s.left + s.right) / 2) - ((l.left + l.right) / 2)) < docWidth * 0.05
+    );
+
+    if (shadowMatch) {
+      const sxPct = Math.round((((shadowMatch.left + shadowMatch.right) / 2) / docWidth) * 100);
+      const syPct = Math.round((((shadowMatch.top + shadowMatch.bottom) / 2) / docHeight) * 100);
+      textZones.push({
+        id: `${zoneId}-shadow`,
+        label: `${label} (Shadow)`,
+        defaultValue: shadowMatch.textValue || textVal,
+        x: sxPct,
+        y: syPct,
+        maxWidth: zone.maxWidth,
+        fontSize: zone.fontSize,
+        fontFamily: zone.fontFamily,
+        color: '#000000',
+        align: 'center',
+        type: zone.type,
+        multiline: isLongText,
+        pairedWithId: zoneId,
+        visibility: {
+          ...DEFAULT_VISIBILITY,
+          userVisible: false,
+          userEditable: false,
+          userLabel: `${label} (Shadow)`,
+        },
+        sourceLayerName: shadowMatch.name,
+      });
+    }
+
+    tCount++;
+  });
+
   return {
     documentDimensions: { width: docWidth, height: docHeight },
-    photoSlots: fallbackPhotoSlots,
-    textZones: fallbackTextZones,
-    staticLayers: [],
-    detectedLayerCount: fallbackPhotoSlots.length + fallbackTextZones.length,
+    photoSlots,
+    textZones,
+    staticLayers,
+    detectedLayerCount: photoSlots.length + primaryTextLayers.length,
     compositePreviewUrl: compositePreviewUrl || undefined,
     cleanBaseImageUrl: compositePreviewUrl || undefined,
   };

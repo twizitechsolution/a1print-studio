@@ -51,6 +51,8 @@ export interface TextZoneConfig {
   type: 'text' | 'date' | 'time' | 'number' | 'calendar' | 'message';
   isCalendar?: boolean;
   isAIMessage?: boolean;
+  multiline?: boolean;
+  pairedWithId?: string;
   visibility?: LayerVisibility;   // Backward-compatible visibility metadata
   locked?: boolean;               // Admin-only: locks position/scale in Studio
   sourceLayerName?: string;       // PSD layer name / AI detection reference
@@ -84,6 +86,10 @@ export interface UniversalFrameTemplate {
   staticLayers?: StaticLayerConfig[];
   createdAt: string;
   importSource?: 'manual' | 'psd' | 'ai-image';
-  originalUploadUrl?: string;   // Retained source image/PSD URL for re-analysis or audit
+  originalUploadUrl?: string;
   aiDetectionConfidence?: Record<string, number>; // slotId/zoneId -> 0-1 confidence
+  documentDimensions?: { width: number; height: number };
+  product?: any;
 }
+
+export type CustomFrameTemplate = UniversalFrameTemplate;
