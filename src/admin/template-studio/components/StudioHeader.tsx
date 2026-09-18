@@ -213,10 +213,10 @@ export const StudioHeader: React.FC<StudioHeaderProps> = ({
           <button
             onClick={onOpenPSDImport}
             className="px-3 py-2 rounded-xl text-xs font-extrabold bg-gradient-to-r from-blue-600/90 to-indigo-600/90 hover:from-blue-500 hover:to-indigo-500 text-white border border-blue-400/40 shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
-            title="Extract photo apertures and text layers directly from Photoshop .PSD file"
+            title="Extract photo apertures and text layers directly from Photoshop .PSD or .TIF file"
           >
             <FileCode className="w-3.5 h-3.5 text-blue-200" />
-            <span>PSD Import</span>
+            <span>PSD / TIF Import</span>
           </button>
         )}
 

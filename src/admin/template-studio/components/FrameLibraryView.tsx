@@ -123,7 +123,7 @@ export const FrameLibraryView: React.FC<FrameLibraryViewProps> = ({
           </div>
           <h3 className="text-lg font-bold text-white mb-1">No Frame Templates Found</h3>
           <p className="text-xs text-slate-400 mb-6">
-            Upload your first Adobe Photoshop (.PSD) file to automatically generate a custom photo frame template with real layers.
+            Upload your first Adobe Photoshop (.PSD or layered .TIF) file to automatically generate a custom photo frame template with real layers.
           </p>
           <button
             onClick={onNewFrame}

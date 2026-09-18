@@ -39,9 +39,13 @@ export const StudioPSDImportModal: React.FC<StudioPSDImportModalProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
+    const lowerName = file.name.toLowerCase();
+    const isPsd = lowerName.endsWith('.psd');
+    const isTif = lowerName.endsWith('.tif') || lowerName.endsWith('.tiff');
+
     // Check extension
-    if (!file.name.toLowerCase().endsWith('.psd')) {
-      setError('Please select a valid Adobe Photoshop (.psd) file.');
+    if (!isPsd && !isTif) {
+      setError('Please select a valid Adobe Photoshop (.psd) or Layered TIFF (.tif, .tiff) file.');
       return;
     }
 
@@ -51,7 +55,7 @@ export const StudioPSDImportModal: React.FC<StudioPSDImportModalProps> = ({
     setPsdResult(null);
 
     try {
-      setParseStep('1/3 Reading binary Photoshop header (8BPS)...');
+      setParseStep(isTif ? '1/3 Reading TIFF tags & Photoshop layer blocks...' : '1/3 Reading binary Photoshop header (8BPS)...');
       await new Promise((r) => setTimeout(r, 300));
 
       setParseStep('2/3 Decoding layer records & bounding boxes...');
@@ -71,8 +75,8 @@ export const StudioPSDImportModal: React.FC<StudioPSDImportModalProps> = ({
       result.textZones.forEach((z) => (zoneMap[z.id] = true));
       setSelectedZones(zoneMap);
     } catch (err: any) {
-      console.error('PSD parsing error:', err);
-      setError(err?.message || 'Failed to read Photoshop file. Please ensure it is a valid .psd document.');
+      console.error('PSD/TIFF parsing error:', err);
+      setError(err?.message || 'Failed to read Photoshop or TIFF file. Please ensure it is a valid layered document.');
     } finally {
       setIsParsing(false);
       setParseStep('');
@@ -129,13 +133,13 @@ export const StudioPSDImportModal: React.FC<StudioPSDImportModalProps> = ({
             </div>
             <div>
               <h3 className="text-lg font-extrabold text-white flex items-center gap-2">
-                Adobe Photoshop (PSD) Layer Importer
+                Photoshop & Layered TIF Importer
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/40 uppercase tracking-wider">
-                  Phase 3
+                  PSD & TIF
                 </span>
               </h3>
               <p className="text-xs text-slate-400">
-                Extract native Photoshop layers, smart objects, photo apertures, and typographical text zones.
+                Extract native Photoshop layers, smart objects, photo apertures, and typographical text zones from .PSD or .TIF.
               </p>
             </div>
           </div>
@@ -166,15 +170,15 @@ export const StudioPSDImportModal: React.FC<StudioPSDImportModalProps> = ({
                 <FolderArchive className="w-8 h-8" />
               </div>
               <h4 className="font-bold text-sm text-slate-200 mb-1">
-                Drop Photoshop .PSD template here or click to browse
+                Drop Photoshop .PSD or Layered .TIF template here or click to browse
               </h4>
               <p className="text-xs text-slate-400 max-w-md">
-                Reads 8BPS Photoshop format directly. Extracts layer names (e.g. "Photo_Arch", "Baby_Name", "Calendar_Zone"), bounding boxes, and styles.
+                Reads Photoshop PSD and Layered TIFF documents. Automatically extracts photo apertures, typographical text zones, and composite previews.
               </p>
               <input
                 type="file"
                 ref={fileInputRef}
-                accept=".psd"
+                accept=".psd,.tif,.tiff,image/tiff,image/x-tiff"
                 className="hidden"
                 onChange={handleFileSelect}
               />

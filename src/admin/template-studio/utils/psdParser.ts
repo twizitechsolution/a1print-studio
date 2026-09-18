@@ -140,6 +140,443 @@ function setupAgPsdCanvas(agPsd: any) {
 }
 
 /**
+ * Checks if buffer has a standard TIFF header:
+ * Little Endian ('II' 0x4949 + 0x002A) or Big Endian ('MM' 0x4D4D + 0x2A00)
+ */
+export function isTiffFile(buffer: ArrayBuffer): boolean {
+  if (buffer.byteLength < 4) return false;
+  const view = new DataView(buffer);
+  const m0 = view.getUint8(0);
+  const m1 = view.getUint8(1);
+  const m2 = view.getUint8(2);
+  const m3 = view.getUint8(3);
+  if (m0 === 0x49 && m1 === 0x49 && m2 === 0x2a && m3 === 0x00) return true;
+  if (m0 === 0x4d && m1 === 0x4d && m2 === 0x00 && m3 === 0x2a) return true;
+  return false;
+}
+
+export interface TiffPhotoshopTags {
+  width: number;
+  height: number;
+  isLittleEndian: boolean;
+  imageSourceData?: Uint8Array;
+  imageResources?: Uint8Array;
+}
+
+/**
+ * Extracts Photoshop metadata tags from a TIFF file:
+ * - Tag 37724 (0x935C): PhotoshopImageSourceData (layer records, masks, typography)
+ * - Tag 34377 (0x8649): PhotoshopImageResources (DPI, resolution, guides)
+ * - Tag 256/257: Image dimensions
+ */
+export function extractTiffPhotoshopTags(buffer: ArrayBuffer): TiffPhotoshopTags {
+  const view = new DataView(buffer);
+  const isLE = view.getUint8(0) === 0x49;
+  let offset = view.getUint32(4, isLE);
+
+  let docWidth = 0;
+  let docHeight = 0;
+  let imageSourceData: Uint8Array | undefined;
+  let imageResources: Uint8Array | undefined;
+
+  let iterations = 0;
+  while (offset > 0 && offset + 2 <= buffer.byteLength && iterations < 15) {
+    iterations++;
+    const numEntries = view.getUint16(offset, isLE);
+    const ifdEnd = offset + 2 + numEntries * 12;
+    if (ifdEnd > buffer.byteLength) break;
+
+    for (let i = 0; i < numEntries; i++) {
+      const entryPos = offset + 2 + i * 12;
+      const tag = view.getUint16(entryPos, isLE);
+      const type = view.getUint16(entryPos + 2, isLE);
+      const count = view.getUint32(entryPos + 4, isLE);
+
+      let valPos = entryPos + 8;
+      let val = 0;
+      if (type === 3 && count === 1) {
+        val = view.getUint16(entryPos + 8, isLE);
+      } else if (type === 4 && count === 1) {
+        val = view.getUint32(entryPos + 8, isLE);
+      } else {
+        valPos = view.getUint32(entryPos + 8, isLE);
+      }
+
+      if (tag === 256) {
+        docWidth = val || (valPos <= buffer.byteLength - 4 ? view.getUint32(valPos, isLE) : 0);
+      } else if (tag === 257) {
+        docHeight = val || (valPos <= buffer.byteLength - 4 ? view.getUint32(valPos, isLE) : 0);
+      } else if (tag === 37724 && valPos + count <= buffer.byteLength) {
+        imageSourceData = new Uint8Array(buffer, valPos, count);
+      } else if (tag === 34377 && valPos + count <= buffer.byteLength) {
+        imageResources = new Uint8Array(buffer, valPos, count);
+      }
+    }
+
+    if (ifdEnd + 4 <= buffer.byteLength) {
+      offset = view.getUint32(ifdEnd, isLE);
+    } else {
+      break;
+    }
+  }
+
+  return {
+    width: docWidth,
+    height: docHeight,
+    isLittleEndian: isLE,
+    imageSourceData,
+    imageResources,
+  };
+}
+
+export interface ExtractedLayerInfoBlock {
+  isLittleEndian: boolean;
+  layrBlock: Uint8Array;
+}
+
+/**
+ * Extracts the 'Layr' tagged block from PhotoshopImageSourceData (Tag 37724)
+ */
+export function extractLayrBlockFromImageSourceData(isd: Uint8Array): ExtractedLayerInfoBlock | null {
+  const len = isd.byteLength;
+  const view = new DataView(isd.buffer, isd.byteOffset, len);
+
+  let pos = 0;
+  while (pos < len - 12) {
+    const b0 = isd[pos];
+    const b1 = isd[pos + 1];
+    const b2 = isd[pos + 2];
+    const b3 = isd[pos + 3];
+
+    // Big Endian: '8BIM'
+    if (b0 === 0x38 && b1 === 0x42 && b2 === 0x49 && b3 === 0x4d) {
+      const type0 = String.fromCharCode(isd[pos + 4], isd[pos + 5], isd[pos + 6], isd[pos + 7]);
+      const blockLen = view.getUint32(pos + 8, false);
+      if (type0 === 'Layr' || type0 === 'Lr16' || type0 === 'Lr32') {
+        const layrData = isd.slice(pos + 12, pos + 12 + blockLen);
+        return { isLittleEndian: false, layrBlock: layrData };
+      }
+      pos += 12 + blockLen + (blockLen % 4 === 0 ? 0 : 4 - (blockLen % 4));
+      continue;
+    }
+
+    // Little Endian: 'MIB8'
+    if (b0 === 0x4d && b1 === 0x49 && b2 === 0x42 && b3 === 0x38) {
+      const type0 = String.fromCharCode(isd[pos + 7], isd[pos + 6], isd[pos + 5], isd[pos + 4]);
+      const blockLen = view.getUint32(pos + 8, true);
+      if (type0 === 'Layr' || type0 === 'Lr16' || type0 === 'Lr32') {
+        const layrData = isd.slice(pos + 12, pos + 12 + blockLen);
+        return { isLittleEndian: true, layrBlock: layrData };
+      }
+      pos += 12 + blockLen + (blockLen % 4 === 0 ? 0 : 4 - (blockLen % 4));
+      continue;
+    }
+
+    pos++;
+  }
+
+  return null;
+}
+
+/**
+ * Builds a valid in-memory PSD ArrayBuffer by combining Photoshop dimensions,
+ * ImageResources (Tag 34377) and the extracted Layr block from TIFF.
+ */
+export function buildPsdFromLayrBlock(
+  docWidth: number,
+  docHeight: number,
+  layrBlock: Uint8Array,
+  imageResources?: Uint8Array
+): ArrayBuffer {
+  const headerLen = 26;
+  const colorModeLen = 4;
+  const resDataLen = imageResources ? imageResources.byteLength : 0;
+  const resSectionLen = 4 + resDataLen;
+  const layerSectionLen = 4 + layrBlock.byteLength;
+  const compositeLen = 2;
+
+  const totalLen = headerLen + colorModeLen + resSectionLen + layerSectionLen + compositeLen;
+  const buffer = new ArrayBuffer(totalLen);
+  const view = new DataView(buffer);
+  const bytes = new Uint8Array(buffer);
+
+  // 1. Header (26 bytes: 8BPS, version 1, 6 reserved, channels 4, height, width, depth 8, mode 3 RGB)
+  bytes[0] = 0x38;
+  bytes[1] = 0x42;
+  bytes[2] = 0x50;
+  bytes[3] = 0x53;
+  view.setUint16(4, 1, false);
+  view.setUint16(12, 4, false);
+  view.setUint32(14, Math.max(100, docHeight), false);
+  view.setUint32(18, Math.max(100, docWidth), false);
+  view.setUint16(22, 8, false);
+  view.setUint16(24, 3, false);
+
+  let cur = 26;
+
+  // 2. Color Mode Section (length = 0)
+  view.setUint32(cur, 0, false);
+  cur += 4;
+
+  // 3. Image Resources Section
+  view.setUint32(cur, resDataLen, false);
+  cur += 4;
+  if (imageResources && resDataLen > 0) {
+    bytes.set(imageResources, cur);
+    cur += resDataLen;
+  }
+
+  // 4. Layer & Mask Section
+  view.setUint32(cur, layrBlock.byteLength, false);
+  cur += 4;
+  bytes.set(layrBlock, cur);
+  cur += layrBlock.byteLength;
+
+  // 5. Composite Image Section (compression = 0)
+  view.setUint16(cur, 0, false);
+
+  return buffer;
+}
+
+/**
+ * Decodes the TIFF composite preview using UTIF.js to an HTML5 Canvas Data URL
+ */
+async function decodeTiffWithUtif(arrayBuffer: ArrayBuffer): Promise<{
+  width: number;
+  height: number;
+  compositePreviewUrl?: string;
+  tags?: any;
+}> {
+  try {
+    const utifModule = await import(/* @vite-ignore */ 'https://esm.sh/utif@3.1.0');
+    const UTIF = utifModule.default || utifModule;
+    if (UTIF && typeof UTIF.decode === 'function') {
+      const ifds = UTIF.decode(arrayBuffer);
+      if (ifds && ifds.length > 0) {
+        const firstPage = ifds[0];
+        UTIF.decodeImage(arrayBuffer, firstPage);
+        const rgba = UTIF.toRGBA8(firstPage);
+        const w = firstPage.width || 1200;
+        const h = firstPage.height || 1600;
+
+        let compositePreviewUrl = '';
+        if (typeof document !== 'undefined' && rgba && rgba.length > 0) {
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            const imgData = ctx.createImageData(w, h);
+            imgData.data.set(rgba);
+            ctx.putImageData(imgData, 0, 0);
+            compositePreviewUrl = canvas.toDataURL('image/jpeg', 0.94);
+          }
+        }
+
+        return {
+          width: w,
+          height: h,
+          compositePreviewUrl: compositePreviewUrl || undefined,
+          tags: firstPage,
+        };
+      }
+    }
+  } catch (err) {
+    console.warn('UTIF decoding notice:', err);
+  }
+  return { width: 1200, height: 1600 };
+}
+
+/**
+ * Extracts printable string or descriptor values from a Photoshop TySh / Text block
+ */
+function extractTextFromTypeToolBlock(slice: Uint8Array): string {
+  let str = '';
+  for (let i = 0; i < slice.length; i++) {
+    str += String.fromCharCode(slice[i]);
+  }
+
+  const textMatch = str.match(/\/Text\s*\(([^)]+)\)/i) || str.match(/\/Txt\s*\(([^)]+)\)/i);
+  if (textMatch && textMatch[1]) {
+    return textMatch[1].replace(/\\([()\\])/g, '$1').trim();
+  }
+
+  for (let i = 0; i < slice.length - 4; i++) {
+    if (slice[i] === 0xfe && slice[i + 1] === 0xff) {
+      let utf16Str = '';
+      for (let j = i + 2; j < slice.length - 1; j += 2) {
+        const code = (slice[j] << 8) | slice[j + 1];
+        if (code === 0 || code === 0x0029) break;
+        if (code >= 32 && code <= 126) {
+          utf16Str += String.fromCharCode(code);
+        }
+      }
+      if (utf16Str.trim().length > 0) {
+        return utf16Str.trim();
+      }
+    }
+  }
+
+  return '';
+}
+
+/**
+ * Parses layer records directly from Layr bytes (supporting both Big-Endian and Little-Endian)
+ */
+function parsePhotoshopLayerRecords(
+  layrBytes: Uint8Array,
+  isLE: boolean,
+  docWidth: number,
+  docHeight: number
+): PSDParsedLayer[] {
+  const view = new DataView(layrBytes.buffer, layrBytes.byteOffset, layrBytes.byteLength);
+  const detectedLayers: PSDParsedLayer[] = [];
+
+  if (layrBytes.byteLength < 6) return detectedLayers;
+
+  let offset = 0;
+  offset += 4; // layerInfoLen
+
+  if (offset + 2 > layrBytes.byteLength) return detectedLayers;
+  const rawCount = view.getInt16(offset, isLE);
+  const layerCount = Math.abs(rawCount);
+  offset += 2;
+
+  let cur = offset;
+  for (let i = 0; i < layerCount && cur + 16 < layrBytes.byteLength; i++) {
+    const top = view.getInt32(cur, isLE);
+    const left = view.getInt32(cur + 4, isLE);
+    const bottom = view.getInt32(cur + 8, isLE);
+    const right = view.getInt32(cur + 12, isLE);
+    cur += 16;
+
+    if (cur + 2 > layrBytes.byteLength) break;
+    const numChannels = view.getUint16(cur, isLE);
+    cur += 2 + numChannels * 6;
+
+    if (cur + 4 > layrBytes.byteLength) break;
+    const sig0 = view.getUint8(cur);
+    const sig1 = view.getUint8(cur + 1);
+    const sig2 = view.getUint8(cur + 2);
+    const sig3 = view.getUint8(cur + 3);
+
+    const isSig =
+      (sig0 === 0x38 && sig1 === 0x42 && sig2 === 0x49 && sig3 === 0x4d) ||
+      (sig0 === 0x4d && sig1 === 0x49 && sig2 === 0x42 && sig3 === 0x38);
+
+    if (!isSig) {
+      cur += 1;
+      continue;
+    }
+
+    cur += 4; // blend sig
+    cur += 4; // blend mode key
+    cur += 1; // opacity
+    cur += 1; // clipping
+    cur += 1; // flags
+    cur += 1; // filler
+
+    if (cur + 4 > layrBytes.byteLength) break;
+    const extraDataLen = view.getUint32(cur, isLE);
+    cur += 4;
+    const extraEnd = cur + extraDataLen;
+
+    if (extraEnd > layrBytes.byteLength) break;
+
+    // Mask info
+    if (cur + 4 <= extraEnd) {
+      const maskLen = view.getUint32(cur, isLE);
+      cur += 4 + maskLen;
+    }
+
+    // Blend ranges
+    if (cur + 4 <= extraEnd) {
+      const blendLen = view.getUint32(cur, isLE);
+      cur += 4 + blendLen;
+    }
+
+    // Layer name (Pascal string)
+    let layerName = '';
+    if (cur < extraEnd) {
+      const nameLen = view.getUint8(cur);
+      cur += 1;
+      for (let n = 0; n < nameLen && cur < extraEnd; n++) {
+        layerName += String.fromCharCode(view.getUint8(cur));
+        cur++;
+      }
+      const pad = (nameLen + 1) % 4 === 0 ? 0 : 4 - ((nameLen + 1) % 4);
+      cur += pad;
+    }
+
+    // Search extra data tagged blocks for typography
+    let textValue = '';
+    let tagCur = cur;
+    while (tagCur + 12 <= extraEnd) {
+      const bSig0 = view.getUint8(tagCur);
+      const bSig1 = view.getUint8(tagCur + 1);
+      const bSig2 = view.getUint8(tagCur + 2);
+      const bSig3 = view.getUint8(tagCur + 3);
+
+      const isBlockSig =
+        (bSig0 === 0x38 && bSig1 === 0x42 && bSig2 === 0x49 && bSig3 === 0x4d) ||
+        (bSig0 === 0x4d && bSig1 === 0x49 && bSig2 === 0x42 && bSig3 === 0x38);
+
+      if (!isBlockSig) {
+        tagCur++;
+        continue;
+      }
+
+      const key = String.fromCharCode(
+        view.getUint8(tagCur + 4),
+        view.getUint8(tagCur + 5),
+        view.getUint8(tagCur + 6),
+        view.getUint8(tagCur + 7)
+      );
+
+      const bLen = view.getUint32(tagCur + 8, isLE);
+      const bDataStart = tagCur + 12;
+      const bDataEnd = Math.min(extraEnd, bDataStart + bLen);
+
+      if (key === 'TySh' || key === 'Txt2' || key === 'hSyT') {
+        const blockSlice = layrBytes.slice(bDataStart, bDataEnd);
+        const extracted = extractTextFromTypeToolBlock(blockSlice);
+        if (extracted) {
+          textValue = extracted;
+        }
+      }
+
+      tagCur = bDataStart + bLen + (bLen % 4 === 0 ? 0 : 4 - (bLen % 4));
+    }
+
+    cur = extraEnd;
+
+    const width = Math.max(10, right - left);
+    const height = Math.max(10, bottom - top);
+
+    if (layerName && (right > left || bottom > top)) {
+      const layerClassification = classifyPSDLayer(layerName);
+      detectedLayers.push({
+        name: layerName,
+        top,
+        left,
+        bottom,
+        right,
+        width,
+        height,
+        type: textValue ? 'text' : layerClassification.type,
+        textValue: textValue || undefined,
+        shape: inferShapeFromLayerName(layerName),
+        fontFamily: 'Playfair Display',
+        fontSize: 28,
+        color: '#160E4B',
+      });
+    }
+  }
+
+  return detectedLayers;
+}
+
+/**
  * Recursively extracts all discrete layers from a PSD children tree
  */
 function flattenPsdChildren(children: any[]): any[] {
@@ -349,41 +786,21 @@ function classifyPsdTextLayer(cleanText: string, layerName: string): ClassifiedP
 }
 
 /**
- * Parses a Photoshop (.PSD) file using ag-psd engine to extract:
- * 1. Pixel-perfect composite artwork preview (`baseImageUrl`)
- * 2. Real text strings and styles from text layers (`defaultValue`, `fontFamily`, `fontSize`, `color`)
- * 3. Real photo layers with thumbnail previews (`PhotoSlotConfig`)
- * 
- * Falls back to fast binary scanning if ag-psd fails or is unavailable.
+ * Processes ag-psd document tree into high-fidelity PhotoSlot, TextZone and StaticLayer configs
  */
-export async function parsePSDFileBinary(file: File): Promise<PSDImportResult> {
-  const arrayBuffer = await file.arrayBuffer();
+export function processAgPsdResult(psd: any, overrideCompositeUrl?: string): PSDImportResult {
+  const docWidth = psd.width || 1200;
+  const docHeight = psd.height || 1600;
 
-  // Try parsing with full ag-psd layer engine first
-  try {
-    const agPsdModule = await import(/* @vite-ignore */ 'https://esm.sh/ag-psd@23.0.0');
-    setupAgPsdCanvas(agPsdModule);
-
-    const readPsd = agPsdModule.readPsd || agPsdModule.default?.readPsd || agPsdModule.default;
-    if (typeof readPsd === 'function') {
-      const psd = readPsd(arrayBuffer, {
-        skipLayerImageData: false,
-        skipCompositeImageData: false,
-        skipThumbnail: false,
-      });
-
-      const docWidth = psd.width || 1200;
-      const docHeight = psd.height || 1600;
-
-      // Extract high-resolution composite preview
-      let compositePreviewUrl = '';
-      if (psd.canvas && typeof psd.canvas.toDataURL === 'function') {
-        try {
-          compositePreviewUrl = psd.canvas.toDataURL('image/jpeg', 0.94);
-        } catch (canvasErr) {
-          console.warn('PSD composite canvas export notice:', canvasErr);
-        }
-      }
+  // Extract high-resolution composite preview
+  let compositePreviewUrl = overrideCompositeUrl || '';
+  if (!compositePreviewUrl && psd.canvas && typeof psd.canvas.toDataURL === 'function') {
+    try {
+      compositePreviewUrl = psd.canvas.toDataURL('image/jpeg', 0.94);
+    } catch (canvasErr) {
+      console.warn('PSD composite canvas export notice:', canvasErr);
+    }
+  }
 
       // Collect all layers recursively
       const allLayers = psd.children ? flattenPsdChildren(psd.children) : [];
@@ -841,17 +1258,200 @@ export async function parsePSDFileBinary(file: File): Promise<PSDImportResult> {
         }
       }
 
-      // If at least some discrete zones or composite were extracted, return parsed result!
-      if (photoSlots.length > 0 || textZones.length > 0 || staticLayers.length > 0 || compositePreviewUrl) {
-        return {
-          documentDimensions: { width: docWidth, height: docHeight },
-          photoSlots,
-          textZones,
-          staticLayers,
-          detectedLayerCount: photoSlots.length + textZones.length + staticLayers.length,
-          compositePreviewUrl: compositePreviewUrl || undefined,
-          cleanBaseImageUrl: cleanBaseImageUrl || compositePreviewUrl || undefined,
-        };
+  return {
+    documentDimensions: { width: docWidth, height: docHeight },
+    photoSlots,
+    textZones,
+    staticLayers,
+    detectedLayerCount: photoSlots.length + textZones.length + staticLayers.length,
+    compositePreviewUrl: compositePreviewUrl || undefined,
+    cleanBaseImageUrl: cleanBaseImageUrl || compositePreviewUrl || undefined,
+  };
+}
+
+/**
+ * Converts parsed raw layers into a structured PSDImportResult
+ */
+export function convertParsedLayersToImportResult(
+  detectedLayers: PSDParsedLayer[],
+  docWidth: number,
+  docHeight: number,
+  compositePreviewUrl?: string
+): PSDImportResult {
+  const fallbackPhotoSlots: PhotoSlotConfig[] = [];
+  const fallbackTextZones: TextZoneConfig[] = [];
+
+  let sCount = 1;
+  let tCount = 1;
+
+  for (const layer of detectedLayers) {
+    if (layer.type === 'background') continue;
+
+    const xPct = Math.round((((layer.left + layer.right) / 2) / docWidth) * 100);
+    const yPct = Math.round((((layer.top + layer.bottom) / 2) / docHeight) * 100);
+    const wPct = Math.min(95, Math.max(10, Math.round((layer.width / docWidth) * 100)));
+    const hPct = Math.min(95, Math.max(5, Math.round((layer.height / docHeight) * 100)));
+
+    if (layer.type === 'photo') {
+      fallbackPhotoSlots.push({
+        id: `slot-psd-${Date.now().toString(36)}-${sCount}`,
+        label: layer.name || `Photo Slot ${sCount}`,
+        shape: layer.shape || inferShapeFromLayerName(layer.name),
+        x: Math.max(10, Math.min(90, xPct)),
+        y: Math.max(10, Math.min(90, yPct)),
+        width: wPct,
+        height: hPct,
+        defaultPhotoUrl: 'https://images.unsplash.com/photo-1519689680058-324335c77eba?auto=format&fit=crop&q=80&w=600',
+        visibility: {
+          ...DEFAULT_VISIBILITY,
+          userLabel: `Upload ${layer.name.replace(/[_-]/g, ' ')}`,
+        },
+        sourceLayerName: layer.name,
+      });
+      sCount++;
+    } else {
+      const classified = classifyPsdTextLayer(layer.textValue || 'Custom Text', layer.name || '');
+      fallbackTextZones.push({
+        id: `text-psd-${Date.now().toString(36)}-${tCount}`,
+        label: classified.label,
+        defaultValue: classified.defaultValue,
+        x: Math.max(10, Math.min(90, xPct)),
+        y: Math.max(10, Math.min(90, yPct)),
+        maxWidth: Math.min(90, Math.max(40, wPct + 10)),
+        fontSize: layer.type === 'calendar' ? 16 : (layer.fontSize || 26),
+        fontFamily: layer.type === 'calendar' ? 'Jost' : (layer.fontFamily || 'Playfair Display'),
+        color: layer.color || '#160E4B',
+        align: 'center',
+        type: classified.type,
+        isCalendar: classified.isCalendar,
+        visibility: {
+          ...DEFAULT_VISIBILITY,
+          userVisible: classified.userVisible,
+          userEditable: classified.userVisible,
+          userLabel: classified.userLabel,
+        },
+        sourceLayerName: layer.name,
+      });
+      tCount++;
+    }
+  }
+
+  return {
+    documentDimensions: { width: docWidth, height: docHeight },
+    photoSlots: fallbackPhotoSlots,
+    textZones: fallbackTextZones,
+    staticLayers: [],
+    detectedLayerCount: fallbackPhotoSlots.length + fallbackTextZones.length,
+    compositePreviewUrl: compositePreviewUrl || undefined,
+    cleanBaseImageUrl: compositePreviewUrl || undefined,
+  };
+}
+
+/**
+ * Parses a Layered TIFF (.tif / .tiff) file saved with Photoshop layers:
+ * 1. Decodes composite artwork preview via UTIF.js
+ * 2. Extracts Tag 37724 (ImageSourceData) and Tag 34377 (ImageResources)
+ * 3. Extracts 'Layr' tagged block
+ * 4. Synthesizes an in-memory PSD buffer and feeds it into ag-psd for 100% feature parity
+ * 5. Falls back to direct layer record scanner if needed
+ */
+export async function parseTiffTemplateBinary(arrayBuffer: ArrayBuffer): Promise<PSDImportResult> {
+  // A. Decode high-resolution composite preview via UTIF.js
+  const utifDecoded = await decodeTiffWithUtif(arrayBuffer);
+  const docWidth = utifDecoded.width || 1200;
+  const docHeight = utifDecoded.height || 1600;
+  const compositePreviewUrl = utifDecoded.compositePreviewUrl;
+
+  // B. Extract TIFF Photoshop metadata (Tag 37724: ImageSourceData, Tag 34377: ImageResources)
+  const tags = extractTiffPhotoshopTags(arrayBuffer);
+  const imageSourceData = tags.imageSourceData || (utifDecoded.tags && (utifDecoded.tags.t37724 || utifDecoded.tags['37724']));
+  const imageResources = tags.imageResources || (utifDecoded.tags && (utifDecoded.tags.t34377 || utifDecoded.tags['34377']));
+
+  // If no Photoshop layers exist (flattened single-layer TIFF)
+  if (!imageSourceData || imageSourceData.byteLength < 12) {
+    return {
+      documentDimensions: { width: docWidth, height: docHeight },
+      photoSlots: [],
+      textZones: [],
+      staticLayers: [],
+      detectedLayerCount: 0,
+      compositePreviewUrl: compositePreviewUrl || undefined,
+      cleanBaseImageUrl: compositePreviewUrl || undefined,
+    };
+  }
+
+  // C. Extract Layr block from ImageSourceData
+  const layrExtraction = extractLayrBlockFromImageSourceData(
+    imageSourceData instanceof Uint8Array ? imageSourceData : new Uint8Array(imageSourceData)
+  );
+
+  if (layrExtraction && !layrExtraction.isLittleEndian) {
+    try {
+      const syntheticPsdBuffer = buildPsdFromLayrBlock(
+        docWidth,
+        docHeight,
+        layrExtraction.layrBlock,
+        imageResources instanceof Uint8Array ? imageResources : (imageResources ? new Uint8Array(imageResources) : undefined)
+      );
+
+      const agPsdModule = await import(/* @vite-ignore */ 'https://esm.sh/ag-psd@23.0.0');
+      setupAgPsdCanvas(agPsdModule);
+      const readPsd = agPsdModule.readPsd || agPsdModule.default?.readPsd || agPsdModule.default;
+
+      if (typeof readPsd === 'function') {
+        const psd = readPsd(syntheticPsdBuffer, {
+          skipLayerImageData: false,
+          skipCompositeImageData: true,
+          skipThumbnail: true,
+        });
+
+        const result = processAgPsdResult(psd, compositePreviewUrl);
+        if (result.detectedLayerCount > 0) {
+          return result;
+        }
+      }
+    } catch (agPsdErr) {
+      console.warn('ag-psd parsing on TIFF synthetic PSD notice:', agPsdErr);
+    }
+  }
+
+  // D. Fallback or Little-Endian: Parse layer records directly
+  const layrBytes = layrExtraction?.layrBlock || (imageSourceData instanceof Uint8Array ? imageSourceData : new Uint8Array(imageSourceData));
+  const isLE = layrExtraction ? layrExtraction.isLittleEndian : tags.isLittleEndian;
+  const detectedLayers = parsePhotoshopLayerRecords(layrBytes, isLE, docWidth, docHeight);
+
+  return convertParsedLayersToImportResult(detectedLayers, docWidth, docHeight, compositePreviewUrl);
+}
+
+/**
+ * Universal Photoshop Template Parser:
+ * Automatically detects whether file is PSD (.psd) or Layered TIFF (.tif / .tiff),
+ * extracts all layers, coordinates, and composite previews.
+ */
+export async function parsePSDFileBinary(file: File): Promise<PSDImportResult> {
+  const arrayBuffer = await file.arrayBuffer();
+
+  // 1. TIFF support (.tif / .tiff)
+  if (isTiffFile(arrayBuffer)) {
+    return parseTiffTemplateBinary(arrayBuffer);
+  }
+
+  // 2. Try parsing with full ag-psd layer engine first
+  try {
+    const agPsdModule = await import(/* @vite-ignore */ 'https://esm.sh/ag-psd@23.0.0');
+    setupAgPsdCanvas(agPsdModule);
+
+    const readPsd = agPsdModule.readPsd || agPsdModule.default?.readPsd || agPsdModule.default;
+    if (typeof readPsd === 'function') {
+      const psd = readPsd(arrayBuffer, {
+        skipLayerImageData: false,
+        skipCompositeImageData: false,
+        skipThumbnail: false,
+      });
+
+      const result = processAgPsdResult(psd);
+      if (result.detectedLayerCount > 0 || result.compositePreviewUrl) {
+        return result;
       }
     }
   } catch (agPsdErr) {
@@ -966,69 +1566,7 @@ export async function parsePSDFileBinary(file: File): Promise<PSDImportResult> {
     }
   }
 
-  const fallbackPhotoSlots: PhotoSlotConfig[] = [];
-  const fallbackTextZones: TextZoneConfig[] = [];
-
-  let sCount = 1;
-  let tCount = 1;
-
-  for (const layer of detectedLayers) {
-    if (layer.type === 'background') continue;
-
-    const xPct = Math.round((((layer.left + layer.right) / 2) / docWidth) * 100);
-    const yPct = Math.round((((layer.top + layer.bottom) / 2) / docHeight) * 100);
-    const wPct = Math.min(95, Math.max(10, Math.round((layer.width / docWidth) * 100)));
-    const hPct = Math.min(95, Math.max(5, Math.round((layer.height / docHeight) * 100)));
-
-    if (layer.type === 'photo') {
-      fallbackPhotoSlots.push({
-        id: `slot-psd-${Date.now().toString(36)}-${sCount}`,
-        label: layer.name || `Photo Slot ${sCount}`,
-        shape: layer.shape || inferShapeFromLayerName(layer.name),
-        x: Math.max(10, Math.min(90, xPct)),
-        y: Math.max(10, Math.min(90, yPct)),
-        width: wPct,
-        height: hPct,
-        defaultPhotoUrl: 'https://images.unsplash.com/photo-1519689680058-324335c77eba?auto=format&fit=crop&q=80&w=600',
-        visibility: {
-          ...DEFAULT_VISIBILITY,
-          userLabel: `Upload ${layer.name.replace(/[_-]/g, ' ')}`,
-        },
-        sourceLayerName: layer.name,
-      });
-      sCount++;
-    } else {
-      const classified = classifyPsdTextLayer(layer.textValue || 'Custom Text', layer.name || '');
-      fallbackTextZones.push({
-        id: `text-psd-${Date.now().toString(36)}-${tCount}`,
-        label: classified.label,
-        defaultValue: classified.defaultValue,
-        x: Math.max(10, Math.min(90, xPct)),
-        y: Math.max(10, Math.min(90, yPct)),
-        maxWidth: Math.min(90, Math.max(40, wPct + 10)),
-        fontSize: layer.type === 'calendar' ? 16 : 26,
-        fontFamily: layer.type === 'calendar' ? 'Jost' : 'Playfair Display',
-        color: '#160E4B',
-        align: 'center',
-        type: classified.type,
-        isCalendar: classified.isCalendar,
-        visibility: {
-          ...DEFAULT_VISIBILITY,
-          userVisible: classified.userVisible,
-          userEditable: classified.userVisible,
-          userLabel: classified.userLabel,
-        },
-        sourceLayerName: layer.name,
-      });
-      tCount++;
-    }
-  }
-
-  return {
-    documentDimensions: { width: docWidth, height: docHeight },
-    photoSlots: fallbackPhotoSlots,
-    textZones: fallbackTextZones,
-    staticLayers: [],
-    detectedLayerCount: fallbackPhotoSlots.length + fallbackTextZones.length,
-  };
+  return convertParsedLayersToImportResult(detectedLayers, docWidth, docHeight);
 }
+
+export const parseTemplateFileBinary = parsePSDFileBinary;

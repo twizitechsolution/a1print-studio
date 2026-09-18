@@ -51,8 +51,12 @@ export const NewFrameWizard: React.FC<NewFrameWizardProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.name.toLowerCase().endsWith('.psd')) {
-      setError('Please select an Adobe Photoshop (.psd) file.');
+    const lowerName = file.name.toLowerCase();
+    const isPsd = lowerName.endsWith('.psd');
+    const isTif = lowerName.endsWith('.tif') || lowerName.endsWith('.tiff');
+
+    if (!isPsd && !isTif) {
+      setError('Please select an Adobe Photoshop (.psd) or Layered TIFF (.tif, .tiff) file.');
       setSelectedFile(null);
       return;
     }
@@ -61,7 +65,7 @@ export const NewFrameWizard: React.FC<NewFrameWizardProps> = ({
     setSelectedFile(file);
     if (!frameName.trim()) {
       // Clean default title from filename
-      const cleanName = file.name.replace(/\.psd$/i, '').replace(/[_-]/g, ' ');
+      const cleanName = file.name.replace(/\.(psd|tiff?)$/i, '').replace(/[_-]/g, ' ');
       setFrameName(cleanName.charAt(0).toUpperCase() + cleanName.slice(1));
     }
   };
@@ -71,28 +75,32 @@ export const NewFrameWizard: React.FC<NewFrameWizardProps> = ({
     const file = e.dataTransfer.files?.[0];
     if (!file) return;
 
-    if (!file.name.toLowerCase().endsWith('.psd')) {
-      setError('Please select an Adobe Photoshop (.psd) file.');
+    const lowerName = file.name.toLowerCase();
+    const isPsd = lowerName.endsWith('.psd');
+    const isTif = lowerName.endsWith('.tif') || lowerName.endsWith('.tiff');
+
+    if (!isPsd && !isTif) {
+      setError('Please select an Adobe Photoshop (.psd) or Layered TIFF (.tif, .tiff) file.');
       return;
     }
 
     setError(null);
     setSelectedFile(file);
     if (!frameName.trim()) {
-      const cleanName = file.name.replace(/\.psd$/i, '').replace(/[_-]/g, ' ');
+      const cleanName = file.name.replace(/\.(psd|tiff?)$/i, '').replace(/[_-]/g, ' ');
       setFrameName(cleanName.charAt(0).toUpperCase() + cleanName.slice(1));
     }
   };
 
   const handleProceed = async () => {
     if (!frameName.trim() || !category || !selectedFile) {
-      setError('Please provide a Frame Name, Category, and select a .psd file.');
+      setError('Please provide a Frame Name, Category, and select a .psd or .tif file.');
       return;
     }
 
     setIsParsing(true);
     setError(null);
-    setParseStep('Reading PSD binary layer tree...');
+    setParseStep('Reading PSD / TIFF binary layer tree...');
 
     try {
       // 1. Parse PSD binary structure
@@ -240,7 +248,7 @@ export const NewFrameWizard: React.FC<NewFrameWizardProps> = ({
             </div>
             <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">Create New Frame Template</h2>
             <p className="text-xs text-slate-400">
-              Upload your Adobe Photoshop (.PSD) file. All layers will automatically be imported as editable photo and text zones.
+              Upload your Adobe Photoshop (.PSD) or Layered TIFF (.TIF) file. All layers will automatically be imported as editable photo and text zones.
             </p>
           </div>
 
@@ -286,16 +294,16 @@ export const NewFrameWizard: React.FC<NewFrameWizardProps> = ({
               </select>
             </div>
 
-            {/* 3. PSD File Upload Zone */}
+            {/* 3. PSD / TIF File Upload Zone */}
             <div>
               <label className="block text-xs font-bold text-slate-300 mb-1.5 uppercase tracking-wider">
-                Photoshop File (.PSD) <span className="text-pink-400">*</span>
+                Photoshop / Layered TIFF File (.PSD / .TIF) <span className="text-pink-400">*</span>
               </label>
 
               <input
                 type="file"
                 ref={fileInputRef}
-                accept=".psd"
+                accept=".psd,.tif,.tiff,image/tiff,image/x-tiff"
                 className="hidden"
                 onChange={handleFileChange}
               />
@@ -338,7 +346,7 @@ export const NewFrameWizard: React.FC<NewFrameWizardProps> = ({
                     </div>
                     <div>
                       <p className="text-xs font-bold text-slate-200">
-                        Drag & drop your <strong className="text-pink-400 font-bold">.psd</strong> file here, or click to browse
+                        Drag & drop your <strong className="text-pink-400 font-bold">.psd</strong> or <strong className="text-pink-400 font-bold">.tif</strong> file here, or click to browse
                       </p>
                       <p className="text-[11px] text-slate-500 mt-1">
                         Supports live text layers, shapes, and photo cutouts
