@@ -9,12 +9,15 @@ export interface PSDParsedLayer {
   bottom: number;
   width: number;
   height: number;
-  type: 'photo' | 'text' | 'calendar' | 'background' | 'static';
+  type: 'photo' | 'text' | 'calendar' | 'background' | 'static' | 'pixel';
   textValue?: string;
   shape?: FrameCutoutShape;
   fontFamily?: string;
   fontSize?: number;
   color?: string;
+  opacity?: number;
+  channelOffsets?: { chId: number; chLen: number; offset: number }[];
+  canvas?: HTMLCanvasElement;
 }
 
 export interface PSDImportResult {
@@ -431,6 +434,117 @@ function extractTextFromTypeToolBlock(slice: Uint8Array): string {
 }
 
 /**
+ * Decompresses Photoshop PackBits RLE channel data
+ */
+function decodePhotoshopRLEChannel(
+  layrBytes: Uint8Array,
+  chOffset: number,
+  chLen: number,
+  width: number,
+  height: number,
+  isLE: boolean
+): Uint8Array | null {
+  if (chLen <= 2 || width <= 0 || height <= 0) return null;
+  const view = new DataView(layrBytes.buffer, layrBytes.byteOffset + chOffset, chLen);
+  const comp = view.getUint16(0, isLE);
+  if (comp !== 1) return null; // 1 = RLE PackBits
+
+  const scanlineLengths: number[] = [];
+  let scanlinePos = 2;
+  for (let y = 0; y < height; y++) {
+    if (scanlinePos + 2 > chLen) return null;
+    scanlineLengths.push(view.getUint16(scanlinePos, isLE));
+    scanlinePos += 2;
+  }
+
+  const out = new Uint8Array(width * height);
+  let dataPos = scanlinePos;
+  let outPos = 0;
+
+  for (let y = 0; y < height; y++) {
+    const slen = scanlineLengths[y];
+    const end = Math.min(chLen, dataPos + slen);
+    let lineOut = 0;
+
+    while (dataPos < end && lineOut < width && outPos < out.length) {
+      const b = view.getInt8(dataPos++);
+      if (b >= 0) {
+        const count = b + 1;
+        for (let k = 0; k < count && lineOut < width && outPos < out.length; k++) {
+          out[outPos++] = view.getUint8(dataPos++);
+          lineOut++;
+        }
+      } else if (b > -128) {
+        const count = 1 - b;
+        const val = view.getUint8(dataPos++);
+        for (let k = 0; k < count && lineOut < width; k++) {
+          out[outPos++] = val;
+          lineOut++;
+        }
+      }
+    }
+    dataPos = end;
+  }
+
+  return out;
+}
+
+/**
+ * Renders a decoded Photoshop layer to an in-memory HTML5 Canvas
+ */
+function renderDecodedLayerCanvas(
+  layrBytes: Uint8Array,
+  layer: PSDParsedLayer,
+  isLE: boolean
+): HTMLCanvasElement | null {
+  if (typeof document === 'undefined') return null;
+  const { width, height, channelOffsets } = layer;
+  if (!width || !height || !channelOffsets || channelOffsets.length === 0) return null;
+
+  let aCh: Uint8Array | null = null;
+  let rCh: Uint8Array | null = null;
+  let gCh: Uint8Array | null = null;
+  let bCh: Uint8Array | null = null;
+
+  for (const ch of channelOffsets) {
+    const decoded = decodePhotoshopRLEChannel(layrBytes, ch.offset, ch.chLen, width, height, isLE);
+    if (!decoded) continue;
+    if (ch.chId === -1) aCh = decoded;
+    else if (ch.chId === 0) rCh = decoded;
+    else if (ch.chId === 1) gCh = decoded;
+    else if (ch.chId === 2) bCh = decoded;
+  }
+
+  if (!rCh) return null;
+
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    const imgData = ctx.createImageData(width, height);
+    const data = imgData.data;
+    const pixelCount = width * height;
+
+    for (let i = 0; i < pixelCount; i++) {
+      const p = i * 4;
+      data[p] = rCh[i];
+      data[p + 1] = gCh ? gCh[i] : rCh[i];
+      data[p + 2] = bCh ? bCh[i] : rCh[i];
+      data[p + 3] = aCh ? aCh[i] : 255;
+    }
+
+    ctx.putImageData(imgData, 0, 0);
+    return canvas;
+  } catch (e) {
+    console.warn('Failed to render layer canvas:', e);
+    return null;
+  }
+}
+
+/**
  * Parses layer records directly from Layr bytes (supporting both Big-Endian and Little-Endian)
  */
 function parsePhotoshopLayerRecords(
@@ -485,7 +599,15 @@ function parsePhotoshopLayerRecords(
 
     if (cur + 2 > layrBytes.byteLength) break;
     const numChannels = view.getUint16(cur, isLE);
-    cur += 2 + numChannels * 6;
+    cur += 2;
+    const channelOffsets: { chId: number; chLen: number; offset: number }[] = [];
+    for (let c = 0; c < numChannels; c++) {
+      if (cur + 6 > layrBytes.byteLength) break;
+      const chId = view.getInt16(cur, isLE);
+      const chLen = view.getUint32(cur + 2, isLE);
+      channelOffsets.push({ chId, chLen, offset: 0 });
+      cur += 6;
+    }
 
     if (cur + 4 > layrBytes.byteLength) break;
     const sig0 = view.getUint8(cur);
@@ -504,6 +626,7 @@ function parsePhotoshopLayerRecords(
 
     cur += 4; // blend sig
     cur += 4; // blend mode key
+    const opacity = view.getUint8(cur) / 255;
     cur += 1; // opacity
     cur += 1; // clipping
     cur += 1; // flags
@@ -612,7 +735,29 @@ function parsePhotoshopLayerRecords(
         fontFamily: 'Playfair Display',
         fontSize: 28,
         color: /white/i.test(layerName) ? '#FFFFFF' : (/black/i.test(layerName) ? '#000000' : '#160E4B'),
+        opacity,
+        channelOffsets,
       });
+    }
+  }
+
+  // Calculate byte offsets for channel data following layer records
+  let imgCur = cur;
+  for (const l of detectedLayers) {
+    if (l.channelOffsets) {
+      for (const ch of l.channelOffsets) {
+        ch.offset = imgCur;
+        imgCur += ch.chLen;
+      }
+    }
+  }
+
+  // Render layer canvases if in browser environment
+  if (typeof document !== 'undefined') {
+    for (const l of detectedLayers) {
+      if (l.channelOffsets && l.channelOffsets.length > 0) {
+        l.canvas = renderDecodedLayerCanvas(layrBytes, l, isLE) || undefined;
+      }
     }
   }
 
@@ -1429,15 +1574,58 @@ export function convertParsedLayersToImportResult(
   selectedApertures.forEach((ap, idx) => {
     const c = ap.cluster;
     const slotNumber = idx + 1;
+
+    // Pick the most representative photo layer in the cluster (preferring non-copy pixel layer)
+    const photoCandidate =
+      c.layers.find((l) => l.canvas && !/copy|mask|outline|frame|border/i.test(l.name || '')) ||
+      c.layers.find((l) => !/copy|mask|outline|frame|border/i.test(l.name || '')) ||
+      c.layers[0];
+
+    const targetW = photoCandidate?.width || c.w;
+    const targetH = photoCandidate?.height || c.h;
+    const targetCx = photoCandidate ? (photoCandidate.left + photoCandidate.right) / 2 : (c.left + c.right) / 2;
+    const targetCy = photoCandidate ? (photoCandidate.top + photoCandidate.bottom) / 2 : (c.top + c.bottom) / 2;
+
+    const cxPct = Math.round((targetCx / docWidth) * 100);
+    const cyPct = Math.round((targetCy / docHeight) * 100);
+    const wPct = Math.round((targetW / docWidth) * 100);
+    const hPct = Math.round((targetH / docHeight) * 100);
+
+    const aspect = targetW / targetH;
+    const isSquareOrCircle = Math.abs(aspect - 1.0) < 0.18;
+    const resolvedShape: FrameCutoutShape = isSquareOrCircle ? 'circle' : ap.shape;
+
+    // Extract actual photo thumbnail from template layer canvas
+    let defaultPhotoUrl = 'https://images.unsplash.com/photo-1519689680058-324335c77eba?auto=format&fit=crop&q=80&w=600';
+    if (photoCandidate && photoCandidate.canvas && typeof document !== 'undefined') {
+      try {
+        const srcCanvas = photoCandidate.canvas as HTMLCanvasElement;
+        const maxDim = 800;
+        const scale = Math.min(1, maxDim / Math.max(srcCanvas.width, srcCanvas.height, 1));
+        const thumbW = Math.max(1, Math.round(srcCanvas.width * scale));
+        const thumbH = Math.max(1, Math.round(srcCanvas.height * scale));
+        const thumbCanvas = document.createElement('canvas');
+        thumbCanvas.width = thumbW;
+        thumbCanvas.height = thumbH;
+        const tCtx = thumbCanvas.getContext('2d');
+        if (tCtx) {
+          tCtx.drawImage(srcCanvas, 0, 0, thumbW, thumbH);
+          defaultPhotoUrl = thumbCanvas.toDataURL('image/jpeg', 0.88);
+        }
+      } catch (err) {
+        console.warn('Failed to extract photo layer thumbnail:', err);
+      }
+    }
+
     photoSlots.push({
       id: `slot-psd-${Date.now().toString(36)}-${slotNumber}`,
       label: selectedApertures.length === 1 ? 'Baby Photo Slot' : `Photo Slot ${slotNumber}`,
-      shape: ap.shape,
-      x: Math.round(c.cxPct),
-      y: Math.round(c.cyPct),
-      width: Math.round(c.wPct),
-      height: Math.round(c.hPct),
-      defaultPhotoUrl: 'https://images.unsplash.com/photo-1519689680058-324335c77eba?auto=format&fit=crop&q=80&w=600',
+      shape: resolvedShape,
+      x: cxPct,
+      y: cyPct,
+      width: wPct,
+      height: hPct,
+      defaultPhotoUrl,
       visibility: {
         ...DEFAULT_VISIBILITY,
         userLabel: selectedApertures.length === 1 ? 'Upload Baby Photo' : `Upload Photo ${slotNumber}`,
@@ -1461,21 +1649,35 @@ export function convertParsedLayersToImportResult(
     }
   }
 
+  const remainingShadowLayers = [...shadowTextLayers];
   let tCount = 1;
   primaryTextLayers.forEach((l) => {
     const textVal = l.textValue || '';
-    const xPct = Math.round((((l.left + l.right) / 2) / docWidth) * 100);
-    const yPct = Math.round((((l.top + l.bottom) / 2) / docHeight) * 100);
+    const lCx = (l.left + l.right) / 2;
+    const lCy = (l.top + l.bottom) / 2;
+    const xPct = Math.round((lCx / docWidth) * 100);
+    const yPct = Math.round((lCy / docHeight) * 100);
     const wPct = Math.round((l.width / docWidth) * 100);
     const isLongText = textVal.length > 50;
 
     let label = (l.name || '').replace(/[_-]/g, ' ').replace(/\b(white|black|layer)\b/gi, '').trim();
-    if (/happy\s*birthday/i.test(textVal)) label = 'Title';
-    else if (/anahitha/i.test(textVal)) label = 'Baby Name';
-    else if (isLongText) label = 'Birthday Quote';
-    if (!label) label = `Text Zone ${tCount}`;
+    let fontFamily = 'Playfair Display';
+    let normalizedFontSize = 32;
 
-    const normalizedFontSize = isLongText ? 18 : (label === 'Baby Name' ? 44 : 36);
+    if (/happy\s*birthday/i.test(textVal)) {
+      label = 'Title';
+      fontFamily = 'Great Vibes';
+      normalizedFontSize = 48;
+    } else if (/anahitha/i.test(textVal)) {
+      label = 'Baby Name';
+      fontFamily = 'Playfair Display';
+      normalizedFontSize = 42;
+    } else if (isLongText) {
+      label = 'Birthday Quote';
+      fontFamily = 'Playfair Display';
+      normalizedFontSize = 18;
+    }
+    if (!label) label = `Text Zone ${tCount}`;
 
     const zoneId = `text-psd-${Date.now().toString(36)}-${tCount}`;
     const zone: TextZoneConfig = {
@@ -1486,7 +1688,7 @@ export function convertParsedLayersToImportResult(
       y: yPct,
       maxWidth: Math.min(90, Math.max(30, wPct + 10)),
       fontSize: normalizedFontSize,
-      fontFamily: 'Playfair Display',
+      fontFamily,
       color: /white/i.test(l.name || '') ? '#FFFFFF' : '#160E4B',
       align: 'center',
       type: isLongText ? 'message' : 'text',
@@ -1501,20 +1703,26 @@ export function convertParsedLayersToImportResult(
     };
     textZones.push(zone);
 
-    // Find matching shadow layer
-    const shadowMatch = shadowTextLayers.find(
-      (s) =>
-        s.textValue?.toLowerCase() === textVal.toLowerCase() ||
-        Math.abs(((s.left + s.right) / 2) - ((l.left + l.right) / 2)) < docWidth * 0.05
-    );
+    // Find matching shadow layer by exact text or spatial proximity in both dimensions
+    const sIdx = remainingShadowLayers.findIndex((s) => {
+      if (s.textValue && textVal && s.textValue.trim().toLowerCase() === textVal.trim().toLowerCase()) {
+        return true;
+      }
+      const sCx = (s.left + s.right) / 2;
+      const sCy = (s.top + s.bottom) / 2;
+      const dx = Math.abs(sCx - lCx);
+      const dy = Math.abs(sCy - lCy);
+      return dx < docWidth * 0.08 && dy < docHeight * 0.08;
+    });
 
-    if (shadowMatch) {
+    if (sIdx !== -1) {
+      const shadowMatch = remainingShadowLayers.splice(sIdx, 1)[0];
       const sxPct = Math.round((((shadowMatch.left + shadowMatch.right) / 2) / docWidth) * 100);
       const syPct = Math.round((((shadowMatch.top + shadowMatch.bottom) / 2) / docHeight) * 100);
       textZones.push({
         id: `${zoneId}-shadow`,
         label: `${label} (Shadow)`,
-        defaultValue: shadowMatch.textValue || textVal,
+        defaultValue: textVal,
         x: sxPct,
         y: syPct,
         maxWidth: zone.maxWidth,
@@ -1538,6 +1746,64 @@ export function convertParsedLayersToImportResult(
     tCount++;
   });
 
+  // 4. Automated Clean Base Artwork Generation:
+  // Composites background canvases, borders, floral rings, and clipart while omitting
+  // editable customer text layers and aperture sample photos.
+  let cleanBaseImageUrl = '';
+  if (typeof document !== 'undefined') {
+    try {
+      const cleanCanvas = document.createElement('canvas');
+      cleanCanvas.width = docWidth;
+      cleanCanvas.height = docHeight;
+      const cleanCtx = cleanCanvas.getContext('2d');
+
+      if (cleanCtx) {
+        const apertureLayerNames = new Set<string>();
+        selectedApertures.forEach((ap) => {
+          ap.cluster.layers.forEach((l) => {
+            if (l.name) apertureLayerNames.add(l.name.trim().toLowerCase());
+          });
+        });
+
+        const textLayerNames = new Set<string>();
+        detectedLayers.forEach((l) => {
+          if (l.type === 'text' || Boolean(l.textValue)) {
+            if (l.name) textLayerNames.add(l.name.trim().toLowerCase());
+          }
+        });
+
+        // Draw layers from bottom to top
+        detectedLayers.forEach((layer) => {
+          if (!layer) return;
+          const lName = (layer.name || '').trim().toLowerCase();
+
+          // Omit customer editable text layers
+          if (layer.type === 'text' || Boolean(layer.textValue) || textLayerNames.has(lName)) {
+            return;
+          }
+
+          // Omit sample photos inside apertures
+          if (apertureLayerNames.has(lName)) {
+            return;
+          }
+
+          if (layer.canvas) {
+            cleanCtx.save();
+            if (layer.opacity !== undefined) {
+              cleanCtx.globalAlpha = layer.opacity;
+            }
+            cleanCtx.drawImage(layer.canvas, layer.left || 0, layer.top || 0);
+            cleanCtx.restore();
+          }
+        });
+
+        cleanBaseImageUrl = cleanCanvas.toDataURL('image/jpeg', 0.92);
+      }
+    } catch (cleanCanvasErr) {
+      console.warn('Clean base artwork composition notice:', cleanCanvasErr);
+    }
+  }
+
   return {
     documentDimensions: { width: docWidth, height: docHeight },
     photoSlots,
@@ -1545,7 +1811,7 @@ export function convertParsedLayersToImportResult(
     staticLayers,
     detectedLayerCount: photoSlots.length + primaryTextLayers.length,
     compositePreviewUrl: compositePreviewUrl || undefined,
-    cleanBaseImageUrl: compositePreviewUrl || undefined,
+    cleanBaseImageUrl: cleanBaseImageUrl || compositePreviewUrl || undefined,
   };
 }
 
