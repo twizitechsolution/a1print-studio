@@ -360,8 +360,43 @@ async function getValidCanvaAccessToken(
 }
 
 // ---------------------------------------------------------------------------
-// Helpers: Canva REST API Calls
+// Helpers: Canva REST API Calls & Cloudinary Asset Preparation
 // ---------------------------------------------------------------------------
+async function ensurePublicCloudinaryImageUrl(imageUrl: string): Promise<string> {
+  // If it's already a clean Cloudinary URL with an extension, return as-is
+  if (imageUrl.startsWith('https://res.cloudinary.com/') && /\.(png|jpe?g|webp)(\?.*)?$/i.test(imageUrl)) {
+    return imageUrl;
+  }
+
+  try {
+    const formData = new URLSearchParams();
+    formData.append('file', imageUrl);
+    formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+    formData.append('folder', 'a1print/canva_imports');
+
+    const cloudinaryUrl = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
+    const res = await fetch(cloudinaryUrl, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      console.warn(`Cloudinary pre-upload warning (${res.status}):`, text);
+      return imageUrl;
+    }
+
+    const data = await res.json();
+    if (data.secure_url) {
+      return data.secure_url;
+    }
+  } catch (err: any) {
+    console.warn('Cloudinary pre-upload exception:', err?.message);
+  }
+
+  return imageUrl;
+}
+
 async function importUrlToCanva(
   accessToken: string,
   title: string,
@@ -802,17 +837,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
 
-      const importResult = await importUrlToCanva(accessToken, targetTitle, targetImageUrl);
+      // Convert base64 or raw image into a high-resolution public Cloudinary PNG URL
+      const publicImageUrl = await ensurePublicCloudinaryImageUrl(targetImageUrl);
+
+      // Sanitize title for Canva API requirements
+      const cleanTitle = (targetTitle || 'Template Artwork')
+        .replace(/[^\w\s-]/gi, '')
+        .trim()
+        .slice(0, 50) || 'Template Artwork';
+
+      const importResult = await importUrlToCanva(accessToken, cleanTitle, publicImageUrl);
 
       // Best effort update to Firestore
       setFirestoreDoc('frame_templates', templateId, {
         canvaDesignId: importResult.designId,
+        cleanBaseImageUrl: publicImageUrl,
       }).catch(() => {});
 
       return res.status(200).json({
         success: true,
         designId: importResult.designId,
         editUrl: importResult.editUrl,
+        publicImageUrl,
       });
     }
 
