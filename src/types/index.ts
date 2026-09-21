@@ -87,16 +87,18 @@ export interface CartItem {
   product: Product;
   selectedSize: SizeOption;
   selectedFrame: FrameOption;
-  uploadedPhotoUrl: string;
-  customizedFramePreviewUrl?: string; // Full composite customized frame artwork URL
-  frameTemplateId?: string;           // References UniversalFrameTemplate.id
-  customTextValues: Record<string, string>;
-  selectedFontFamily?: string;
+  customPhotoValues?: Record<string, string>;   // slot.id -> Cloudinary URL (multi-slot support)
+  customTextValues: Record<string, string>;     // zone.id -> customized text value
+  customizedFramePreviewUrl?: string;           // Full composite customized frame artwork URL
+  frameTemplateId?: string;                     // References UniversalFrameTemplate.id
   quantity: number;
+  itemTotalPrice: number;
+  /** @deprecated remove after one release cycle — preserved for backward-compatibility */
+  uploadedPhotoUrl?: string;
+  selectedFontFamily?: string;
   photoScale?: number;
   photoPosition?: { x: number; y: number };
   photoRotation?: number;
-  itemTotalPrice: number;
 }
 
 export interface CustomerDetails {

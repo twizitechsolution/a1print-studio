@@ -463,6 +463,14 @@ export const AdminOrderList: React.FC<AdminOrderListProps> = ({
       photos.push({ name: `${order.id}-item${itemIndex + 1}-main-photo.png`, url: item.uploadedPhotoUrl });
     }
 
+    if (item.customPhotoValues) {
+      Object.entries(item.customPhotoValues).forEach(([key, val]) => {
+        if (typeof val === 'string' && (val.startsWith('http') || val.startsWith('data:image')) && !photos.some(p => p.url === val)) {
+          photos.push({ name: `${order.id}-item${itemIndex + 1}-slot-${key}.png`, url: val });
+        }
+      });
+    }
+
     Object.entries(item.customTextValues || {}).forEach(([key, val]) => {
       if (typeof val === 'string' && (val.startsWith('http') || val.startsWith('data:image')) && !photos.some(p => p.url === val)) {
         photos.push({ name: `${order.id}-item${itemIndex + 1}-${key}.png`, url: val });

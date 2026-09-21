@@ -1306,7 +1306,8 @@ export function useCartStore() {
     uploadedPhotoUrl?: string,
     customTextValues?: Record<string, string>,
     quantity = 1,
-    customizedFramePreviewUrl?: string
+    customizedFramePreviewUrl?: string,
+    customPhotoValues?: Record<string, string>
   ) => {
     let newItem: CartItem;
 
@@ -1322,6 +1323,7 @@ export function useCartStore() {
         uploadedPhotoUrl: itemObj.uploadedPhotoUrl || itemObj.product.thumbnail,
         customizedFramePreviewUrl: customUrl,
         customTextValues: itemObj.customTextValues || {},
+        customPhotoValues: itemObj.customPhotoValues || {},
         quantity: itemObj.quantity || 1,
         itemTotalPrice: itemObj.itemTotalPrice || (itemObj.selectedSize?.price || 699) * (itemObj.quantity || 1),
       };
@@ -1341,6 +1343,7 @@ export function useCartStore() {
         uploadedPhotoUrl: uploadedPhotoUrl || product?.thumbnail || '',
         customizedFramePreviewUrl: customUrl,
         customTextValues: customTextValues || {},
+        customPhotoValues: customPhotoValues || {},
         quantity,
         itemTotalPrice,
       };
@@ -1414,6 +1417,7 @@ export function useCartStore() {
           let previewUrl = item.customizedFramePreviewUrl || '';
           let photoUrl = item.uploadedPhotoUrl || '';
           const customTexts: Record<string, string> = { ...(item.customTextValues || {}) };
+          const customPhotos: Record<string, string> = { ...(item.customPhotoValues || {}) };
 
           // 1. Upload composite customized frame preview if it's Base64
           if (previewUrl && previewUrl.startsWith('data:image')) {
@@ -1433,7 +1437,18 @@ export function useCartStore() {
             }
           }
 
-          // 3. Upload slot photos in customTextValues (e.g. photo-1, photo-2, babyPhoto)
+          // 3. Upload slot photos in customPhotoValues
+          for (const [key, val] of Object.entries(customPhotos)) {
+            if (typeof val === 'string' && val.startsWith('data:image')) {
+              try {
+                customPhotos[key] = await uploadOrderArtwork(orderId, val, `slot-${key}-${itemIdx}.png`);
+              } catch (err) {
+                console.warn(`Failed to upload slot photo ${key} for item ${itemIdx}:`, err);
+              }
+            }
+          }
+
+          // 4. Upload slot photos in customTextValues (legacy e.g. photo-1, photo-2, babyPhoto)
           for (const [key, val] of Object.entries(customTexts)) {
             if (typeof val === 'string' && val.startsWith('data:image')) {
               try {
@@ -1449,6 +1464,7 @@ export function useCartStore() {
             customizedFramePreviewUrl: previewUrl,
             uploadedPhotoUrl: photoUrl,
             customTextValues: customTexts,
+            customPhotoValues: customPhotos,
           };
         })
       );

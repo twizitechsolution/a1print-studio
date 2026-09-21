@@ -25,6 +25,7 @@ import { AdminThemeProvider, useAdminTheme } from '../../context/AdminThemeConte
 import { AdminThemeSwitch } from '../../components/admin/AdminThemeSwitch';
 import { AdminSupportDesk } from '../../components/admin/AdminSupportDesk';
 import { TemplateStudio } from '../../admin/template-studio/TemplateStudio';
+import { VisualTemplateEditor } from '../../admin/template-editor/VisualTemplateEditor';
 import { UniversalFrameTemplate } from '../../types/template';
 
 import {
@@ -106,6 +107,7 @@ const AdminDashboardInner: React.FC<AdminDashboardProps> = ({ orders: initialOrd
   const [editingTemplateProduct, setEditingTemplateProduct] = useState<Product | null>(null);
   const [editingProductFullPage, setEditingProductFullPage] = useState<{ active: boolean; product: Product | null } | null>(null);
   const [studioInitialTemplate, setStudioInitialTemplate] = useState<UniversalFrameTemplate | undefined>(undefined);
+  const [studioEditorMode, setStudioEditorMode] = useState<'visual' | 'legacy'>('visual');
 
   // Live Registered Customers List state from Firestore & Local Storage
   const [registeredCustomers, setRegisteredCustomers] = useState<CustomerUser[]>([]);
@@ -493,18 +495,63 @@ const AdminDashboardInner: React.FC<AdminDashboardProps> = ({ orders: initialOrd
 
           {/* Module: Smart Layer Template Studio */}
           {activeTab === 'template_studio' && (
-            <div className="rounded-2xl overflow-hidden border dark:border-zinc-800 border-slate-200 shadow-xl">
-              <TemplateStudio
-                initialTemplate={studioInitialTemplate}
-                onExit={() => {
-                  setStudioInitialTemplate(undefined);
-                  setActiveTab('catalog');
-                }}
-                onSaveSuccess={() => {
-                  setStudioInitialTemplate(undefined);
-                  setActiveTab('catalog');
-                }}
-              />
+            <div className="space-y-3">
+              {/* Engine Switcher (Feature Flag rollout) */}
+              <div className="flex items-center justify-between bg-slate-900/80 p-2.5 rounded-xl border border-slate-800 text-xs shadow-xs">
+                <div className="flex items-center gap-2.5">
+                  <span className="font-bold text-slate-300">Editor Engine:</span>
+                  <div className="flex rounded-lg bg-slate-950 p-0.5 border border-slate-800">
+                    <button
+                      onClick={() => setStudioEditorMode('visual')}
+                      className={`px-3 py-1 rounded-md font-semibold transition-all ${
+                        studioEditorMode === 'visual'
+                          ? 'bg-cyan-600 text-white shadow-xs'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      Visual Template Editor (v2)
+                    </button>
+                    <button
+                      onClick={() => setStudioEditorMode('legacy')}
+                      className={`px-3 py-1 rounded-md font-semibold transition-all ${
+                        studioEditorMode === 'legacy'
+                          ? 'bg-slate-700 text-white shadow-xs'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      Legacy Studio (v1)
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl overflow-hidden border dark:border-zinc-800 border-slate-200 shadow-xl">
+                {studioEditorMode === 'visual' ? (
+                  <VisualTemplateEditor
+                    initialTemplate={studioInitialTemplate}
+                    onExit={() => {
+                      setStudioInitialTemplate(undefined);
+                      setActiveTab('catalog');
+                    }}
+                    onSaveSuccess={() => {
+                      setStudioInitialTemplate(undefined);
+                      setActiveTab('catalog');
+                    }}
+                  />
+                ) : (
+                  <TemplateStudio
+                    initialTemplate={studioInitialTemplate}
+                    onExit={() => {
+                      setStudioInitialTemplate(undefined);
+                      setActiveTab('catalog');
+                    }}
+                    onSaveSuccess={() => {
+                      setStudioInitialTemplate(undefined);
+                      setActiveTab('catalog');
+                    }}
+                  />
+                )}
+              </div>
             </div>
           )}
 

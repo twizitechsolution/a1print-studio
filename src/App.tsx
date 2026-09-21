@@ -151,6 +151,7 @@ export const App: React.FC = () => {
         uploadedPhotoUrl: firstPhoto,
         customizedFramePreviewUrl: (customizedFramePreviewUrl && (customizedFramePreviewUrl.startsWith('data:image') || customizedFramePreviewUrl.startsWith('http://') || customizedFramePreviewUrl.startsWith('https://')) && !customizedFramePreviewUrl.includes('[COMPRESSED_FIRESTORE_PREVIEW]') ? customizedFramePreviewUrl : ''),
         customTextValues: mergedValues,
+        customPhotoValues: compressedPhotoValues,
         frameTemplateId: frameTemplateId || prod?.linkedFrameTemplateId,
         quantity: 1,
         photoScale: 1,

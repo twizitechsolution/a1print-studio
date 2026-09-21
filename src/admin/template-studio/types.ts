@@ -7,7 +7,7 @@ export interface SelectedLayer {
   id: string;
 }
 
-export type ResizeHandle = 'tl' | 'tc' | 'tr' | 'ml' | 'mr' | 'bl' | 'bc' | 'br' | 'move';
+export type ResizeHandle = 'tl' | 'tc' | 'tr' | 'ml' | 'mr' | 'bl' | 'bc' | 'br' | 'move' | 'rotate';
 
 export interface StudioCanvasState {
   zoom: number;

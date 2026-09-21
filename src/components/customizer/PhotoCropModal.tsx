@@ -4,6 +4,8 @@ import { ZoomIn, ZoomOut, Check, X, Move } from 'lucide-react';
 interface PhotoCropModalProps {
   isOpen: boolean;
   imageSrc: string | null;
+  aspectRatio?: number;
+  shape?: 'rectangle' | 'circle';
   onCropAndSubmit: (croppedUrl: string) => void;
   onCancel: () => void;
 }
@@ -11,6 +13,8 @@ interface PhotoCropModalProps {
 export const PhotoCropModal: React.FC<PhotoCropModalProps> = ({
   isOpen,
   imageSrc,
+  aspectRatio = 1,
+  shape = 'rectangle',
   onCropAndSubmit,
   onCancel,
 }) => {
@@ -20,6 +24,8 @@ export const PhotoCropModal: React.FC<PhotoCropModalProps> = ({
   const dragStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
   if (!isOpen || !imageSrc) return null;
+
+  const validRatio = aspectRatio > 0 ? aspectRatio : 1;
 
   const handleMouseDown = (e: React.MouseEvent) => {
     setIsDragging(true);
@@ -41,26 +47,46 @@ export const PhotoCropModal: React.FC<PhotoCropModalProps> = ({
     setIsDragging(false);
   };
 
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      setIsDragging(true);
+      dragStartRef.current = {
+        x: e.touches[0].clientX - position.x,
+        y: e.touches[0].clientY - position.y,
+      };
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isDragging || e.touches.length !== 1) return;
+    setPosition({
+      x: e.touches[0].clientX - dragStartRef.current.x,
+      y: e.touches[0].clientY - dragStartRef.current.y,
+    });
+  };
+
   const handleSubmit = () => {
-    // Generate scaled & cropped image using HTML5 Canvas
+    // Generate scaled & cropped image using HTML5 Canvas matching slot aspect ratio
     const img = new Image();
     img.onload = () => {
+      const targetW = 800;
+      const targetH = Math.max(100, Math.round(800 / validRatio));
       const canvas = document.createElement('canvas');
-      canvas.width = 600;
-      canvas.height = 600;
+      canvas.width = targetW;
+      canvas.height = targetH;
       const ctx = canvas.getContext('2d');
       if (!ctx) return onCropAndSubmit(imageSrc);
 
       ctx.fillStyle = '#FFFFFF';
-      ctx.fillRect(0, 0, 600, 600);
+      ctx.fillRect(0, 0, targetW, targetH);
 
-      const targetW = 600 * scale;
-      const targetH = (img.height / img.width) * targetW;
-      const drawX = (600 - targetW) / 2 + position.x;
-      const drawY = (600 - targetH) / 2 + position.y;
+      const drawW = targetW * scale;
+      const drawH = (img.height / img.width) * drawW;
+      const drawX = (targetW - drawW) / 2 + position.x * (targetW / 300);
+      const drawY = (targetH - drawH) / 2 + position.y * (targetH / 300);
 
-      ctx.drawImage(img, drawX, drawY, targetW, targetH);
-      const croppedResult = canvas.toDataURL('image/jpeg', 0.85);
+      ctx.drawImage(img, drawX, drawY, drawW, drawH);
+      const croppedResult = canvas.toDataURL('image/jpeg', 0.90);
       onCropAndSubmit(croppedResult);
     };
     img.onerror = () => onCropAndSubmit(imageSrc);
@@ -75,16 +101,20 @@ export const PhotoCropModal: React.FC<PhotoCropModalProps> = ({
           <h3 className="font-bold text-sm text-[#160E4B] flex items-center gap-1.5">
             <Move className="w-4 h-4 text-[#F82BA9]" /> Crop & Position Photo
           </h3>
-          <span className="text-[10px] text-gray-400 font-bold">Drag to move photo</span>
+          <span className="text-[10px] text-gray-400 font-bold">Drag to position photo</span>
         </div>
 
-        {/* Auto-Fitted Crop Window Container (object-contain guarantees photo opens 100% fitted!) */}
+        {/* Auto-Fitted Crop Window Container matching slot aspect ratio */}
         <div
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
-          className="relative w-full aspect-square bg-gray-100 rounded-2xl overflow-hidden border-2 border-gray-300 flex items-center justify-center cursor-grab active:cursor-grabbing shadow-inner"
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleMouseUp}
+          className="relative w-full bg-gray-100 rounded-2xl overflow-hidden border-2 border-gray-300 flex items-center justify-center cursor-grab active:cursor-grabbing shadow-inner max-h-[300px]"
+          style={{ aspectRatio: `${validRatio}` }}
         >
           <img
             src={imageSrc}
@@ -95,8 +125,12 @@ export const PhotoCropModal: React.FC<PhotoCropModalProps> = ({
             }}
           />
 
-          {/* Dotted Cutout Grid Overlay */}
-          <div className="absolute inset-4 border-2 border-dashed border-[#F82BA9]/80 rounded-xl pointer-events-none shadow-2xs" />
+          {/* Cutout Guide Overlay */}
+          <div
+            className={`absolute inset-3 border-2 border-dashed border-[#F82BA9]/80 pointer-events-none shadow-2xs ${
+              shape === 'circle' ? 'rounded-full' : 'rounded-xl'
+            }`}
+          />
         </div>
 
         {/* Zoom Range Slider Control */}
@@ -110,7 +144,7 @@ export const PhotoCropModal: React.FC<PhotoCropModalProps> = ({
             <input
               type="range"
               min="0.5"
-              max="2.5"
+              max="3.0"
               step="0.05"
               value={scale}
               onChange={(e) => setScale(parseFloat(e.target.value))}

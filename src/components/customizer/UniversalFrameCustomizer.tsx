@@ -209,6 +209,8 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
   const liveCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [fontValues, setFontValues] = useState<Record<string, string>>({});
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [missingSlotIds, setMissingSlotIds] = useState<Set<string>>(new Set());
+  const [missingZoneIds, setMissingZoneIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     initSession(template);
@@ -216,20 +218,24 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
 
   useEffect(() => {
     let active = true;
-    if (liveCanvasRef.current) {
-      renderTemplateComposite({
-        canvas: liveCanvasRef.current,
-        template,
-        customerInputs: { photoValues, textValues },
-        targetWidth: 800,
-        targetHeight: 1000,
-        drawFrameBorder: false,
-      }).catch((err) => {
-        if (active) console.warn('Live canvas render error:', err);
-      });
-    }
+    const timer = setTimeout(() => {
+      if (liveCanvasRef.current && active) {
+        renderTemplateComposite({
+          canvas: liveCanvasRef.current,
+          template,
+          customerInputs: { photoValues, textValues },
+          targetWidth: 800,
+          targetHeight: 1000,
+          drawFrameBorder: false,
+        }).catch((err) => {
+          if (active) console.warn('Live canvas render error:', err);
+        });
+      }
+    }, 150);
+
     return () => {
       active = false;
+      clearTimeout(timer);
     };
   }, [template, photoValues, textValues]);
 
@@ -404,15 +410,15 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
   const rawPhotoSlots = photoSlots;
   const rawTextZones = textZones;
 
-  // Phase 4: Enforce LayerVisibility
-  // Admin layers with userVisible === false are hidden from the customer's customization controls
+  // Phase 4: Enforce LayerVisibility & visibleToCustomer
+  // Layers with visibleToCustomer === false or userVisible === false are hidden from the customer's customization controls
   const visiblePhotoSlots = useMemo(
-    () => rawPhotoSlots.filter((slot) => resolveVisibility(slot.visibility).userVisible),
+    () => rawPhotoSlots.filter((slot) => slot.visibleToCustomer !== false && resolveVisibility(slot.visibility).userVisible),
     [rawPhotoSlots]
   );
 
   const visibleTextZones = useMemo(
-    () => rawTextZones.filter((zone) => resolveVisibility(zone.visibility).userVisible),
+    () => rawTextZones.filter((zone) => zone.visibleToCustomer !== false && resolveVisibility(zone.visibility).userVisible),
     [rawTextZones]
   );
 
@@ -423,6 +429,7 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
       return; // Non-editable slot
     }
     setActiveSlotId(slotId);
+    setActiveSlotForCrop(slot || null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
       fileInputRef.current.click();
@@ -446,6 +453,13 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
   const handleCropAndSubmit = (croppedDataUrl: string) => {
     if (activeSlotId) {
       setPhotoValue(activeSlotId, croppedDataUrl);
+      if (missingSlotIds.has(activeSlotId)) {
+        setMissingSlotIds((prev) => {
+          const next = new Set(prev);
+          next.delete(activeSlotId);
+          return next;
+        });
+      }
       uploadCustomerPhoto(activeSlotId, croppedDataUrl).catch((err) => {
         console.warn('Background upload of customer photo to Cloudinary:', err);
       });
@@ -453,36 +467,40 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
     setCropModalOpen(false);
     setTempUploadedImage(null);
     setActiveSlotId(null);
+    setActiveSlotForCrop(null);
   };
 
   // Proceed with High-Res Export -> Checkout (Strict Validation on REQUIRED Visible Fields Only!)
   const handleProceedWithExport = async () => {
     // 1. Mandatory Text Fields Validation (only for visible & required text zones)
     const missingText = visibleTextZones.filter((z) => {
-      const vis = resolveVisibility(z.visibility);
-      if (!vis.required) return false;
+      const isReq = z.required || resolveVisibility(z.visibility).required;
+      if (!isReq) return false;
       return !textValues[z.id] || textValues[z.id].trim() === '';
     });
 
-    if (missingText.length > 0) {
-      const missingLabels = missingText.map((t) => resolveVisibility(t.visibility).userLabel || t.label).join(', ');
+    // 2. Mandatory Photo Slots Validation (only for visible & required photo slots)
+    const missingPhotos = visiblePhotoSlots.filter((s) => {
+      const isReq = s.required || resolveVisibility(s.visibility).required;
+      if (!isReq) return false;
+      return !photoValues[s.id];
+    });
+
+    if (missingText.length > 0 || missingPhotos.length > 0) {
+      setMissingZoneIds(new Set(missingText.map((z) => z.id)));
+      setMissingSlotIds(new Set(missingPhotos.map((s) => s.id)));
+
+      const missingLabels = [
+        ...missingPhotos.map((p) => resolveVisibility(p.visibility).userLabel || p.label),
+        ...missingText.map((t) => resolveVisibility(t.visibility).userLabel || t.label),
+      ].join(', ');
+
       setValidationError(`⚠️ Required customization field(s) missing! Please complete: ${missingLabels}`);
       return;
     }
 
-    // 2. Mandatory Photo Slots Validation (only for visible & required photo slots)
-    const missingPhotos = visiblePhotoSlots.filter((s) => {
-      const vis = resolveVisibility(s.visibility);
-      if (!vis.required) return false;
-      return !photoValues[s.id];
-    });
-
-    if (missingPhotos.length > 0) {
-      const missingLabels = missingPhotos.map((p) => resolveVisibility(p.visibility).userLabel || p.label).join(', ');
-      setValidationError(`⚠️ Required photo(s) missing! Please upload photos for: ${missingLabels}`);
-      return;
-    }
-
+    setMissingZoneIds(new Set());
+    setMissingSlotIds(new Set());
     setValidationError(null);
     setIsExportingCanvas(true);
     try {
@@ -717,15 +735,22 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                     const vis = resolveVisibility(slot.visibility);
                     const displayLabel = vis.userLabel || slot.label;
                     const isEditable = vis.userEditable;
+                    const isRequired = slot.required || vis.required;
+                    const isMissing = missingSlotIds.has(slot.id);
 
                     return (
-                      <div key={slot.id} className="p-3 bg-white rounded-xl border border-purple-100 flex items-center justify-between gap-3 shadow-2xs">
+                      <div
+                        key={slot.id}
+                        className={`p-3 bg-white rounded-xl border ${
+                          isMissing ? 'border-rose-500 ring-2 ring-rose-500/20 bg-rose-50/20' : 'border-purple-100'
+                        } flex items-center justify-between gap-3 shadow-2xs transition-all`}
+                      >
                         <div className="space-y-0.5">
                           <span className="text-xs font-bold text-gray-900 block flex items-center gap-1">
                             {displayLabel}
-                            {vis.required && <span className="text-rose-500 font-extrabold">*</span>}
+                            {isRequired && <span className="text-rose-500 font-extrabold">*</span>}
                           </span>
-                          <span className="text-[10px] text-gray-400">Shape: {slot.shape}</span>
+                          <span className="text-[10px] text-gray-400">Shape: {slot.shape || 'rectangle'}</span>
                         </div>
 
                         <div className="flex items-center gap-2">
@@ -768,6 +793,8 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                     const vis = resolveVisibility(zone.visibility);
                     const displayLabel = vis.userLabel || zone.label;
                     const isEditable = vis.userEditable;
+                    const isRequired = zone.required || vis.required;
+                    const isMissing = missingZoneIds.has(zone.id);
 
                     const labelLower = (zone.label || '').toLowerCase();
                     const idLower = (zone.id || '').toLowerCase();
@@ -776,14 +803,51 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                     const isDateField = !isArabicDate && (zone.isCalendar || zone.type === 'calendar' || zone.type === 'date' || labelLower.includes('date') || labelLower.includes('dob') || idLower.includes('date'));
                     const isTimeField = zone.type === 'time' || labelLower.includes('time') || idLower.includes('time');
                     const isMessageField = zone.type === 'message' || zone.isAIMessage === true;
+                    const isSelectField = zone.type === 'select' || (Array.isArray(zone.selectOptions) && zone.selectOptions.length > 0);
+
+                    const handleTextChange = (val: string) => {
+                      if (!isEditable) return;
+                      setTextValue(zone.id, val);
+                      if (missingZoneIds.has(zone.id)) {
+                        setMissingZoneIds((prev) => {
+                          const next = new Set(prev);
+                          next.delete(zone.id);
+                          return next;
+                        });
+                      }
+                    };
+
+                    if (isSelectField) {
+                      return (
+                        <div key={zone.id} className="space-y-1 sm:col-span-1">
+                          <label className="text-xs font-bold text-gray-800 block">
+                            {displayLabel} {isRequired && <span className="text-rose-500 font-extrabold">*</span>} :
+                          </label>
+                          <select
+                            disabled={!isEditable}
+                            value={textValues[zone.id] !== undefined ? textValues[zone.id] : (zone.defaultValue || zone.selectOptions?.[0] || '')}
+                            onChange={(e) => handleTextChange(e.target.value)}
+                            className={`w-full px-3 py-2 text-xs bg-white border ${
+                              isMissing ? 'border-rose-500 ring-2 ring-rose-500/20' : 'border-gray-300'
+                            } rounded-xl focus:outline-hidden focus:border-[#F82BA9] font-medium disabled:bg-slate-100 cursor-pointer`}
+                          >
+                            {(zone.selectOptions || []).map((opt) => (
+                              <option key={opt} value={opt}>
+                                {opt}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      );
+                    }
 
                     if (isDateField) {
                       return (
-                        <div key={zone.id} className={!isEditable ? 'pointer-events-none opacity-80' : ''}>
+                        <div key={zone.id} className={`${!isEditable ? 'pointer-events-none opacity-80' : ''} ${isMissing ? 'p-1 rounded-xl bg-rose-50 border border-rose-400' : ''}`}>
                           <DatePickerControl
-                            label={`${displayLabel}${vis.required ? ' *' : ''}`}
+                            label={`${displayLabel}${isRequired ? ' *' : ''}`}
                             value={textValues[zone.id] !== undefined ? textValues[zone.id] : (zone.defaultValue || '')}
-                            onChange={(val) => isEditable && setTextValue(zone.id, val)}
+                            onChange={handleTextChange}
                           />
                         </div>
                       );
@@ -791,11 +855,11 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
 
                     if (isTimeField) {
                       return (
-                        <div key={zone.id} className={!isEditable ? 'pointer-events-none opacity-80' : ''}>
+                        <div key={zone.id} className={`${!isEditable ? 'pointer-events-none opacity-80' : ''} ${isMissing ? 'p-1 rounded-xl bg-rose-50 border border-rose-400' : ''}`}>
                           <TimePickerControl
-                            label={`${displayLabel}${vis.required ? ' *' : ''}`}
+                            label={`${displayLabel}${isRequired ? ' *' : ''}`}
                             value={textValues[zone.id] !== undefined ? textValues[zone.id] : (zone.defaultValue || '')}
-                            onChange={(val) => isEditable && setTextValue(zone.id, val)}
+                            onChange={handleTextChange}
                           />
                         </div>
                       );
@@ -807,14 +871,14 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                         <div key={zone.id} className="space-y-1.5 sm:col-span-2">
                           <div className="flex items-center justify-between">
                             <label className="text-xs font-bold text-gray-800">
-                              {displayLabel} {vis.required && <span className="text-rose-500 font-extrabold">*</span>} :
+                              {displayLabel} {isRequired && <span className="text-rose-500 font-extrabold">*</span>} :
                             </label>
                             {isEditable && (
                               <button
                                 type="button"
                                 onClick={() => {
                                   const newMsg = getRandomBirthdayMessage(textValues[zone.id] || zone.defaultValue);
-                                  setTextValue(zone.id, newMsg);
+                                  handleTextChange(newMsg);
                                   setGeneratedZones((prev) => ({ ...prev, [zone.id]: true }));
                                 }}
                                 className="text-[11px] font-extrabold text-[#F82BA9] hover:text-pink-700 bg-pink-50 hover:bg-pink-100 px-3 py-1 rounded-xl border border-pink-200 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
@@ -828,8 +892,10 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                             rows={2}
                             disabled={!isEditable}
                             value={textValues[zone.id] || ''}
-                            onChange={(e) => setTextValue(zone.id, e.target.value)}
-                            className="w-full px-3 py-2 text-xs bg-white border border-gray-300 rounded-xl focus:outline-hidden focus:border-[#F82BA9] font-medium disabled:bg-slate-100"
+                            onChange={(e) => handleTextChange(e.target.value)}
+                            className={`w-full px-3 py-2 text-xs bg-white border ${
+                              isMissing ? 'border-rose-500 ring-2 ring-rose-500/20' : 'border-gray-300'
+                            } rounded-xl focus:outline-hidden focus:border-[#F82BA9] font-medium disabled:bg-slate-100`}
                             placeholder={isEditable ? (zone.defaultValue ? `e.g. ${zone.defaultValue}` : `Type ${displayLabel}...`) : zone.defaultValue}
                           />
                         </div>
@@ -841,14 +907,16 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
                     return (
                       <div key={zone.id} className="space-y-1 sm:col-span-1">
                         <label className="text-xs font-bold text-gray-800 block">
-                          {displayLabel} {vis.required && <span className="text-rose-500 font-extrabold">*</span>} :
+                          {displayLabel} {isRequired && <span className="text-rose-500 font-extrabold">*</span>} :
                         </label>
                         <input
                           type="text"
                           disabled={!isEditable}
                           value={textValues[zone.id] || ''}
-                          onChange={(e) => setTextValue(zone.id, e.target.value)}
-                          className="w-full px-3 py-2 text-xs bg-white border border-gray-300 rounded-xl focus:outline-hidden focus:border-[#F82BA9] font-medium disabled:bg-slate-100"
+                          onChange={(e) => handleTextChange(e.target.value)}
+                          className={`w-full px-3 py-2 text-xs bg-white border ${
+                            isMissing ? 'border-rose-500 ring-2 ring-rose-500/20' : 'border-gray-300'
+                          } rounded-xl focus:outline-hidden focus:border-[#F82BA9] font-medium disabled:bg-slate-100`}
                           placeholder={isEditable ? samplePlaceholder : zone.defaultValue}
                         />
                       </div>
@@ -938,14 +1006,17 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
 
       </div>
 
-      {/* Crop Modal Popup */}
+      {/* Crop Modal Popup locked to slot aspect ratio & shape */}
       <PhotoCropModal
         isOpen={cropModalOpen}
         imageSrc={tempUploadedImage}
+        aspectRatio={activeSlotForCrop?.width && activeSlotForCrop?.height ? activeSlotForCrop.width / activeSlotForCrop.height : 1}
+        shape={activeSlotForCrop?.shape || 'rectangle'}
         onCropAndSubmit={handleCropAndSubmit}
         onCancel={() => {
           setCropModalOpen(false);
           setTempUploadedImage(null);
+          setActiveSlotForCrop(null);
         }}
       />
 

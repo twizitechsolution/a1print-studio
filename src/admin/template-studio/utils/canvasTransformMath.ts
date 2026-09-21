@@ -62,16 +62,37 @@ export function getTextZoneBoundingBox(
   };
 }
 
-export function getHandles(box: BoundingBox): Record<Exclude<ResizeHandle, 'move'>, { x: number; y: number }> {
+export function rotatePoint(x: number, y: number, cx: number, cy: number, angleDeg: number): { x: number; y: number } {
+  if (!angleDeg) return { x, y };
+  const rad = (angleDeg * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  const dx = x - cx;
+  const dy = y - cy;
   return {
-    tl: { x: box.left, y: box.top },
-    tc: { x: box.centerX, y: box.top },
-    tr: { x: box.right, y: box.top },
-    ml: { x: box.left, y: box.centerY },
-    mr: { x: box.right, y: box.centerY },
-    bl: { x: box.left, y: box.bottom },
-    bc: { x: box.centerX, y: box.bottom },
-    br: { x: box.right, y: box.bottom },
+    x: cx + (dx * cos - dy * sin),
+    y: cy + (dx * sin + dy * cos),
+  };
+}
+
+export function getRotateHandle(box: BoundingBox, rotation = 0): { x: number; y: number } {
+  const unrotated = { x: box.centerX, y: box.top - 24 };
+  return rotatePoint(unrotated.x, unrotated.y, box.centerX, box.centerY, rotation);
+}
+
+export function getHandles(box: BoundingBox, rotation = 0): Record<Exclude<ResizeHandle, 'move'>, { x: number; y: number }> {
+  const cx = box.centerX;
+  const cy = box.centerY;
+  return {
+    tl: rotatePoint(box.left, box.top, cx, cy, rotation),
+    tc: rotatePoint(box.centerX, box.top, cx, cy, rotation),
+    tr: rotatePoint(box.right, box.top, cx, cy, rotation),
+    ml: rotatePoint(box.left, box.centerY, cx, cy, rotation),
+    mr: rotatePoint(box.right, box.centerY, cx, cy, rotation),
+    bl: rotatePoint(box.left, box.bottom, cx, cy, rotation),
+    bc: rotatePoint(box.centerX, box.bottom, cx, cy, rotation),
+    br: rotatePoint(box.right, box.bottom, cx, cy, rotation),
+    rotate: getRotateHandle(box, rotation),
   };
 }
 
@@ -79,22 +100,31 @@ export function hitTestHandles(
   mouseX: number,
   mouseY: number,
   box: BoundingBox,
-  tolerance = 12
+  tolerance = 12,
+  rotation = 0
 ): ResizeHandle | null {
-  const handles = getHandles(box);
+  const handles = getHandles(box, rotation);
 
+  // 1. Check rotate handle first
+  if (Math.hypot(mouseX - handles.rotate.x, mouseY - handles.rotate.y) <= tolerance + 2) {
+    return 'rotate';
+  }
+
+  // 2. Check resize handles
   for (const [key, pos] of Object.entries(handles)) {
+    if (key === 'rotate') continue;
     if (Math.abs(mouseX - pos.x) <= tolerance && Math.abs(mouseY - pos.y) <= tolerance) {
       return key as ResizeHandle;
     }
   }
 
-  // Inside bounding box -> move handle
+  // 3. Check inside bounding box (considering rotation)
+  const unrotated = rotatePoint(mouseX, mouseY, box.centerX, box.centerY, -rotation);
   if (
-    mouseX >= box.left &&
-    mouseX <= box.right &&
-    mouseY >= box.top &&
-    mouseY <= box.bottom
+    unrotated.x >= box.left &&
+    unrotated.x <= box.right &&
+    unrotated.y >= box.top &&
+    unrotated.y <= box.bottom
   ) {
     return 'move';
   }

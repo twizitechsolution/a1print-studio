@@ -17,7 +17,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
-    const { amount, currency = 'INR', receipt, customKeyId, customKeySecret } = body;
+    const {
+      amount,
+      currency = 'INR',
+      receipt,
+      customKeyId,
+      customKeySecret,
+      notes = {},
+      items = [],
+      customer,
+    } = body;
 
     const keyId = customKeyId || process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || 'rzp_live_TYixCQSVrMZ1et';
     const keySecret = customKeySecret || process.env.RAZORPAY_KEY_SECRET || 'FrL6S0QU2AqHddY2NHCiV706';
@@ -35,6 +44,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let orderAmount: number = Math.round(amountInPaise);
     let orderCurrency: string = currency || 'INR';
 
+    // Prepare Razorpay notes (maximum 15 key-value pairs, string values up to 500 chars)
+    const orderNotes: Record<string, string> = { ...notes };
+    if (customer?.fullName) orderNotes.customer_name = String(customer.fullName).slice(0, 100);
+    if (customer?.phone) orderNotes.customer_phone = String(customer.phone).slice(0, 20);
+    if (Array.isArray(items) && items.length > 0) {
+      orderNotes.items_count = String(items.length);
+      const firstItem = items[0];
+      if (firstItem?.customizedFramePreviewUrl) {
+        orderNotes.preview_url = String(firstItem.customizedFramePreviewUrl).slice(0, 200);
+      }
+      if (firstItem?.customPhotoValues) {
+        orderNotes.photos_count = String(Object.keys(firstItem.customPhotoValues).length);
+      }
+    }
+
     // Approach 1: Try Razorpay Node SDK (ESM-safe import)
     try {
       const RazorpayClass = (RazorpayPkg as any).default || RazorpayPkg;
@@ -47,6 +71,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         amount: orderAmount,
         currency: orderCurrency,
         receipt: receipt || `receipt_${Date.now()}`,
+        notes: orderNotes,
       });
 
       if (order && order.id) {
@@ -72,6 +97,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           amount: orderAmount,
           currency: orderCurrency,
           receipt: receipt || `receipt_${Date.now()}`,
+          notes: orderNotes,
         }),
       });
 
