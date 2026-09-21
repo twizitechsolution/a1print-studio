@@ -465,27 +465,93 @@ const AdminDashboardInner: React.FC<AdminDashboardProps> = ({ orders: initialOrd
             <>
               {activeTab === 'catalog' && (
                 <AdminCatalogManager
-                  onEditTemplate={(product) => setEditingTemplateProduct(product)}
-                  onOpenTemplateEditor={(product) => setEditingTemplateProduct(product)}
-                  onOpenVisualEditor={(product) => setEditingTemplateProduct(product)}
-                  onEditProductFullPage={(product) => setEditingProductFullPage({ active: true, product })}
-                  onOpenTemplateStudio={(product) => {
-                    if (product) {
+                  onEditTemplate={(product) => {
+                    if (product && product.id) {
                       setStudioInitialTemplate({
-                        id: `tmpl-${product.id}`,
+                        id: product.linkedFrameTemplateId || `tmpl-${product.id}`,
                         productId: product.id,
                         title: product.title,
                         category: product.category || 'all',
                         basePrice: product.sizes?.[0]?.price || 699,
                         originalPrice: product.sizes?.[0]?.originalPrice || 999,
                         baseImageUrl: product.baseImageUrl || product.thumbnail || product.images?.[0] || '',
+                        cleanBaseImageUrl: (product as any).cleanBaseImageUrl || '',
                         photoSlots: product.photoSlots || [],
                         textZones: product.textZones || [],
-                        createdAt: new Date().toISOString(),
+                        status: 'published',
+                        createdAt: product.createdAt || new Date().toISOString(),
                       });
                     } else {
                       setStudioInitialTemplate(undefined);
                     }
+                    setStudioEditorMode('visual');
+                    setActiveTab('template_studio');
+                  }}
+                  onOpenTemplateEditor={(product) => {
+                    if (product && product.id) {
+                      setStudioInitialTemplate({
+                        id: product.linkedFrameTemplateId || `tmpl-${product.id}`,
+                        productId: product.id,
+                        title: product.title,
+                        category: product.category || 'all',
+                        basePrice: product.sizes?.[0]?.price || 699,
+                        originalPrice: product.sizes?.[0]?.originalPrice || 999,
+                        baseImageUrl: product.baseImageUrl || product.thumbnail || product.images?.[0] || '',
+                        cleanBaseImageUrl: (product as any).cleanBaseImageUrl || '',
+                        photoSlots: product.photoSlots || [],
+                        textZones: product.textZones || [],
+                        status: 'published',
+                        createdAt: product.createdAt || new Date().toISOString(),
+                      });
+                    } else {
+                      setStudioInitialTemplate(undefined);
+                    }
+                    setStudioEditorMode('visual');
+                    setActiveTab('template_studio');
+                  }}
+                  onOpenVisualEditor={(product) => {
+                    if (product && product.id) {
+                      setStudioInitialTemplate({
+                        id: product.linkedFrameTemplateId || `tmpl-${product.id}`,
+                        productId: product.id,
+                        title: product.title,
+                        category: product.category || 'all',
+                        basePrice: product.sizes?.[0]?.price || 699,
+                        originalPrice: product.sizes?.[0]?.originalPrice || 999,
+                        baseImageUrl: product.baseImageUrl || product.thumbnail || product.images?.[0] || '',
+                        cleanBaseImageUrl: (product as any).cleanBaseImageUrl || '',
+                        photoSlots: product.photoSlots || [],
+                        textZones: product.textZones || [],
+                        status: 'published',
+                        createdAt: product.createdAt || new Date().toISOString(),
+                      });
+                    } else {
+                      setStudioInitialTemplate(undefined);
+                    }
+                    setStudioEditorMode('visual');
+                    setActiveTab('template_studio');
+                  }}
+                  onEditProductFullPage={(product) => setEditingProductFullPage({ active: true, product })}
+                  onOpenTemplateStudio={(product) => {
+                    if (product && product.id) {
+                      setStudioInitialTemplate({
+                        id: product.linkedFrameTemplateId || `tmpl-${product.id}`,
+                        productId: product.id,
+                        title: product.title,
+                        category: product.category || 'all',
+                        basePrice: product.sizes?.[0]?.price || 699,
+                        originalPrice: product.sizes?.[0]?.originalPrice || 999,
+                        baseImageUrl: product.baseImageUrl || product.thumbnail || product.images?.[0] || '',
+                        cleanBaseImageUrl: (product as any).cleanBaseImageUrl || '',
+                        photoSlots: product.photoSlots || [],
+                        textZones: product.textZones || [],
+                        status: 'published',
+                        createdAt: product.createdAt || new Date().toISOString(),
+                      });
+                    } else {
+                      setStudioInitialTemplate(undefined);
+                    }
+                    setStudioEditorMode('visual');
                     setActiveTab('template_studio');
                   }}
                 />

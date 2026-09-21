@@ -45,6 +45,16 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    match /universal_templates/{templateId} {
+      allow read, create, update: if true;
+      allow delete: if false;
+    }
+
+    match /frame_templates/{templateId} {
+      allow read, create, update: if true;
+      allow delete: if false;
+    }
+
     match /store_settings/{settingId} {
       allow read, write: if true;
     }

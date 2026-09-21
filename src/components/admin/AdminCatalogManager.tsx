@@ -232,6 +232,18 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
             >
               <Plus className="w-3.5 h-3.5" /> Add Frame Product
             </button>
+
+            {/* Create Template in Visual Editor Studio */}
+            {onOpenVisualEditor && (
+              <button
+                type="button"
+                onClick={() => onOpenVisualEditor({} as any)}
+                className="px-3.5 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                title="Design a brand new custom frame template in Visual Template Editor"
+              >
+                <Wand2 className="w-3.5 h-3.5" /> Visual Frame Studio
+              </button>
+            )}
           </div>
         </div>
       </div>

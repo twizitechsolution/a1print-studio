@@ -16,7 +16,9 @@ import {
   clamp,
 } from '../template-studio/utils/canvasTransformMath';
 import { renderFrameComposite } from '../../lib/renderFrameComposite';
-import { firebaseCloudDb, uploadCategoryImage } from '../../config/firebase';
+import { firebaseCloudDb, uploadProductImage, base64ToBlob } from '../../config/firebase';
+import { Product } from '../../types';
+import { useCartStore } from '../../store/useCartStore';
 import { parsePSDFileBinary } from '../template-studio/utils/psdParser';
 import {
   Plus,
@@ -79,6 +81,8 @@ export const VisualTemplateEditor: React.FC<VisualTemplateEditorProps> = ({
   onExit,
   onSaveSuccess,
 }) => {
+  const { products, addProduct, updateProduct, categories } = useCartStore();
+
   // 1. Template State with History Stack
   const defaultBaseTemplate: UniversalFrameTemplate = {
     id: `tmpl-${Date.now().toString(36)}`,
@@ -157,6 +161,23 @@ export const VisualTemplateEditor: React.FC<VisualTemplateEditorProps> = ({
   ]);
   const [historyIdx, setHistoryIdx] = useState<number>(0);
 
+  // Sync state if initialTemplate prop changes (e.g. user opens different product from catalog)
+  useEffect(() => {
+    if (initialTemplate) {
+      const normalized = normalizeTemplateLayerDefaults(initialTemplate);
+      setTemplate(normalized);
+      setHistory([normalized]);
+      setHistoryIdx(0);
+      if (normalized.photoSlots && normalized.photoSlots.length > 0) {
+        setSelectedLayer({ type: 'slot', id: normalized.photoSlots[0].id });
+      } else if (normalized.textZones && normalized.textZones.length > 0) {
+        setSelectedLayer({ type: 'zone', id: normalized.textZones[0].id });
+      } else {
+        setSelectedLayer(null);
+      }
+    }
+  }, [initialTemplate]);
+
   const pushHistory = useCallback((nextTemplate: UniversalFrameTemplate) => {
     setHistory((prev) => {
       const sliced = prev.slice(0, historyIdx + 1);
@@ -186,6 +207,9 @@ export const VisualTemplateEditor: React.FC<VisualTemplateEditorProps> = ({
     type: 'slot',
     id: template.photoSlots[0]?.id || '',
   });
+
+  // Right property panel tab: 'layer' | 'settings'
+  const [rightPanelTab, setRightPanelTab] = useState<'layer' | 'settings'>('layer');
 
   // 3. Canvas Display & Navigation
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -392,6 +416,7 @@ export const VisualTemplateEditor: React.FC<VisualTemplateEditorProps> = ({
       const hit = hitTestHandles(x, y, box, 6, z.rotation || 0);
       if (hit) {
         setSelectedLayer({ type: 'zone', id: z.id });
+        setRightPanelTab('layer');
         setActiveDrag({
           handle: 'move',
           startX: x,
@@ -410,6 +435,7 @@ export const VisualTemplateEditor: React.FC<VisualTemplateEditorProps> = ({
       const hit = hitTestHandles(x, y, box, 6, s.rotation || 0);
       if (hit) {
         setSelectedLayer({ type: 'slot', id: s.id });
+        setRightPanelTab('layer');
         setActiveDrag({
           handle: 'move',
           startX: x,
@@ -565,6 +591,7 @@ export const VisualTemplateEditor: React.FC<VisualTemplateEditorProps> = ({
     };
     setTemplate(next);
     setSelectedLayer({ type: 'slot', id: newSlot.id });
+    setRightPanelTab('layer');
     pushHistory(next);
   };
 
@@ -595,6 +622,7 @@ export const VisualTemplateEditor: React.FC<VisualTemplateEditorProps> = ({
     };
     setTemplate(next);
     setSelectedLayer({ type: 'zone', id: newZone.id });
+    setRightPanelTab('layer');
     pushHistory(next);
   };
 
@@ -669,38 +697,144 @@ export const VisualTemplateEditor: React.FC<VisualTemplateEditorProps> = ({
     }
   };
 
-  // Save to Firestore & Product
+  // Save to Firestore & Product Store
   const handleSave = async () => {
     setIsSaving(true);
     setStatusMessage({ text: 'Saving template to cloud database...', type: 'info' });
 
     try {
+      const isNewTemplate = !template.productId;
+      const targetProductId =
+        template.productId ||
+        (template.id.startsWith('tmpl-') ? template.id.replace('tmpl-', 'prod-') : `prod-${Date.now()}`);
+
+      let cleanBase = template.cleanBaseImageUrl || template.baseImageUrl || '';
+      let samplePreview = template.baseImageUrl || cleanBase || '';
+
+      // Upload base64 images to Cloudinary CDN if needed to prevent Firestore size quota limits (<1MB)
+      if (cleanBase && cleanBase.startsWith('data:image')) {
+        try {
+          const blob = base64ToBlob(cleanBase);
+          const uploadedUrl = await uploadProductImage(targetProductId, blob, `clean_base-${Date.now()}.jpg`);
+          if (uploadedUrl) cleanBase = uploadedUrl;
+        } catch (uploadErr) {
+          console.warn('Could not upload cleanBase to Cloudinary:', uploadErr);
+        }
+      }
+
+      if (samplePreview && samplePreview.startsWith('data:image')) {
+        try {
+          const blob = base64ToBlob(samplePreview);
+          const uploadedUrl = await uploadProductImage(targetProductId, blob, `sample_preview-${Date.now()}.jpg`);
+          if (uploadedUrl) samplePreview = uploadedUrl;
+        } catch (uploadErr) {
+          console.warn('Could not upload samplePreview to Cloudinary:', uploadErr);
+        }
+      }
+
+      // Safeguard slot thumbnails so they never exceed Firestore quota (< 100KB)
+      const sanitizedPhotoSlots = (template.photoSlots || []).map((slot) => {
+        if (slot.defaultPhotoUrl && slot.defaultPhotoUrl.startsWith('data:image') && slot.defaultPhotoUrl.length > 100000) {
+          return {
+            ...slot,
+            defaultPhotoUrl: 'https://images.unsplash.com/photo-1519689680058-324335c77eba?auto=format&fit=crop&q=80&w=600',
+          };
+        }
+        return slot;
+      });
+
       const templateToSave: UniversalFrameTemplate = {
         ...template,
+        productId: targetProductId,
+        baseImageUrl: samplePreview,
+        cleanBaseImageUrl: cleanBase,
+        photoSlots: sanitizedPhotoSlots,
+        status: template.status || 'published',
+        category: template.category || 'all',
         updatedAt: new Date().toISOString(),
       };
 
       // 1. Save to universal_templates collection in Firestore
       await firebaseCloudDb.setDocument('universal_templates', templateToSave.id, templateToSave);
 
-      // 2. Sync with linked product if present
-      if (templateToSave.productId) {
-        const existingProd = await firebaseCloudDb.getDocument<any>('products', templateToSave.productId);
-        const productUpdate = {
-          ...(existingProd || {}),
-          id: templateToSave.productId,
-          linkedFrameTemplateId: templateToSave.id,
-          baseImageUrl: templateToSave.cleanBaseImageUrl || templateToSave.baseImageUrl,
-          cleanBaseImageUrl: templateToSave.cleanBaseImageUrl,
-          photoSlots: templateToSave.photoSlots,
-          textZones: templateToSave.textZones,
-          updatedAt: new Date().toISOString(),
-        };
-        await firebaseCloudDb.setDocument('products', templateToSave.productId, productUpdate);
+      // 2. Also save to frame_templates for complete backwards-compatibility
+      await firebaseCloudDb.setDocument('frame_templates', templateToSave.id, templateToSave);
+
+      // 3. Sync or create product in store catalog & products collection
+      const existingProd = products.find((p) => p.id === targetProductId);
+      const primaryImage = samplePreview || cleanBase || 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=1200&q=80';
+      const basePrice = Number(templateToSave.basePrice) || 699;
+      const originalPrice = Number(templateToSave.originalPrice) || 999;
+      const discountPct = originalPrice > basePrice ? Math.round(((originalPrice - basePrice) / originalPrice) * 100) : 30;
+
+      const matchedCategory = categories.find((c) => c.id === templateToSave.category || c.slug === templateToSave.category);
+      const categoryLabel = matchedCategory ? matchedCategory.name : (templateToSave.category || 'Custom Frame');
+
+      const fullProduct: Product = {
+        ...(existingProd || {}),
+        id: targetProductId,
+        productId: targetProductId,
+        title: templateToSave.title || 'Custom Photo Frame',
+        subtitle: existingProd?.subtitle || 'Personalized Designer Photo Frame',
+        slug: existingProd?.slug || (templateToSave.title || 'custom-frame').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
+        category: templateToSave.category || 'all',
+        categoryLabel: categoryLabel,
+        rating: existingProd?.rating || 4.9,
+        reviewsCount: existingProd?.reviewsCount || 128,
+        thumbnail: primaryImage,
+        baseImageUrl: primaryImage,
+        images: existingProd?.images && existingProd.images.length > 0 ? existingProd.images : [primaryImage],
+        bestseller: existingProd?.bestseller ?? false,
+        onSale: existingProd?.onSale ?? true,
+        description: existingProd?.description || `Personalize this stunning frame with your favorite photos and custom text. Premium acrylic glass with HD print quality.`,
+        features: existingProd?.features || [
+          'High Definition Photo Print',
+          'Premium Matte/Glossy Acrylic Glass',
+          'Durable Synthetic Wooden Frame',
+          'Ready to Hang & Tabletop Stand Included',
+        ],
+        sizes: existingProd?.sizes && existingProd.sizes.length > 0 ? existingProd.sizes : [
+          {
+            id: 'size-m',
+            name: 'Medium (9x12 inch)',
+            dimensions: '9x12 inch',
+            price: basePrice,
+            originalPrice: originalPrice,
+            discountPercentage: discountPct,
+          },
+          {
+            id: 'size-l',
+            name: 'Large (12x18 inch)',
+            dimensions: '12x18 inch',
+            price: Math.round(basePrice * 1.4),
+            originalPrice: Math.round(originalPrice * 1.4),
+            discountPercentage: discountPct,
+          },
+        ],
+        frames: existingProd?.frames && existingProd.frames.length > 0 ? existingProd.frames : [
+          { id: 'classic-black', name: 'Classic Black', color: '#111827' },
+          { id: 'warm-walnut', name: 'Warm Walnut', color: '#593D28' },
+          { id: 'pure-white', name: 'Pure White', color: '#FFFFFF' },
+        ],
+        photoSlots: templateToSave.photoSlots,
+        textZones: templateToSave.textZones,
+        linkedFrameTemplateId: templateToSave.id,
+        stockQuantity: existingProd?.stockQuantity ?? 50,
+        updatedAt: new Date().toISOString(),
+      };
+
+      if (existingProd) {
+        await updateProduct(targetProductId, fullProduct);
+      } else {
+        await addProduct(fullProduct);
       }
 
-      setStatusMessage({ text: `Template "${templateToSave.title}" saved successfully!`, type: 'success' });
-      setTimeout(() => setStatusMessage(null), 3000);
+      setTemplate(templateToSave);
+      setStatusMessage({
+        text: `Template "${templateToSave.title}" saved & published to Shop catalog!`,
+        type: 'success',
+      });
+      setTimeout(() => setStatusMessage(null), 4000);
       onSaveSuccess?.(templateToSave);
     } catch (err: any) {
       console.error('Save error:', err);
@@ -743,7 +877,9 @@ export const VisualTemplateEditor: React.FC<VisualTemplateEditorProps> = ({
                 {template.status || 'draft'}
               </span>
             </div>
-            <div className="text-[10px] text-slate-400 font-mono">ID: {template.id}</div>
+            <div className="text-[10px] text-slate-400 font-mono">
+              ID: {template.id} {template.productId ? `• Product: ${template.productId}` : ''}
+            </div>
           </div>
         </div>
 
@@ -790,22 +926,37 @@ export const VisualTemplateEditor: React.FC<VisualTemplateEditorProps> = ({
 
           <div className="h-5 w-[1px] bg-slate-800 mx-1" />
 
-          <button
-            onClick={() =>
-              setTemplate((prev) => ({
-                ...prev,
-                status: prev.status === 'published' ? 'draft' : 'published',
-              }))
-            }
-            className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors"
-          >
-            Status: {template.status === 'published' ? 'Published' : 'Draft'}
-          </button>
+          {/* Dual Pill Status Selector */}
+          <div className="flex items-center bg-slate-950 p-0.5 rounded-lg border border-slate-800 text-xs">
+            <button
+              type="button"
+              onClick={() => setTemplate((prev) => ({ ...prev, status: 'draft' }))}
+              className={`px-2.5 py-1 rounded-md font-semibold transition-all ${
+                template.status !== 'published'
+                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-xs'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Draft
+            </button>
+            <button
+              type="button"
+              onClick={() => setTemplate((prev) => ({ ...prev, status: 'published' }))}
+              className={`px-2.5 py-1 rounded-md font-bold transition-all flex items-center gap-1 ${
+                template.status === 'published'
+                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <CheckCircle2 className="w-3 h-3 text-white" />
+              Published
+            </button>
+          </div>
 
           <button
             onClick={handleSave}
             disabled={isSaving}
-            className="px-4 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-lg shadow-blue-600/20 flex items-center gap-1.5 disabled:opacity-50 transition-all"
+            className="px-4 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-lg shadow-blue-600/20 flex items-center gap-1.5 disabled:opacity-50 transition-all cursor-pointer"
           >
             <Save className="w-4 h-4" />
             <span>{isSaving ? 'Saving...' : 'Save Template'}</span>
@@ -949,31 +1100,70 @@ export const VisualTemplateEditor: React.FC<VisualTemplateEditorProps> = ({
 
         {/* RIGHT PANE: 30% Contextual Property Panel */}
         <div className="flex-[3] max-w-sm w-full bg-slate-900 border-l border-slate-800 flex flex-col overflow-y-auto">
-          {/* Panel Header */}
-          <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/60 sticky top-0 z-10">
-            <div className="flex items-center gap-2">
-              <Sliders className="w-4 h-4 text-cyan-400" />
-              <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">
-                {selectedSlot
-                  ? 'Photo Slot Properties'
-                  : selectedZone
-                  ? 'Text Zone Properties'
-                  : 'Template Settings'}
-              </span>
+          {/* Panel Header with Navigation Tabs */}
+          <div className="border-b border-slate-800 bg-slate-900/90 sticky top-0 z-10">
+            <div className="p-2.5 flex items-center justify-between border-b border-slate-800/60">
+              <div className="grid grid-cols-2 gap-1 w-full bg-slate-950 p-0.5 rounded-lg border border-slate-800 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setRightPanelTab('layer')}
+                  className={`py-1.5 px-2 rounded-md font-semibold transition-all flex items-center justify-center gap-1.5 ${
+                    rightPanelTab === 'layer'
+                      ? 'bg-cyan-600 text-white shadow-xs'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Sliders className="w-3.5 h-3.5" />
+                  <span>Layer Settings</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRightPanelTab('settings')}
+                  className={`py-1.5 px-2 rounded-md font-semibold transition-all flex items-center justify-center gap-1.5 ${
+                    rightPanelTab === 'settings'
+                      ? 'bg-cyan-600 text-white shadow-xs'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Settings2 className="w-3.5 h-3.5" />
+                  <span>Template & Shop</span>
+                </button>
+              </div>
             </div>
-            {selectedLayer && (
-              <button
-                onClick={() => setSelectedLayer(null)}
-                className="text-[11px] text-cyan-400 hover:underline font-semibold"
-              >
-                Deselect
-              </button>
+            {rightPanelTab === 'layer' && selectedLayer && (
+              <div className="px-3 py-1.5 flex items-center justify-between text-[11px] bg-slate-950/40 border-b border-slate-800/40">
+                <span className="text-slate-400 font-medium truncate max-w-[200px]">
+                  {selectedSlot ? `Slot: ${selectedSlot.label}` : `Zone: ${selectedZone?.label}`}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedLayer(null)}
+                  className="text-cyan-400 hover:text-cyan-300 font-semibold cursor-pointer shrink-0"
+                >
+                  Deselect
+                </button>
+              </div>
             )}
           </div>
 
           <div className="p-4 space-y-6 flex-1 text-xs">
+            {/* When in Layer Tab but no layer is selected */}
+            {rightPanelTab === 'layer' && !selectedSlot && !selectedZone && (
+              <div className="p-6 text-center text-slate-400 space-y-3">
+                <Sliders className="w-8 h-8 mx-auto text-slate-600" />
+                <p className="text-xs">No layer selected. Click any photo cutout or text zone on the canvas to edit its properties.</p>
+                <button
+                  type="button"
+                  onClick={() => setRightPanelTab('settings')}
+                  className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-400 text-xs font-semibold cursor-pointer border border-slate-700"
+                >
+                  Edit Template & Shop Settings →
+                </button>
+              </div>
+            )}
+
             {/* A. PHOTO SLOT PROPERTIES */}
-            {selectedSlot && (
+            {rightPanelTab === 'layer' && selectedSlot && (
               <div className="space-y-4 animate-in fade-in duration-150">
                 {/* Slot Label */}
                 <div>
@@ -1196,7 +1386,7 @@ export const VisualTemplateEditor: React.FC<VisualTemplateEditorProps> = ({
             )}
 
             {/* B. TEXT ZONE PROPERTIES */}
-            {selectedZone && (
+            {rightPanelTab === 'layer' && selectedZone && (
               <div className="space-y-4 animate-in fade-in duration-150">
                 {/* Zone Label */}
                 <div>
@@ -1538,9 +1728,9 @@ export const VisualTemplateEditor: React.FC<VisualTemplateEditorProps> = ({
               </div>
             )}
 
-            {/* C. GENERAL TEMPLATE SETTINGS (When nothing is selected) */}
-            {!selectedSlot && !selectedZone && (
-              <div className="space-y-4">
+            {/* C. GENERAL TEMPLATE SETTINGS (When tab is 'settings' or nothing is selected) */}
+            {(rightPanelTab === 'settings' || (!selectedSlot && !selectedZone)) && (
+              <div className="space-y-4 animate-in fade-in duration-150">
                 <div>
                   <label className="block text-slate-400 font-semibold mb-1">Template Title</label>
                   <input
@@ -1548,9 +1738,72 @@ export const VisualTemplateEditor: React.FC<VisualTemplateEditorProps> = ({
                     value={template.title}
                     onChange={(e) => setTemplate((prev) => ({ ...prev, title: e.target.value }))}
                     className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-white font-medium focus:border-cyan-500 outline-none text-xs"
+                    placeholder="e.g. Baby Birthday Photo Frame"
                   />
                 </div>
 
+                {/* Category Dropdown */}
+                <div>
+                  <label className="block text-slate-400 font-semibold mb-1">Product Category</label>
+                  <select
+                    value={template.category || 'all'}
+                    onChange={(e) => setTemplate((prev) => ({ ...prev, category: e.target.value }))}
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-white font-medium focus:border-cyan-500 outline-none text-xs capitalize cursor-pointer"
+                  >
+                    <option value="all">All Frames / General</option>
+                    {categories.map((cat) => (
+                      <option key={cat.id} value={cat.slug || cat.id}>
+                        {cat.name} ({cat.slug || cat.id})
+                      </option>
+                    ))}
+                    {!categories.some((c) => c.slug === 'baby-birth-frame' || c.id === 'baby-birth-frame') && (
+                      <option value="baby-birth-frame">Baby Birth Frame</option>
+                    )}
+                    {!categories.some((c) => c.slug === 'anniversary-frame' || c.id === 'anniversary-frame') && (
+                      <option value="anniversary-frame">Anniversary Frame</option>
+                    )}
+                    {!categories.some((c) => c.slug === 'birthday-frame' || c.id === 'birthday-frame') && (
+                      <option value="birthday-frame">Birthday Frame</option>
+                    )}
+                  </select>
+                </div>
+
+                {/* Publishing Status */}
+                <div>
+                  <label className="block text-slate-400 font-semibold mb-1">Publishing Status</label>
+                  <div className="grid grid-cols-2 gap-2 bg-slate-950 p-1 rounded-lg border border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => setTemplate((prev) => ({ ...prev, status: 'draft' }))}
+                      className={`py-1.5 px-3 rounded-md font-semibold text-xs transition-all ${
+                        template.status !== 'published'
+                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-xs'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      Draft (Hidden)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTemplate((prev) => ({ ...prev, status: 'published' }))}
+                      className={`py-1.5 px-3 rounded-md font-bold text-xs transition-all flex items-center justify-center gap-1.5 ${
+                        template.status === 'published'
+                          ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      Published (Active)
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    {template.status === 'published'
+                      ? '✓ Live in Catalog & Shop for customers to personalize.'
+                      : 'Hidden from storefront until you are ready to publish.'}
+                  </p>
+                </div>
+
+                {/* Base & Original Pricing */}
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="block text-slate-400 font-semibold mb-1">Base Price (₹)</label>
@@ -1574,6 +1827,31 @@ export const VisualTemplateEditor: React.FC<VisualTemplateEditorProps> = ({
                   </div>
                 </div>
 
+                {/* Frame Artwork Background Preview & Replace */}
+                <div className="pt-2 border-t border-slate-800 space-y-2">
+                  <label className="block text-slate-400 font-semibold">Frame Artwork Background</label>
+                  <div className="flex items-center gap-3 bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+                    <img
+                      src={template.cleanBaseImageUrl || template.baseImageUrl}
+                      alt="Artwork"
+                      className="w-14 h-18 object-cover rounded-lg border border-slate-800 bg-slate-900 shrink-0"
+                    />
+                    <div className="flex-1 min-w-0 space-y-1.5">
+                      <div className="text-[11px] text-slate-300 font-medium truncate">
+                        {template.cleanBaseImageUrl ? 'Clean Frame Artwork' : 'Composite Artwork'}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-semibold rounded-lg border border-slate-700 flex items-center gap-1 transition-colors cursor-pointer"
+                      >
+                        <Upload className="w-3 h-3" />
+                        Replace Image
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Layer Hierarchy Overview */}
                 <div className="pt-2 border-t border-slate-800 space-y-2">
                   <div className="font-semibold text-slate-300 flex items-center justify-between">
@@ -1581,12 +1859,15 @@ export const VisualTemplateEditor: React.FC<VisualTemplateEditorProps> = ({
                     <Layers className="w-3.5 h-3.5 text-slate-500" />
                   </div>
 
-                  <div className="space-y-1 max-h-64 overflow-y-auto pr-1">
+                  <div className="space-y-1 max-h-56 overflow-y-auto pr-1">
                     {/* Photo slots list */}
                     {template.photoSlots.map((s) => (
                       <div
                         key={s.id}
-                        onClick={() => setSelectedLayer({ type: 'slot', id: s.id })}
+                        onClick={() => {
+                          setSelectedLayer({ type: 'slot', id: s.id });
+                          setRightPanelTab('layer');
+                        }}
                         className="p-2 rounded-lg bg-slate-950 hover:bg-slate-800/80 border border-slate-800 flex items-center justify-between cursor-pointer transition-colors"
                       >
                         <div className="flex items-center gap-2">
@@ -1601,7 +1882,10 @@ export const VisualTemplateEditor: React.FC<VisualTemplateEditorProps> = ({
                     {template.textZones.map((z) => (
                       <div
                         key={z.id}
-                        onClick={() => setSelectedLayer({ type: 'zone', id: z.id })}
+                        onClick={() => {
+                          setSelectedLayer({ type: 'zone', id: z.id });
+                          setRightPanelTab('layer');
+                        }}
                         className="p-2 rounded-lg bg-slate-950 hover:bg-slate-800/80 border border-slate-800 flex items-center justify-between cursor-pointer transition-colors"
                       >
                         <div className="flex items-center gap-2">

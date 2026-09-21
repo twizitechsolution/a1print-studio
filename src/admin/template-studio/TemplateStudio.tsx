@@ -28,7 +28,7 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
   onExit,
 }) => {
   // Store products for 2-way sync
-  const { products = [], updateProduct: updateStoreProduct } = useCartStore();
+  const { products = [], addProduct: addStoreProduct, updateProduct: updateStoreProduct, categories = [] } = useCartStore();
 
   // Linear Wizard Navigation: Library -> New Frame Wizard -> Editor
   const [currentView, setCurrentView] = useState<'library' | 'wizard' | 'editor'>(
@@ -437,8 +437,13 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
         return slot;
       });
 
+      const targetProductId =
+        template.productId ||
+        (template.id.startsWith('tmpl-') ? template.id.replace('tmpl-', 'prod-') : `prod-${Date.now()}`);
+
       const templateToSave: UniversalFrameTemplate = {
         ...template,
+        productId: targetProductId,
         baseImageUrl: samplePreview,
         cleanBaseImageUrl: cleanBase,
         photoSlots: sanitizedPhotoSlots,
@@ -447,34 +452,63 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
         createdAt: template.createdAt || new Date().toISOString(),
       };
 
-      // 1. Save to universal_templates collection
+      // 1. Save to universal_templates and frame_templates collections
       await firebaseCloudDb.setDocument('universal_templates', templateToSave.id, templateToSave);
+      await firebaseCloudDb.setDocument('frame_templates', templateToSave.id, templateToSave);
 
-      // 2. If linked to a product, sync to products collection and store
-      if (templateToSave.productId) {
-        const existingProd = await firebaseCloudDb.getDocument<any>('products', templateToSave.productId);
+      // 2. Sync with products collection and store
+      const existingProd = products.find((p) => p.id === targetProductId);
+      const basePrice = Number(templateToSave.basePrice) || 699;
+      const originalPrice = Number(templateToSave.originalPrice) || 999;
+      const discountPct = originalPrice > basePrice ? Math.round(((originalPrice - basePrice) / originalPrice) * 100) : 30;
 
-        const productUpdate: any = {
-          ...(existingProd || {}),
-          id: templateToSave.productId,
-          linkedFrameTemplateId: templateToSave.id,
-          baseImageUrl: samplePreview,
-          cleanBaseImageUrl: cleanBase,
-          thumbnail: samplePreview,
-          image: samplePreview,
-          images: [samplePreview],
-          photoSlots: templateToSave.photoSlots,
-          textZones: templateToSave.textZones,
-          version: ((existingProd?.version || 1) + 1),
-          updatedAt: new Date().toISOString(),
-        };
+      const matchedCategory = categories.find((c) => c.id === templateToSave.category || c.slug === templateToSave.category);
+      const categoryLabel = matchedCategory ? matchedCategory.name : (templateToSave.category || 'Custom Frame');
 
-        try {
-          await firebaseCloudDb.setDocument('products', templateToSave.productId, productUpdate);
-          updateStoreProduct(templateToSave.productId, productUpdate);
-        } catch (prodErr) {
-          console.warn('Product sync warning:', prodErr);
+      const fullProduct: any = {
+        ...(existingProd || {}),
+        id: targetProductId,
+        productId: targetProductId,
+        title: templateToSave.title || 'Custom Photo Frame',
+        subtitle: existingProd?.subtitle || 'Personalized Designer Photo Frame',
+        slug: existingProd?.slug || (templateToSave.title || 'custom-frame').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
+        category: templateToSave.category || 'all',
+        categoryLabel: categoryLabel,
+        rating: existingProd?.rating || 4.9,
+        reviewsCount: existingProd?.reviewsCount || 128,
+        thumbnail: samplePreview || cleanBase,
+        baseImageUrl: samplePreview || cleanBase,
+        image: samplePreview || cleanBase,
+        images: existingProd?.images && existingProd.images.length > 0 ? existingProd.images : [samplePreview || cleanBase],
+        photoSlots: templateToSave.photoSlots,
+        textZones: templateToSave.textZones,
+        linkedFrameTemplateId: templateToSave.id,
+        sizes: existingProd?.sizes && existingProd.sizes.length > 0 ? existingProd.sizes : [
+          {
+            id: 'size-m',
+            name: 'Medium (9x12 inch)',
+            dimensions: '9x12 inch',
+            price: basePrice,
+            originalPrice: originalPrice,
+            discountPercentage: discountPct,
+          },
+        ],
+        frames: existingProd?.frames && existingProd.frames.length > 0 ? existingProd.frames : [
+          { id: 'classic-black', name: 'Classic Black', color: '#111827' },
+        ],
+        version: ((existingProd?.version || 1) + 1),
+        updatedAt: new Date().toISOString(),
+      };
+
+      try {
+        if (existingProd) {
+          await firebaseCloudDb.setDocument('products', targetProductId, fullProduct);
+          updateStoreProduct(targetProductId, fullProduct);
+        } else {
+          await addStoreProduct(fullProduct);
         }
+      } catch (prodErr) {
+        console.warn('Product sync warning in TemplateStudio:', prodErr);
       }
 
       setSaveMessage({

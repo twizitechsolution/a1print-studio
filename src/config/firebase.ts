@@ -427,7 +427,7 @@ export const firebaseCloudDb = {
 
     try {
       const docRef = doc(firebaseDb, collectionName, docId);
-      await setDoc(docRef, {
+      const sdkWrite = setDoc(docRef, {
         id: sanitizedPayload.id || docId,
         title: sanitizedPayload.title || '',
         category: sanitizedPayload.category || '',
@@ -439,10 +439,19 @@ export const firebaseCloudDb = {
         updatedAt: now,
         jsonPayload: JSON.stringify(sanitizedPayload),
       });
+
+      // 🛡️ 3.5-second timeout guard: never let client WebSockets freeze indefinitely
+      await Promise.race([
+        sdkWrite,
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Firestore SDK write timeout')), 3500)),
+      ]);
       return true;
     } catch (sdkErr) {
-      console.warn(`Firestore SDK setDocument error [${collectionName}/${docId}], trying REST fallback:`, sdkErr);
+      console.warn(`Firestore SDK setDocument notice [${collectionName}/${docId}], executing REST write:`, sdkErr);
       try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 4500);
+
         const body = {
           fields: {
             id: { stringValue: sanitizedPayload.id || docId },
@@ -463,9 +472,12 @@ export const firebaseCloudDb = {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
+          signal: controller.signal,
         });
+        clearTimeout(timeoutId);
         return res.ok;
       } catch (e) {
+        console.warn(`Firestore REST setDocument fallback warning [${collectionName}/${docId}]:`, e);
         return false;
       }
     }
