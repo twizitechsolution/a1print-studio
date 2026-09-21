@@ -14,13 +14,13 @@
     "api/*.ts": {
       "memory": 1024,
       "maxDuration": 30
-    },
-    "api/**/*.ts": {
-      "memory": 1024,
-      "maxDuration": 30
     }
   },
   "rewrites": [
+    {
+      "source": "/api/canva/:action",
+      "destination": "/api/canva?action=:action"
+    },
     {
       "source": "/((?!api/).*)",
       "destination": "/index.html"

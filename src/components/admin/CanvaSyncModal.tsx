@@ -55,7 +55,7 @@ export const CanvaSyncModal: React.FC<CanvaSyncModalProps> = ({
   const checkAuthStatus = async () => {
     setIsCheckingAuth(true);
     try {
-      const res = await fetch('/api/canva/auth-status');
+      const res = await fetch('/api/canva?action=auth-status');
       if (res.ok) {
         const data = await res.json();
         setIsAuthenticated(Boolean(data.isAuthenticated));
@@ -71,7 +71,7 @@ export const CanvaSyncModal: React.FC<CanvaSyncModalProps> = ({
 
   const handleConnectCanva = () => {
     const returnUrl = window.location.pathname + window.location.search;
-    window.location.href = `/api/canva/auth-start?returnUrl=${encodeURIComponent(returnUrl)}`;
+    window.location.href = `/api/canva?action=auth-start&returnUrl=${encodeURIComponent(returnUrl)}`;
   };
 
   const handleStartEditing = async () => {
@@ -80,7 +80,7 @@ export const CanvaSyncModal: React.FC<CanvaSyncModalProps> = ({
     setIsLicenseError(false);
 
     try {
-      const res = await fetch('/api/canva/import', {
+      const res = await fetch('/api/canva?action=import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ templateId }),
@@ -119,7 +119,7 @@ export const CanvaSyncModal: React.FC<CanvaSyncModalProps> = ({
     setIsLicenseError(false);
 
     try {
-      const res = await fetch('/api/canva/export', {
+      const res = await fetch('/api/canva?action=export', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ templateId }),
