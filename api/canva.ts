@@ -51,7 +51,26 @@ const CLOUDINARY_UPLOAD_PRESET =
 const CANVA_API_BASE = 'https://api.canva.com/rest/v1';
 
 // ---------------------------------------------------------------------------
-// Helpers: Firestore REST
+// Cookie Utilities
+// ---------------------------------------------------------------------------
+function parseCookies(req: VercelRequest): Record<string, string> {
+  const list: Record<string, string> = {};
+  const cookieHeader = req.headers.cookie;
+  if (!cookieHeader) return list;
+
+  cookieHeader.split(';').forEach((cookie) => {
+    let [name, ...rest] = cookie.split('=');
+    name = name?.trim();
+    if (!name) return;
+    const value = rest.join('=').trim();
+    list[name] = decodeURIComponent(value);
+  });
+
+  return list;
+}
+
+// ---------------------------------------------------------------------------
+// Helpers: Firestore REST (With graceful 429 quota handling)
 // ---------------------------------------------------------------------------
 function fromFirestoreDoc(docData: any): any {
   if (!docData) return null;
@@ -107,57 +126,105 @@ function toFirestoreFields(obj: Record<string, any>): Record<string, any> {
 }
 
 async function getFirestoreDoc(collection: string, docId: string): Promise<any | null> {
-  const url = `${FIRESTORE_BASE_URL}/${collection}/${encodeURIComponent(docId)}?${REST_AUTH_PARAM}`;
-  const res = await fetch(url);
-  if (!res.ok) {
-    if (res.status === 404) return null;
-    const text = await res.text();
-    throw new Error(`Firestore GET failed (${res.status}): ${text}`);
+  try {
+    const url = `${FIRESTORE_BASE_URL}/${collection}/${encodeURIComponent(docId)}?${REST_AUTH_PARAM}`;
+    const res = await fetch(url);
+    if (!res.ok) {
+      if (res.status === 404) return null;
+      const text = await res.text();
+      console.warn(`Firestore GET failed (${res.status}): ${text}`);
+      return null;
+    }
+    const json = await res.json();
+    return fromFirestoreDoc(json);
+  } catch (err: any) {
+    console.warn(`Firestore GET exception for ${collection}/${docId}:`, err?.message);
+    return null;
   }
-  const json = await res.json();
-  return fromFirestoreDoc(json);
 }
 
 async function setFirestoreDoc(collection: string, docId: string, data: Record<string, any>): Promise<boolean> {
-  const url = `${FIRESTORE_BASE_URL}/${collection}/${encodeURIComponent(docId)}?${REST_AUTH_PARAM}`;
-  const fields = toFirestoreFields({
-    ...data,
-    jsonPayload: JSON.stringify(data),
-    updatedAt: new Date().toISOString(),
-  });
+  try {
+    const url = `${FIRESTORE_BASE_URL}/${collection}/${encodeURIComponent(docId)}?${REST_AUTH_PARAM}`;
+    const fields = toFirestoreFields({
+      ...data,
+      jsonPayload: JSON.stringify(data),
+      updatedAt: new Date().toISOString(),
+    });
 
-  const res = await fetch(url, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fields }),
-  });
+    const res = await fetch(url, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fields }),
+    });
 
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Firestore PATCH failed (${res.status}): ${text}`);
+    if (!res.ok) {
+      const text = await res.text();
+      console.warn(`Firestore PATCH skipped (${res.status}): ${text}`);
+      return false;
+    }
+    return true;
+  } catch (err: any) {
+    console.warn(`Firestore PATCH exception for ${collection}/${docId}:`, err?.message);
+    return false;
   }
-  return true;
 }
 
 async function deleteFirestoreDoc(collection: string, docId: string): Promise<boolean> {
-  const url = `${FIRESTORE_BASE_URL}/${collection}/${encodeURIComponent(docId)}?${REST_AUTH_PARAM}`;
-  const res = await fetch(url, { method: 'DELETE' });
-  return res.ok;
+  try {
+    const url = `${FIRESTORE_BASE_URL}/${collection}/${encodeURIComponent(docId)}?${REST_AUTH_PARAM}`;
+    const res = await fetch(url, { method: 'DELETE' });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
 
 // ---------------------------------------------------------------------------
-// Helpers: PKCE
+// Helpers: PKCE & Stateless HMAC-Signed OAuth State
 // ---------------------------------------------------------------------------
 function toBase64Url(buf: Buffer): string {
   return buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-function generatePKCE(): { codeVerifier: string; codeChallenge: string; state: string } {
+function generatePKCE(): { codeVerifier: string; codeChallenge: string } {
   const codeVerifier = toBase64Url(crypto.randomBytes(32));
   const hash = crypto.createHash('sha256').update(codeVerifier).digest();
   const codeChallenge = toBase64Url(hash);
-  const state = toBase64Url(crypto.randomBytes(16));
-  return { codeVerifier, codeChallenge, state };
+  return { codeVerifier, codeChallenge };
+}
+
+function signOAuthState(payload: {
+  codeVerifier: string;
+  redirectUri: string;
+  returnUrl: string;
+  ts: number;
+}): string {
+  const jsonStr = JSON.stringify(payload);
+  const dataB64 = Buffer.from(jsonStr).toString('base64url');
+  const hmac = crypto.createHmac('sha256', CANVA_CLIENT_SECRET).update(dataB64).digest('base64url');
+  return `${dataB64}.${hmac}`;
+}
+
+function verifyOAuthState(stateStr: string): {
+  codeVerifier: string;
+  redirectUri: string;
+  returnUrl: string;
+} | null {
+  try {
+    const parts = stateStr.split('.');
+    if (parts.length !== 2) return null;
+    const [dataB64, hmac] = parts;
+    const expectedHmac = crypto.createHmac('sha256', CANVA_CLIENT_SECRET).update(dataB64).digest('base64url');
+    if (hmac !== expectedHmac) return null;
+    const jsonStr = Buffer.from(dataB64, 'base64url').toString('utf8');
+    const payload = JSON.parse(jsonStr);
+    // 30 minute expiry
+    if (Date.now() - payload.ts > 30 * 60 * 1000) return null;
+    return payload;
+  } catch {
+    return null;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -170,12 +237,15 @@ interface StoredCanvaTokens {
   scope?: string;
 }
 
-async function saveCanvaTokens(tokens: {
-  access_token: string;
-  refresh_token: string;
-  expires_in: number;
-  scope?: string;
-}): Promise<StoredCanvaTokens> {
+async function saveCanvaTokens(
+  tokens: {
+    access_token: string;
+    refresh_token: string;
+    expires_in: number;
+    scope?: string;
+  },
+  res?: VercelResponse
+): Promise<StoredCanvaTokens> {
   const expires_at = Date.now() + (tokens.expires_in - 300) * 1000;
   const payload: StoredCanvaTokens = {
     access_token: tokens.access_token,
@@ -184,11 +254,52 @@ async function saveCanvaTokens(tokens: {
     scope: tokens.scope,
   };
 
+  // 1. Try to save in Firestore (gracefully ignores 429 quota errors)
   await setFirestoreDoc('canvaAuth', 'admin_tokens', payload);
+
+  // 2. Also set in HttpOnly cookie so the session works even if Firestore quota is exceeded
+  if (res) {
+    const cookieVal = encodeURIComponent(JSON.stringify(payload));
+    res.setHeader('Set-Cookie', [
+      `canva_tokens=${cookieVal}; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000; Secure`,
+    ]);
+  }
+
   return payload;
 }
 
-async function refreshCanvaAccessToken(tokens: StoredCanvaTokens): Promise<string> {
+async function getStoredTokens(req: VercelRequest): Promise<StoredCanvaTokens | null> {
+  // 1. Check HttpOnly cookie
+  const cookies = parseCookies(req);
+  if (cookies.canva_tokens) {
+    try {
+      const parsed = JSON.parse(cookies.canva_tokens);
+      if (parsed?.access_token) return parsed;
+    } catch {}
+  }
+
+  // 2. Check custom header (from client store)
+  const headerToken = req.headers['x-canva-tokens'];
+  if (typeof headerToken === 'string') {
+    try {
+      const parsed = JSON.parse(decodeURIComponent(headerToken));
+      if (parsed?.access_token) return parsed;
+    } catch {}
+  }
+
+  // 3. Check Firestore
+  const fromDb = await getFirestoreDoc('canvaAuth', 'admin_tokens');
+  if (fromDb?.access_token) {
+    return fromDb;
+  }
+
+  return null;
+}
+
+async function refreshCanvaAccessToken(
+  tokens: StoredCanvaTokens,
+  res?: VercelResponse
+): Promise<string> {
   if (!tokens.refresh_token) {
     throw new Error('No Canva refresh token found. Please re-authenticate.');
   }
@@ -198,7 +309,7 @@ async function refreshCanvaAccessToken(tokens: StoredCanvaTokens): Promise<strin
   bodyParams.append('grant_type', 'refresh_token');
   bodyParams.append('refresh_token', tokens.refresh_token);
 
-  const res = await fetch(`${CANVA_API_BASE}/oauth/token`, {
+  const tokenRes = await fetch(`${CANVA_API_BASE}/oauth/token`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
@@ -207,27 +318,33 @@ async function refreshCanvaAccessToken(tokens: StoredCanvaTokens): Promise<strin
     body: bodyParams.toString(),
   });
 
-  if (!res.ok) {
-    const errorText = await res.text();
+  if (!tokenRes.ok) {
+    const errorText = await tokenRes.text();
     console.error('Failed to refresh Canva access token:', errorText);
     const err: any = new Error('Canva authorization has expired. Please re-connect Canva in the admin panel.');
     err.code = 'CANVA_REAUTH_REQUIRED';
     throw err;
   }
 
-  const newTokens = await res.json();
-  const saved = await saveCanvaTokens({
-    access_token: newTokens.access_token,
-    refresh_token: newTokens.refresh_token || tokens.refresh_token,
-    expires_in: newTokens.expires_in || 14400,
-    scope: newTokens.scope || tokens.scope,
-  });
+  const newTokens = await tokenRes.json();
+  const saved = await saveCanvaTokens(
+    {
+      access_token: newTokens.access_token,
+      refresh_token: newTokens.refresh_token || tokens.refresh_token,
+      expires_in: newTokens.expires_in || 14400,
+      scope: newTokens.scope || tokens.scope,
+    },
+    res
+  );
 
   return saved.access_token;
 }
 
-async function getValidCanvaAccessToken(): Promise<string> {
-  const tokens = await getFirestoreDoc('canvaAuth', 'admin_tokens');
+async function getValidCanvaAccessToken(
+  req: VercelRequest,
+  res?: VercelResponse
+): Promise<string> {
+  const tokens = await getStoredTokens(req);
   if (!tokens || !tokens.access_token) {
     const err: any = new Error('Canva is not connected. Please click "Authorize & Connect Canva" in the template editor.');
     err.code = 'CANVA_NOT_CONNECTED';
@@ -236,7 +353,7 @@ async function getValidCanvaAccessToken(): Promise<string> {
 
   const isExpired = Date.now() >= (tokens.expires_at || 0);
   if (isExpired) {
-    return await refreshCanvaAccessToken(tokens);
+    return await refreshCanvaAccessToken(tokens, res);
   }
 
   return tokens.access_token;
@@ -447,7 +564,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // CORS configuration
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-canva-tokens');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
@@ -468,7 +585,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     // -------------------------------------------------------------------------
-    // 1. auth-start: Initiates Canva OAuth PKCE
+    // 1. auth-start: Initiates Canva OAuth PKCE (Zero Database Calls)
     // -------------------------------------------------------------------------
     if (action === 'auth-start') {
       if (!CANVA_CLIENT_ID) {
@@ -477,7 +594,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
       }
 
-      const { codeVerifier, codeChallenge, state } = generatePKCE();
+      const { codeVerifier, codeChallenge } = generatePKCE();
 
       const host = req.headers['x-forwarded-host'] || req.headers.host || 'a1print-studio.vercel.app';
       const proto = req.headers['x-forwarded-proto'] || 'https';
@@ -485,11 +602,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const redirectUri = CANVA_REDIRECT_URI || computedRedirectUri;
       const returnUrl = (req.query.returnUrl as string) || '/admin';
 
-      await setFirestoreDoc('canva_oauth_states', state, {
+      // Stateless, tamper-proof state signed with HMAC-SHA256 (no Firestore quota consumed)
+      const state = signOAuthState({
         codeVerifier,
         redirectUri,
         returnUrl,
-        createdAt: Date.now(),
+        ts: Date.now(),
       });
 
       const scopes = [
@@ -515,7 +633,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // -------------------------------------------------------------------------
-    // 2. callback: Canva OAuth Redirect Handler
+    // 2. callback: Canva OAuth Redirect Handler (Stateless Verification)
     // -------------------------------------------------------------------------
     if (action === 'callback') {
       const { code, state, error, error_description } = req.query;
@@ -527,15 +645,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       if (!code || !state || typeof code !== 'string' || typeof state !== 'string') {
-        return res.status(400).send('Missing authorization code or state parameter.');
+        res.writeHead(302, { Location: `/admin?canvaError=missing_oauth_params` });
+        return res.end();
       }
 
-      const oauthState = await getFirestoreDoc('canva_oauth_states', state);
+      // Verify stateless signed state
+      let oauthState = verifyOAuthState(state);
+
+      // Fallback: check Firestore if this is an older request format
+      if (!oauthState) {
+        const legacyDoc = await getFirestoreDoc('canva_oauth_states', state);
+        if (legacyDoc?.codeVerifier) {
+          oauthState = {
+            codeVerifier: legacyDoc.codeVerifier,
+            redirectUri: legacyDoc.redirectUri,
+            returnUrl: legacyDoc.returnUrl,
+          };
+          deleteFirestoreDoc('canva_oauth_states', state).catch(() => {});
+        }
+      }
+
       if (!oauthState || !oauthState.codeVerifier) {
-        return res.status(400).send('Invalid or expired OAuth state session. Please try connecting to Canva again.');
+        // If state expired or could not be decoded, redirect back to admin to re-authenticate cleanly
+        res.writeHead(302, { Location: `/admin?canvaReauth=true` });
+        return res.end();
       }
-
-      await deleteFirestoreDoc('canva_oauth_states', state).catch(() => {});
 
       const basicAuth = Buffer.from(`${CANVA_CLIENT_ID}:${CANVA_CLIENT_SECRET}`).toString('base64');
       const bodyParams = new URLSearchParams();
@@ -556,20 +690,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!tokenRes.ok) {
         const errText = await tokenRes.text();
         console.error('Failed to exchange Canva authorization code:', errText);
-        return res.status(502).send(`Canva token exchange failed: ${errText}`);
+        res.writeHead(302, { Location: `/admin?canvaError=${encodeURIComponent(errText)}` });
+        return res.end();
       }
 
       const tokenData = await tokenRes.json();
-      await saveCanvaTokens({
-        access_token: tokenData.access_token,
-        refresh_token: tokenData.refresh_token,
-        expires_in: tokenData.expires_in || 14400,
-        scope: tokenData.scope,
-      });
+      const savedTokens = await saveCanvaTokens(
+        {
+          access_token: tokenData.access_token,
+          refresh_token: tokenData.refresh_token,
+          expires_in: tokenData.expires_in || 14400,
+          scope: tokenData.scope,
+        },
+        res
+      );
 
       const returnUrl = oauthState.returnUrl || '/admin';
       const separator = returnUrl.includes('?') ? '&' : '?';
-      res.writeHead(302, { Location: `${returnUrl}${separator}canvaConnected=true` });
+      const cookieVal = encodeURIComponent(JSON.stringify(savedTokens));
+
+      res.writeHead(302, {
+        Location: `${returnUrl}${separator}canvaConnected=true`,
+        'Set-Cookie': `canva_tokens=${cookieVal}; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000; Secure`,
+      });
       return res.end();
     }
 
@@ -577,7 +720,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // 3. auth-status: Check if Canva is authenticated
     // -------------------------------------------------------------------------
     if (action === 'auth-status') {
-      const tokens = await getFirestoreDoc('canvaAuth', 'admin_tokens');
+      const tokens = await getStoredTokens(req);
       if (!tokens || !tokens.access_token) {
         return res.status(200).json({ isAuthenticated: false });
       }
@@ -585,7 +728,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const isExpired = !tokens.expires_at || Date.now() >= (tokens.expires_at - 300000);
       if (isExpired && tokens.refresh_token) {
         try {
-          await refreshCanvaAccessToken(tokens);
+          await refreshCanvaAccessToken(tokens, res);
           return res.status(200).json({
             isAuthenticated: true,
             expiresAt: Date.now() + 14400000,
@@ -616,29 +759,40 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
-      const { templateId, imageUrl, title } = body;
+      const { templateId, imageUrl, title, canvaDesignId } = body;
 
       if (!templateId) {
         return res.status(400).json({ error: 'templateId is required' });
       }
 
-      const accessToken = await getValidCanvaAccessToken();
-      const template = await getFirestoreDoc('frame_templates', templateId);
-      const targetImageUrl = imageUrl || template?.cleanBaseImageUrl || template?.baseImageUrl;
-      const targetTitle = title || template?.title || `Template ${templateId}`;
+      const accessToken = await getValidCanvaAccessToken(req, res);
+
+      // Prefer payload values to avoid unnecessary Firestore read queries
+      let targetImageUrl = imageUrl;
+      let targetTitle = title;
+      let existingDesignId = canvaDesignId;
+
+      if (!targetImageUrl) {
+        const template = await getFirestoreDoc('frame_templates', templateId);
+        targetImageUrl = template?.cleanBaseImageUrl || template?.baseImageUrl;
+        targetTitle = targetTitle || template?.title;
+        existingDesignId = existingDesignId || template?.canvaDesignId;
+      }
+
+      targetTitle = targetTitle || `Template ${templateId}`;
 
       if (!targetImageUrl) {
         return res.status(400).json({ error: 'Template has no baseImageUrl to edit in Canva.' });
       }
 
       // If already linked, get fresh edit URL
-      if (template?.canvaDesignId) {
+      if (existingDesignId) {
         try {
-          const existingDesign = await getCanvaDesign(accessToken, template.canvaDesignId);
+          const existingDesign = await getCanvaDesign(accessToken, existingDesignId);
           if (existingDesign.editUrl) {
             return res.status(200).json({
               success: true,
-              designId: template.canvaDesignId,
+              designId: existingDesignId,
               editUrl: existingDesign.editUrl,
               reused: true,
             });
@@ -650,12 +804,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       const importResult = await importUrlToCanva(accessToken, targetTitle, targetImageUrl);
 
-      if (template) {
-        await setFirestoreDoc('frame_templates', templateId, {
-          ...template,
-          canvaDesignId: importResult.designId,
-        });
-      }
+      // Best effort update to Firestore
+      setFirestoreDoc('frame_templates', templateId, {
+        canvaDesignId: importResult.designId,
+      }).catch(() => {});
 
       return res.status(200).json({
         success: true,
@@ -673,31 +825,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
-      const { templateId } = body;
+      const { templateId, canvaDesignId } = body;
 
       if (!templateId) {
         return res.status(400).json({ error: 'templateId is required' });
       }
 
-      const template = await getFirestoreDoc('frame_templates', templateId);
-      if (!template) {
-        return res.status(404).json({ error: `Template with ID '${templateId}' not found.` });
+      let activeDesignId = canvaDesignId;
+      if (!activeDesignId) {
+        const template = await getFirestoreDoc('frame_templates', templateId);
+        activeDesignId = template?.canvaDesignId;
       }
 
-      if (!template.canvaDesignId) {
+      if (!activeDesignId) {
         return res.status(400).json({ error: 'This template is not linked to a Canva design yet.' });
       }
 
-      const accessToken = await getValidCanvaAccessToken();
-      const canvaDownloadUrl = await exportCanvaDesign(accessToken, template.canvaDesignId);
+      const accessToken = await getValidCanvaAccessToken(req, res);
+      const canvaDownloadUrl = await exportCanvaDesign(accessToken, activeDesignId);
       const permanentCloudinaryUrl = await uploadCanvaExportToCloudinary(canvaDownloadUrl);
 
       const nowIso = new Date().toISOString();
-      await setFirestoreDoc('frame_templates', templateId, {
-        ...template,
+      // Best-effort Firestore update
+      setFirestoreDoc('frame_templates', templateId, {
         baseImageUrl: permanentCloudinaryUrl,
         canvaLastSyncedAt: nowIso,
-      });
+      }).catch(() => {});
 
       return res.status(200).json({
         success: true,
@@ -715,7 +868,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ error: 'designId is required' });
       }
 
-      const accessToken = await getValidCanvaAccessToken();
+      const accessToken = await getValidCanvaAccessToken(req, res);
       const design = await getCanvaDesign(accessToken, designId);
       return res.status(200).json({ success: true, design });
     }

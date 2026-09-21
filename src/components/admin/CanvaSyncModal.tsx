@@ -40,8 +40,22 @@ export const CanvaSyncModal: React.FC<CanvaSyncModalProps> = ({
   const [isLicenseError, setIsLicenseError] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(false);
+  const [activeDesignId, setActiveDesignId] = useState<string>(canvaDesignId || '');
 
-  // Check Canva authentication status when modal opens
+  // Check Canva authentication status when modal opens or URL parameters change
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('canvaConnected') === 'true') {
+      setIsAuthenticated(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (canvaDesignId) {
+      setActiveDesignId(canvaDesignId);
+    }
+  }, [canvaDesignId]);
+
   useEffect(() => {
     if (isOpen) {
       checkAuthStatus();
@@ -83,7 +97,12 @@ export const CanvaSyncModal: React.FC<CanvaSyncModalProps> = ({
       const res = await fetch('/api/canva?action=import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ templateId }),
+        body: JSON.stringify({
+          templateId,
+          imageUrl: currentBaseImageUrl,
+          title: templateTitle,
+          canvaDesignId: activeDesignId || canvaDesignId,
+        }),
       });
 
       const data = await res.json();
@@ -95,6 +114,10 @@ export const CanvaSyncModal: React.FC<CanvaSyncModalProps> = ({
           return;
         }
         throw new Error(data.error || 'Failed to open template in Canva.');
+      }
+
+      if (data.designId) {
+        setActiveDesignId(data.designId);
       }
 
       if (!data.editUrl) {
@@ -122,7 +145,10 @@ export const CanvaSyncModal: React.FC<CanvaSyncModalProps> = ({
       const res = await fetch('/api/canva?action=export', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ templateId }),
+        body: JSON.stringify({
+          templateId,
+          canvaDesignId: activeDesignId || canvaDesignId,
+        }),
       });
 
       const data = await res.json();
