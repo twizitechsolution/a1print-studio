@@ -198,7 +198,6 @@ const AdminDashboardInner: React.FC<AdminDashboardProps> = ({ orders: initialOrd
       group: 'Products & Customization',
       items: [
         { id: 'catalog' as AdminTab, label: 'Frame Catalog', icon: Layers },
-        { id: 'template_studio' as AdminTab, label: 'Smart Template Studio', icon: Wand2 },
         { id: 'custom_fields' as AdminTab, label: 'Customization Fields', icon: Settings },
       ],
     },

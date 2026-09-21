@@ -171,8 +171,8 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
             </button>
           </div>
 
-          {/* Middle & Right: Search Box, Categories, Add Product */}
-          <div className="flex flex-wrap items-center gap-3">
+          {/* Middle & Right: Search Box, Categories, Add Product on a single clean row */}
+          <div className="flex items-center gap-3">
             {/* Search Input */}
             <div className="relative min-w-[200px]">
               <input
@@ -183,25 +183,31 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
                   setSearchQuery(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="pl-8 pr-3 py-2 bg-[#1A2035] border border-[#262E4A] rounded-xl text-xs text-white placeholder-gray-500 focus:outline-none focus:border-[#3B82F6] font-medium w-56 sm:w-64 shadow-xs"
+                className="pl-8 pr-3 py-2 bg-[#1A2035] border border-[#262E4A] rounded-xl text-xs text-white placeholder-gray-500 focus:outline-none focus:border-[#3B82F6] font-medium w-52 sm:w-64 shadow-xs"
               />
               <span className="absolute left-2.5 top-2.5 text-gray-400 text-xs">🔍</span>
             </div>
 
-            {/* Smart Template Studio Direct Launch Button */}
-            {onOpenTemplateStudio && (
-              <button
-                type="button"
-                onClick={onOpenTemplateStudio}
-                className="px-3.5 py-2 bg-gradient-to-r from-[#F82BA9] to-purple-600 hover:brightness-110 text-white font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
-                title="Open Smart Layer Template Studio with AI/PSD Import"
-              >
-                <Wand2 className="w-3.5 h-3.5" /> Smart Template Studio
-              </button>
-            )}
+            {/* Category Manager Button */}
+            <button
+              type="button"
+              onClick={() => setIsCategoryModalOpen(true)}
+              className="px-3.5 py-2 bg-[#1A2035] hover:bg-[#222943] text-gray-200 font-semibold text-xs rounded-xl border border-[#262E4A] transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs whitespace-nowrap"
+            >
+              <FolderPlus className="w-3.5 h-3.5 text-purple-400" /> Categories ({safeCategories.length})
+            </button>
 
-            {/* Bulk Restore All Soft-Deleted Frames Button (Shows when deleted products exist) */}
-            {deletedProducts.length > 0 && (
+            {/* Add Product Button */}
+            <button
+              type="button"
+              onClick={handleOpenAddModal}
+              className="px-3.5 py-2 bg-[#3B82F6] hover:bg-[#2563EB] text-white font-semibold text-xs rounded-xl border border-[#3B82F6] transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs whitespace-nowrap"
+            >
+              <Plus className="w-3.5 h-3.5" /> Add Frame Product
+            </button>
+
+            {/* Restore All button (only visible when viewing Recycle Bin) */}
+            {viewMode === 'recycleBin' && deletedProducts.length > 0 && (
               <button
                 type="button"
                 onClick={() => {
@@ -213,35 +219,7 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
                 className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-md transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
                 title="Restore all soft-deleted frames back to active catalog"
               >
-                <RotateCcw className="w-3.5 h-3.5" /> Restore All ({deletedProducts.length}) Frames
-              </button>
-            )}
-
-            {/* Category Manager Button */}
-            <button
-              onClick={() => setIsCategoryModalOpen(true)}
-              className="px-3.5 py-2 bg-[#1A2035] hover:bg-[#222943] text-gray-200 font-semibold text-xs rounded-xl border border-[#262E4A] transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs whitespace-nowrap"
-            >
-              <FolderPlus className="w-3.5 h-3.5 text-purple-400" /> Categories ({safeCategories.length})
-            </button>
-
-            {/* Add Product Button */}
-            <button
-              onClick={handleOpenAddModal}
-              className="px-3.5 py-2 bg-[#3B82F6] hover:bg-[#2563EB] text-white font-semibold text-xs rounded-xl border border-[#3B82F6] transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs whitespace-nowrap"
-            >
-              <Plus className="w-3.5 h-3.5" /> Add Frame Product
-            </button>
-
-            {/* Create Template in Visual Editor Studio */}
-            {onOpenVisualEditor && (
-              <button
-                type="button"
-                onClick={() => onOpenVisualEditor({} as any)}
-                className="px-3.5 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
-                title="Design a brand new custom frame template in Visual Template Editor"
-              >
-                <Wand2 className="w-3.5 h-3.5" /> Visual Frame Studio
+                <RotateCcw className="w-3.5 h-3.5" /> Restore All ({deletedProducts.length})
               </button>
             )}
           </div>
@@ -422,16 +400,6 @@ export const AdminCatalogManager: React.FC<AdminCatalogManagerProps> = ({
                             >
                               {copiedAdLinkId === product.id ? 'Copied ✓' : 'Copy 🔗'}
                             </button>
-
-                            {onOpenTemplateStudio && (
-                              <button
-                                onClick={() => onOpenTemplateStudio(product)}
-                                className="px-3.5 py-2 bg-gradient-to-r from-[#F82BA9] to-purple-600 hover:brightness-110 text-white font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
-                                title="Open this product in Smart Layer Template Studio"
-                              >
-                                <Wand2 className="w-3.5 h-3.5" /> Smart Studio
-                              </button>
-                            )}
 
                             <button
                               onClick={() => handleVisualWorkspaceClick(product)}
