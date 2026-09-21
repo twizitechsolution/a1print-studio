@@ -22,12 +22,14 @@ interface NewFrameWizardProps {
 }
 
 const DEFAULT_CATEGORIES = [
-  { id: 'baby-birth-frame', name: 'Baby Milestone & Birth Frame' },
-  { id: 'wedding-anniversary', name: 'Wedding & Anniversary Frame' },
-  { id: 'birthday-special', name: 'Birthday Celebration Frame' },
-  { id: 'love-couple', name: 'Love & Couple Frame' },
-  { id: 'family-collage', name: 'Family Multi-Photo Collage' },
-  { id: 'minimal-single', name: 'Minimal Single Photo Frame' },
+  { id: 'baby-birth-frame', name: 'Baby Birth Frame' },
+  { id: 'birthday-gift', name: 'Birthday Gift' },
+  { id: 'first-year-photo-frames', name: 'First Year Photo Frames' },
+  { id: 'family-frame', name: 'Family Frame' },
+  { id: 'marriage-anniversary-gift', name: 'Marriage Anniversary Gift' },
+  { id: 'photo-collage-frames', name: 'Photo Collage Frames' },
+  { id: 'twin-baby-frames', name: 'Twin Baby Frames' },
+  { id: 'gifts-for-brother-sister', name: 'Gifts For Brother & Sister' },
 ];
 
 export const NewFrameWizard: React.FC<NewFrameWizardProps> = ({

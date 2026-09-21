@@ -95,10 +95,10 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
           <div className="space-y-3">
             <h4 className="font-bold text-sm text-[#F82BA9] uppercase tracking-wider">Frame Collections</h4>
             <ul className="space-y-2 text-gray-300 font-medium">
-              <li><button onClick={() => onNavigate('catalog', 'baby')} className="hover:text-white cursor-pointer">Baby Birth Frames</button></li>
-              <li><button onClick={() => onNavigate('catalog', 'couple')} className="hover:text-white cursor-pointer">Anniversary & Love Frames</button></li>
-              <li><button onClick={() => onNavigate('catalog', 'acrylic')} className="hover:text-white cursor-pointer">High-Gloss Acrylic Wall Frames</button></li>
-              <li><button onClick={() => onNavigate('catalog', 'collage')} className="hover:text-white cursor-pointer">Multi-Photo Memory Collages</button></li>
+              <li><button onClick={() => onNavigate('catalog', 'baby-birth-frame')} className="hover:text-white cursor-pointer">Baby Birth Frames</button></li>
+              <li><button onClick={() => onNavigate('catalog', 'marriage-anniversary-gift')} className="hover:text-white cursor-pointer">Anniversary & Love Frames</button></li>
+              <li><button onClick={() => onNavigate('catalog', 'birthday-gift')} className="hover:text-white cursor-pointer">Birthday Gift Frames</button></li>
+              <li><button onClick={() => onNavigate('catalog', 'photo-collage-frames')} className="hover:text-white cursor-pointer">Multi-Photo Memory Collages</button></li>
             </ul>
           </div>
 

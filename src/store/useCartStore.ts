@@ -84,6 +84,107 @@ export const DEFAULT_CATEGORIES: Category[] = [
   },
 ];
 
+export function normalizeProductCategory(p: Product, cats: Category[] = DEFAULT_CATEGORIES): Product {
+  if (!p) return p;
+
+  const catRaw = (p.category || '').trim().toLowerCase();
+  const labelRaw = (p.categoryLabel || '').trim();
+
+  // 1. Direct match by category slug
+  const matchedBySlug = cats.find((c) => c.slug.toLowerCase() === catRaw);
+  if (matchedBySlug) {
+    return {
+      ...p,
+      category: matchedBySlug.slug,
+      categoryLabel: (labelRaw && labelRaw !== 'Photo Collages') ? labelRaw : matchedBySlug.name,
+    };
+  }
+
+  // 2. Direct match by category ID (e.g. 'cat-baby-birth-frame')
+  const matchedById = cats.find((c) => c.id.toLowerCase() === catRaw);
+  if (matchedById) {
+    return {
+      ...p,
+      category: matchedById.slug,
+      categoryLabel: (labelRaw && labelRaw !== 'Photo Collages') ? labelRaw : matchedById.name,
+    };
+  }
+
+  // 3. Match by categoryLabel against category names
+  const matchedByName = cats.find((c) => c.name.toLowerCase() === labelRaw.toLowerCase());
+  if (matchedByName) {
+    return {
+      ...p,
+      category: matchedByName.slug,
+      categoryLabel: matchedByName.name,
+    };
+  }
+
+  // 4. Legacy short code aliases mapping:
+  let targetSlug = '';
+  if (catRaw === 'birthday' || catRaw.includes('birthday')) {
+    targetSlug = 'birthday-gift';
+  } else if (catRaw === 'baby' || catRaw === 'baby-birth' || catRaw.includes('baby-birth')) {
+    targetSlug = 'baby-birth-frame';
+  } else if (catRaw === 'first-year' || catRaw.includes('first-year') || catRaw.includes('1st-year')) {
+    targetSlug = 'first-year-photo-frames';
+  } else if (catRaw === 'family' || catRaw.includes('family')) {
+    targetSlug = 'family-frame';
+  } else if (catRaw === 'couple' || catRaw.includes('anniversary') || catRaw.includes('marriage')) {
+    targetSlug = 'marriage-anniversary-gift';
+  } else if (catRaw === 'twin' || catRaw.includes('twin')) {
+    targetSlug = 'twin-baby-frames';
+  } else if (catRaw === 'brother' || catRaw.includes('brother') || catRaw.includes('sister')) {
+    targetSlug = 'gifts-for-brother-sister';
+  } else if (catRaw === 'collage' || catRaw === 'acrylic' || catRaw.includes('collage')) {
+    targetSlug = 'photo-collage-frames';
+  }
+
+  if (targetSlug) {
+    const found = cats.find((c) => c.slug === targetSlug);
+    if (found) {
+      return {
+        ...p,
+        category: found.slug,
+        categoryLabel: found.name,
+      };
+    }
+  }
+
+  // 5. Keyword search in product title for accurate categorisation of existing frames
+  const titleLower = (p.title || '').toLowerCase();
+  if (titleLower.includes('twin')) {
+    const found = cats.find((c) => c.slug === 'twin-baby-frames');
+    if (found) return { ...p, category: found.slug, categoryLabel: found.name };
+  } else if (titleLower.includes('first year') || titleLower.includes('1st year') || titleLower.includes('12 month')) {
+    const found = cats.find((c) => c.slug === 'first-year-photo-frames');
+    if (found) return { ...p, category: found.slug, categoryLabel: found.name };
+  } else if (titleLower.includes('anniversary') || titleLower.includes('wedding') || titleLower.includes('marriage')) {
+    const found = cats.find((c) => c.slug === 'marriage-anniversary-gift');
+    if (found) return { ...p, category: found.slug, categoryLabel: found.name };
+  } else if (titleLower.includes('birthday')) {
+    const found = cats.find((c) => c.slug === 'birthday-gift');
+    if (found) return { ...p, category: found.slug, categoryLabel: found.name };
+  } else if (titleLower.includes('brother') || titleLower.includes('sister') || titleLower.includes('rakhi')) {
+    const found = cats.find((c) => c.slug === 'gifts-for-brother-sister');
+    if (found) return { ...p, category: found.slug, categoryLabel: found.name };
+  } else if (titleLower.includes('family')) {
+    const found = cats.find((c) => c.slug === 'family-frame');
+    if (found) return { ...p, category: found.slug, categoryLabel: found.name };
+  } else if (titleLower.includes('baby') || titleLower.includes('birth') || titleLower.includes('born')) {
+    const found = cats.find((c) => c.slug === 'baby-birth-frame');
+    if (found) return { ...p, category: found.slug, categoryLabel: found.name };
+  }
+
+  // 6. Safe canonical fallback
+  const fallback = cats[0] || DEFAULT_CATEGORIES[0];
+  return {
+    ...p,
+    category: p.category || fallback.slug,
+    categoryLabel: (labelRaw && labelRaw !== 'Photo Collages') ? labelRaw : fallback.name,
+  };
+}
+
 interface StoreData {
   products: Product[];
   items: CartItem[];
@@ -92,8 +193,8 @@ interface StoreData {
 }
 
 const PERM_DELETED_IDS_KEY = 'a1print_perm_deleted_product_ids_v20';
-const APP_CACHE_VERSION_KEY = 'a1print_store_app_version_v25';
-const CURRENT_APP_VERSION = 'v25_server_truth_prio';
+const APP_CACHE_VERSION_KEY = 'a1print_store_app_version_v26';
+const CURRENT_APP_VERSION = 'v26_category_sync_alignment';
 
 function checkAndMigrateStaleCache() {
   try {
@@ -104,19 +205,33 @@ function checkAndMigrateStaleCache() {
       memoryData.categories = DEFAULT_CATEGORIES;
     }
 
+    const activeCats = (memoryData.categories && memoryData.categories.length > 0) ? memoryData.categories : DEFAULT_CATEGORIES;
+
     const storedVer = localStorage.getItem(APP_CACHE_VERSION_KEY);
     if (storedVer !== CURRENT_APP_VERSION) {
       const overrides = getStoredProductOverrides();
       let hasChanges = false;
       Object.keys(overrides).forEach((key) => {
-        if (overrides[key] && overrides[key].syncStatus !== 'pending') {
-          delete overrides[key];
+        if (overrides[key]) {
+          overrides[key] = normalizeProductCategory(overrides[key], activeCats);
           hasChanges = true;
         }
       });
       if (hasChanges) {
         saveStoredProductOverrides(overrides);
       }
+
+      if (Array.isArray(memoryData.products)) {
+        memoryData.products = memoryData.products.map((p) => normalizeProductCategory(p, activeCats));
+        saveStoredLocalData(memoryData);
+      }
+
+      const master = getStoredMasterProducts();
+      if (Array.isArray(master) && master.length > 0) {
+        const normalizedMaster = master.map((p) => normalizeProductCategory(p, activeCats));
+        localStorage.setItem(MASTER_PRODUCTS_ARCHIVE_KEY, JSON.stringify(normalizedMaster));
+      }
+
       localStorage.setItem(APP_CACHE_VERSION_KEY, CURRENT_APP_VERSION);
     }
   } catch (e) {}
@@ -341,7 +456,7 @@ function getStoredLocalData(): StoreData {
     .filter((p: Product) => p && p.id && !permDeletedIds.has(p.id) && !p.isSampleData)
     .map((p: Product) => {
       const isDel = Boolean(p.isDeleted || deletedIds.has(p.id));
-      return { ...p, isDeleted: isDel };
+      return normalizeProductCategory({ ...p, isDeleted: isDel }, categories);
     });
 
   // Attach remarks to orders
@@ -484,7 +599,7 @@ async function syncFromCloud() {
           const isDeletedState = Boolean(cp.isDeleted || (existing && existing.isDeleted));
 
           if (!existing || cpVer > exVer || (cpVer === exVer && cpTime > existingTime)) {
-            const merged: Product = {
+            const rawMerged: Product = {
               ...cp,
               isDeleted: isDeletedState,
               stockQuantity: cp.stockQuantity !== undefined ? cp.stockQuantity : (existing?.stockQuantity ?? 50),
@@ -492,13 +607,14 @@ async function syncFromCloud() {
               syncStatus: 'synced',
               lastSyncedAt: new Date().toISOString(),
             };
+            const merged = normalizeProductCategory(rawMerged, memoryData.categories);
             productMap.set(cp.id, merged);
             changedDeltas.push(merged);
           }
         }
       });
 
-      const mergedProducts = Array.from(productMap.values());
+      const mergedProducts = Array.from(productMap.values()).map((p) => normalizeProductCategory(p, memoryData.categories));
       if (mergedProducts.length > 0 && JSON.stringify(mergedProducts) !== JSON.stringify(memoryData.products)) {
         memoryData.products = mergedProducts;
         applyProductDelta(changedDeltas);
@@ -716,7 +832,7 @@ async function initCloudSync() {
 
       saveStoredProductOverrides(overridesMap);
 
-      const docs = Array.from(productMap.values());
+      const docs = Array.from(productMap.values()).map((p) => normalizeProductCategory(p, memoryData.categories));
       memoryData.products = docs;
       saveStoredLocalData(memoryData);
       notifyListeners();
@@ -887,7 +1003,7 @@ export function useCartStore() {
       saveDeletedProductIds(deletedSet);
     }
 
-    const prodWithStock: Product = {
+    const rawProdWithStock: Product = {
       ...newProduct,
       id: recordId,
       createdAt: newProduct.createdAt || now,
@@ -910,6 +1026,7 @@ export function useCartStore() {
         },
       ],
     };
+    const prodWithStock: Product = normalizeProductCategory(rawProdWithStock, memoryData.categories);
 
     // 1. Enqueue job in Write-Ahead Outbox Queue
     enqueueOutboxJob('products', recordId, 'create', prodWithStock);
@@ -1002,7 +1119,7 @@ export function useCartStore() {
     }
 
     if (targetUpdated) {
-      const finalTarget: Product = targetUpdated;
+      const finalTarget: Product = normalizeProductCategory(targetUpdated, memoryData.categories);
       enqueueOutboxJob('products', id, 'update', finalTarget);
       writeAuditLog('UPDATE', 'product', id, 'Admin User', oldProduct, finalTarget);
 
@@ -1011,7 +1128,7 @@ export function useCartStore() {
       applyProductDelta([finalTarget]);
 
       // Optimistic update
-      memoryData.products = updatedProducts;
+      memoryData.products = updatedProducts.map((p) => p.id === id ? finalTarget : p);
       saveStoredLocalData(memoryData);
       notifyListeners();
 

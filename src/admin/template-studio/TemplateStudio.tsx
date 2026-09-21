@@ -582,6 +582,7 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
       <div className="relative">
         <NewFrameWizard
           onBack={() => setCurrentView('library')}
+          categoryList={categories.length > 0 ? categories.map((c) => ({ id: c.slug, name: c.name })) : undefined}
           onComplete={async ({ title, category, photoSlots, textZones, staticLayers, baseImageUrl, cleanBaseImageUrl, originalUploadUrl, documentDimensions }) => {
             const uniqueId = `tmpl-${Date.now()}`;
             // For PSD templates, preserve the pure, crystal-clear artwork directly from Photoshop!

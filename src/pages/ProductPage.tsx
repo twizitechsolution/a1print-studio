@@ -171,7 +171,7 @@ export const ProductPage: React.FC<ProductPageProps> = ({
       <nav className="text-xs text-gray-500 font-bold flex items-center gap-1.5">
         <button onClick={() => onNavigate('home')} className="hover:text-[#F82BA9]">Home</button>
         <ChevronRight className="w-3 h-3 text-gray-400" />
-        <button onClick={() => onNavigate('catalog')} className="hover:text-[#F82BA9]">{product.categoryLabel || 'Custom Frame'}</button>
+        <button onClick={() => onNavigate('catalog', product.category)} className="hover:text-[#F82BA9]">{product.categoryLabel || 'Custom Frame'}</button>
         <ChevronRight className="w-3 h-3 text-gray-400" />
         <span className="text-gray-900 font-extrabold truncate max-w-xs sm:max-w-md">{product.title || 'Custom Frame'}</span>
       </nav>

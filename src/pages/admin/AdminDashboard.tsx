@@ -447,7 +447,7 @@ const AdminDashboardInner: React.FC<AdminDashboardProps> = ({ orders: initialOrd
           {editingProductFullPage ? (
             <AdminProductPageEditor
               product={editingProductFullPage.product}
-              categories={categories.map((c) => ({ id: c.id, name: c.name }))}
+              categories={categories}
               onSave={async (savedProd) => {
                 const exists = products.some((p) => p.id === savedProd.id);
                 const result = exists

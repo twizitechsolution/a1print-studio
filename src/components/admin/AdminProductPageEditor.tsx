@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Product, PhotoSlot, TextZone, SizeOption, FrameOption } from '../../types';
+import { Product, PhotoSlot, TextZone, SizeOption, FrameOption, Category } from '../../types';
 import { UniversalFrameTemplate } from '../../types/template';
 import { firebaseCloudDb, uploadAllProductImages } from '../../config/firebase';
 import { ArrowLeft, Save, Plus, Trash2, Upload, Image as ImageIcon, Sparkles, Star, CheckCircle2, ShieldCheck, CreditCard, DollarSign, Layers, Eye, RefreshCw, Loader2, Link2, Unlink } from 'lucide-react';
 
 interface AdminProductPageEditorProps {
   product: Product | null;
-  categories: { id: string; name: string }[];
+  categories: Category[];
   onSave: (product: Product) => void | Promise<void> | Promise<{ success: boolean; error?: string }>;
   onBack: () => void;
 }
@@ -47,12 +47,35 @@ export const AdminProductPageEditor: React.FC<AdminProductPageEditorProps> = ({
   }, []);
 
   // 1. Basic Info
+  const getInitialCategory = () => {
+    if (!product) return categories[0] || null;
+    const matchBySlugOrId = categories.find((c) => c.slug === product.category || c.id === product.category);
+    if (matchBySlugOrId) return matchBySlugOrId;
+    const matchByName = categories.find((c) => c.name.toLowerCase() === (product.categoryLabel || '').toLowerCase());
+    if (matchByName) return matchByName;
+    return categories[0] || null;
+  };
+
+  const initialCat = getInitialCategory();
   const [id, setId] = useState<string>(product?.id || `prod-${Date.now()}`);
   const [slug, setSlug] = useState<string>(product?.slug || '');
   const [title, setTitle] = useState<string>(product?.title || '');
   const [subtitle, setSubtitle] = useState<string>(product?.subtitle || '');
-  const [category, setCategory] = useState<string>(product?.category || 'birthday');
-  const [categoryLabel, setCategoryLabel] = useState<string>(product?.categoryLabel || 'Photo Collages');
+  const [category, setCategory] = useState<string>(product?.category || initialCat?.slug || 'baby-birth-frame');
+  const [categoryLabel, setCategoryLabel] = useState<string>(product?.categoryLabel || initialCat?.name || 'Baby Birth Frame');
+
+  useEffect(() => {
+    if (product) {
+      const matchBySlugOrId = categories.find((c) => c.slug === product.category || c.id === product.category);
+      const matchByName = categories.find((c) => c.name.toLowerCase() === (product.categoryLabel || '').toLowerCase());
+      const matched = matchBySlugOrId || matchByName || categories[0];
+      if (matched) {
+        setCategory(matched.slug);
+        setCategoryLabel(product.categoryLabel || matched.name);
+      }
+    }
+  }, [product, categories]);
+
   const [allowedPaymentMethods, setAllowedPaymentMethods] = useState<'both' | 'prepaid_only' | 'cod_only'>(
     (product as any)?.allowedPaymentMethods || 'both'
   );
@@ -324,13 +347,17 @@ export const AdminProductPageEditor: React.FC<AdminProductPageEditorProps> = ({
         },
       ];
 
+      const matchingCat = categories.find((c) => c.slug === category || c.id === category);
+      const finalCategory = matchingCat ? matchingCat.slug : category.trim();
+      const finalCategoryLabel = categoryLabel.trim() || (matchingCat ? matchingCat.name : 'Custom Photo Frame');
+
       const fullProduct: Product = {
         id: productId,
         slug: slug.trim() || title.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
         title: title.trim(),
         subtitle: subtitle.trim(),
-        category: category.trim(),
-        categoryLabel: categoryLabel.trim() || 'Photo Collages',
+        category: finalCategory,
+        categoryLabel: finalCategoryLabel,
         rating: product?.rating || 5.0,
         reviewsCount: reviews.length || 25,
         thumbnail: finalBaseImageUrl || finalImages[0] || 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80',
@@ -540,28 +567,33 @@ export const AdminProductPageEditor: React.FC<AdminProductPageEditorProps> = ({
                 <select
                   value={category}
                   onChange={(e) => {
-                    const catId = e.target.value;
-                    setCategory(catId);
-                    const found = categories.find((c) => c.id === catId);
-                    if (found) setCategoryLabel(found.name);
+                    const catSlug = e.target.value;
+                    setCategory(catSlug);
+                    const found = categories.find((c) => c.slug === catSlug || c.id === catSlug);
+                    if (found) {
+                      setCategoryLabel(found.name);
+                    }
                   }}
                   className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-gray-900 focus:outline-hidden focus:border-[#F82BA9] cursor-pointer"
                 >
-                  <option value="birthday">Birthday Gifts</option>
-                  <option value="baby">Baby Birth Frames</option>
-                  <option value="couple">Couple & Anniversary</option>
-                  <option value="family">Family Frame</option>
-                  <option value="acrylic">Acrylic Glass</option>
-                  <option value="collage">Photo Collages</option>
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.slug}>
+                      {cat.icon || '🏷️'} {cat.name}
+                    </option>
+                  ))}
                 </select>
               </div>
 
               <div className="space-y-1">
-                <label className="text-gray-700">Category Display Badge</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-gray-700">Category Display Badge</label>
+                  <span className="text-[10px] text-[#F82BA9] font-medium">Auto-synced with Category</span>
+                </div>
                 <input
                   type="text"
                   value={categoryLabel}
                   onChange={(e) => setCategoryLabel(e.target.value)}
+                  placeholder="e.g. Baby Birth Frame"
                   className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-gray-700 focus:outline-hidden focus:border-[#F82BA9]"
                 />
               </div>

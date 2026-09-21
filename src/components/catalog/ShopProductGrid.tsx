@@ -1,9 +1,27 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Product } from '../../types';
 import { useCartStore, DEFAULT_CATEGORIES } from '../../store/useCartStore';
 import { ProductCard } from './ProductCard';
 import { NoProductsFound } from '../common/NoProductsFound';
 import { ChevronDown, Filter } from 'lucide-react';
+
+const CATEGORY_ICON_FALLBACKS: Record<string, string> = {
+  'baby-birth-frame': '👶',
+  'birthday-gift': '🎂',
+  'first-year-photo-frames': '🍼',
+  'family-frame': '👨‍👩‍👧‍👦',
+  'marriage-anniversary-gift': '💍',
+  'photo-collage-frames': '🖼️',
+  'twin-baby-frames': '👶👶',
+  'gifts-for-brother-sister': '🎁',
+};
+
+export const getCleanCategoryIcon = (cat: { slug: string; icon?: string }) => {
+  if (cat.icon && !cat.icon.includes('?') && cat.icon.trim().length > 0) {
+    return cat.icon;
+  }
+  return CATEGORY_ICON_FALLBACKS[cat.slug] || '🏷️';
+};
 
 interface ShopProductGridProps {
   onSelectProduct: (product: Product) => void;
@@ -18,21 +36,26 @@ export const ShopProductGrid: React.FC<ShopProductGridProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string>(initialCategory);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
 
+  useEffect(() => {
+    if (initialCategory) {
+      setSelectedCategory(initialCategory);
+    }
+  }, [initialCategory]);
+
   const activeCategories = (categories && categories.length > 0) ? categories : DEFAULT_CATEGORIES;
 
   // Calculate dynamic real-time product counts for each category
   const getCategoryCount = (categorySlug: string, categoryName: string) => {
+    const slugLower = categorySlug.toLowerCase();
+    const nameLower = categoryName.toLowerCase();
     return products.filter((p) => {
       if (!p || p.isDeleted) return false;
       const catLower = (p.category || '').toLowerCase();
       const labelLower = (p.categoryLabel || '').toLowerCase();
-      const slugLower = categorySlug.toLowerCase();
-      const nameLower = categoryName.toLowerCase();
       return (
         catLower === slugLower ||
         labelLower === nameLower ||
-        catLower.includes(slugLower) ||
-        (slugLower.includes('baby') && catLower.includes('baby'))
+        catLower.replace(/s$/, '') === slugLower.replace(/s$/, '')
       );
     }).length;
   };
@@ -41,23 +64,24 @@ export const ShopProductGrid: React.FC<ShopProductGridProps> = ({
     if (!product || product.isDeleted) return false;
     if (selectedCategory === 'all') return true;
     
-    // Category match logic
     const catLower = (product.category || '').toLowerCase();
     const catLabelLower = (product.categoryLabel || '').toLowerCase();
     const selLower = selectedCategory.toLowerCase();
 
-    return (
-      catLower === selLower ||
-      catLabelLower === selLower ||
-      catLower.includes(selLower) ||
-      catLabelLower.includes(selLower) ||
-      (selLower.includes('baby') && (catLower.includes('baby') || catLower.includes('birth'))) ||
-      (selLower.includes('birthday') && (catLower.includes('birth') || catLower.includes('birthday'))) ||
-      (selLower.includes('anniversary') && (catLower.includes('marriage') || catLower.includes('anniversary'))) ||
-      (selLower.includes('collage') && catLower.includes('collage')) ||
-      (selLower.includes('family') && catLower.includes('family')) ||
-      (selLower.includes('brother') && (catLower.includes('brother') || catLower.includes('sister')))
+    // 1. Exact match on slug or label
+    if (catLower === selLower || catLabelLower === selLower) return true;
+
+    // 2. Exact match on category definitions
+    const matchedCategory = activeCategories.find(
+      (c) => c.slug.toLowerCase() === selLower || c.id.toLowerCase() === selLower || c.name.toLowerCase() === selLower
     );
+    if (matchedCategory) {
+      if (catLower === matchedCategory.slug.toLowerCase() || catLabelLower === matchedCategory.name.toLowerCase()) {
+        return true;
+      }
+    }
+
+    return false;
   });
 
   return (
@@ -132,7 +156,7 @@ export const ShopProductGrid: React.FC<ShopProductGridProps> = ({
                   }`}
                 >
                   <div className="flex items-center gap-2.5 flex-1 text-xs">
-                    <span className="text-base leading-none">{cat.icon || '🏷️'}</span>
+                    <span className="text-base leading-none">{getCleanCategoryIcon(cat)}</span>
                     <span className={isSelected ? 'font-black' : 'font-medium'}>{cat.name}</span>
                   </div>
 

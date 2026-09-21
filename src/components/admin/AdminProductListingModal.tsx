@@ -58,7 +58,9 @@ export const AdminProductListingModal: React.FC<AdminProductListingModalProps> =
     if (editingProduct) {
       setTitle(editingProduct.title || '');
       setProductId(editingProduct.productId || `PRD-${Math.floor(1000 + Math.random() * 9000)}`);
-      setCategory(editingProduct.category || 'baby-birth-frame');
+      const matchCat = categories.find((c) => c.slug === editingProduct.category || c.id === editingProduct.category)
+        || categories.find((c) => c.name.toLowerCase() === (editingProduct.categoryLabel || '').toLowerCase());
+      setCategory(matchCat ? matchCat.slug : (editingProduct.category || categories[0]?.slug || 'baby-birth-frame'));
       setPrice(editingProduct.sizes?.[0]?.price || 699);
       setOriginalPrice(editingProduct.sizes?.[0]?.originalPrice || 999);
       setStockQuantity(editingProduct.stockQuantity !== undefined ? editingProduct.stockQuantity : 50);
@@ -184,8 +186,9 @@ export const AdminProductListingModal: React.FC<AdminProductListingModalProps> =
 
     const defaultImg = uploadedPosterUrl || angleImages[0] || 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80';
     const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-    const selectedCategoryObj = categories.find((c) => c.slug === category);
+    const selectedCategoryObj = categories.find((c) => c.slug === category || c.id === category);
     const categoryLabel = selectedCategoryObj ? selectedCategoryObj.name : 'Custom Photo Frame';
+    const finalCategory = selectedCategoryObj ? selectedCategoryObj.slug : category;
 
     const finalImages = angleImages.length > 0 ? angleImages : [defaultImg];
 
@@ -195,7 +198,7 @@ export const AdminProductListingModal: React.FC<AdminProductListingModalProps> =
       slug,
       title: title.trim(),
       subtitle: `${categoryLabel} Gift Frame`,
-      category,
+      category: finalCategory,
       categoryLabel,
       rating: editingProduct?.rating || 4.9,
       reviewsCount: editingProduct?.reviewsCount || 128,
