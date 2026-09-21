@@ -14,6 +14,7 @@ import { generateCleanBaseImage } from '../../utils/cleanBaseGenerator';
 import { firebaseCloudDb, base64ToBlob, uploadProductImage } from '../../config/firebase';
 import { useCartStore } from '../../store/useCartStore';
 import { UniversalFrameCustomizer } from '../../components/customizer/UniversalFrameCustomizer';
+import { CanvaSyncModal } from '../../components/admin/CanvaSyncModal';
 import { CheckCircle2, AlertCircle, Link2, X, Grid } from 'lucide-react';
 
 interface TemplateStudioProps {
@@ -72,6 +73,7 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
   // Import Modals
   const [isAIImportOpen, setIsAIImportOpen] = useState<boolean>(false);
   const [isPSDImportOpen, setIsPSDImportOpen] = useState<boolean>(false);
+  const [isCanvaModalOpen, setIsCanvaModalOpen] = useState<boolean>(false);
 
   // Record history snapshot helper
   const pushHistory = useCallback((current: UniversalFrameTemplate) => {
@@ -656,6 +658,7 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
         previewMode={previewMode}
         onTogglePreviewMode={handleTogglePreviewMode}
         onTestCustomizer={() => setIsLiveTestOpen(true)}
+        onOpenCanva={() => setIsCanvaModalOpen(true)}
       />
 
       {/* Sub-Header: Linked Product Sync Bar */}
@@ -809,6 +812,31 @@ export const TemplateStudio: React.FC<TemplateStudioProps> = ({
         </div>
       )}
 
+      {/* Canva Sync Modal */}
+      <CanvaSyncModal
+        isOpen={isCanvaModalOpen}
+        onClose={() => setIsCanvaModalOpen(false)}
+        templateId={template.id}
+        templateTitle={template.title}
+        currentBaseImageUrl={template.baseImageUrl}
+        canvaDesignId={template.canvaDesignId}
+        canvaLastSyncedAt={template.canvaLastSyncedAt}
+        onSyncSuccess={(newBaseImageUrl, canvaLastSyncedAt) => {
+          pushHistory(template);
+          setTemplate((prev) => ({
+            ...prev,
+            baseImageUrl: newBaseImageUrl,
+            cleanBaseImageUrl: newBaseImageUrl,
+            canvaLastSyncedAt,
+            updatedAt: new Date().toISOString(),
+          }));
+          setSaveMessage({
+            text: 'Artwork updated from Canva! Please review slot positions.',
+            type: 'success',
+          });
+          setTimeout(() => setSaveMessage(null), 6000);
+        }}
+      />
     </div>
   );
 };

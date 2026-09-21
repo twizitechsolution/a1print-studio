@@ -20,6 +20,7 @@ interface StudioHeaderProps {
   previewMode?: 'cutout' | 'sample';
   onTogglePreviewMode?: () => void;
   onTestCustomizer?: () => void;
+  onOpenCanva?: () => void;
 }
 
 const CATEGORIES = [
@@ -50,6 +51,7 @@ export const StudioHeader: React.FC<StudioHeaderProps> = ({
   previewMode = 'cutout',
   onTogglePreviewMode,
   onTestCustomizer,
+  onOpenCanva,
 }) => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [isUploadingBase, setIsUploadingBase] = useState(false);
@@ -198,6 +200,17 @@ export const StudioHeader: React.FC<StudioHeaderProps> = ({
 
       {/* Right: AI Import + PSD Import + Base Poster Uploader + Save Button */}
       <div className="flex items-center gap-2.5 w-full lg:w-auto justify-end">
+        {onOpenCanva && (
+          <button
+            onClick={onOpenCanva}
+            className="px-3 py-2 rounded-xl text-xs font-extrabold bg-gradient-to-r from-[#7D2AE8] via-[#00C4CC] to-[#0074E4] hover:opacity-95 text-white border border-purple-400/40 shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+            title="Edit artwork directly in Canva"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-white" />
+            <span>Edit in Canva</span>
+          </button>
+        )}
+
         {onOpenAIImport && (
           <button
             onClick={onOpenAIImport}

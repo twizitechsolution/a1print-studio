@@ -100,6 +100,8 @@ export interface UniversalFrameTemplate {
   originalUploadUrl?: string;
   aiDetectionConfidence?: Record<string, number>; // slotId/zoneId -> 0-1 confidence
   documentDimensions?: { width: number; height: number };
+  canvaDesignId?: string;      // NEW — the Canva design backing this template's artwork
+  canvaLastSyncedAt?: string;  // NEW — ISO timestamp of the last successful pull from Canva
   product?: any;
 }
 

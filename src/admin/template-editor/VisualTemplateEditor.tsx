@@ -20,6 +20,7 @@ import { firebaseCloudDb, uploadProductImage, base64ToBlob } from '../../config/
 import { Product } from '../../types';
 import { useCartStore } from '../../store/useCartStore';
 import { parsePSDFileBinary } from '../template-studio/utils/psdParser';
+import { CanvaSyncModal } from '../../components/admin/CanvaSyncModal';
 import {
   Plus,
   Type,
@@ -233,6 +234,7 @@ export const VisualTemplateEditor: React.FC<VisualTemplateEditorProps> = ({
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [isImportingPsd, setIsImportingPsd] = useState<boolean>(false);
+  const [isCanvaModalOpen, setIsCanvaModalOpen] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const psdInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -922,6 +924,19 @@ export const VisualTemplateEditor: React.FC<VisualTemplateEditorProps> = ({
             title="Redo"
           >
             <RotateCw className="w-4 h-4" />
+          </button>
+
+          <div className="h-5 w-[1px] bg-slate-800 mx-1" />
+
+          {/* Canva Studio Integration Button */}
+          <button
+            type="button"
+            onClick={() => setIsCanvaModalOpen(true)}
+            className="px-3 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-[#7D2AE8] via-[#00C4CC] to-[#0074E4] hover:opacity-95 text-white shadow-md shadow-purple-600/20 flex items-center gap-1.5 transition-all cursor-pointer"
+            title="Edit artwork directly in Canva"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Edit in Canva</span>
           </button>
 
           <div className="h-5 w-[1px] bg-slate-800 mx-1" />
@@ -1902,6 +1917,33 @@ export const VisualTemplateEditor: React.FC<VisualTemplateEditorProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Canva Sync Modal */}
+      <CanvaSyncModal
+        isOpen={isCanvaModalOpen}
+        onClose={() => setIsCanvaModalOpen(false)}
+        templateId={template.id}
+        templateTitle={template.title}
+        currentBaseImageUrl={template.baseImageUrl}
+        canvaDesignId={template.canvaDesignId}
+        canvaLastSyncedAt={template.canvaLastSyncedAt}
+        onSyncSuccess={(newBaseImageUrl, canvaLastSyncedAt) => {
+          const updated: UniversalFrameTemplate = {
+            ...template,
+            baseImageUrl: newBaseImageUrl,
+            cleanBaseImageUrl: newBaseImageUrl,
+            canvaLastSyncedAt,
+            updatedAt: new Date().toISOString(),
+          };
+          setTemplate(updated);
+          pushHistory(updated);
+          setStatusMessage({
+            text: 'Artwork updated from Canva! Please review your slot & zone positions.',
+            type: 'success',
+          });
+          setTimeout(() => setStatusMessage(null), 6000);
+        }}
+      />
     </div>
   );
 };
