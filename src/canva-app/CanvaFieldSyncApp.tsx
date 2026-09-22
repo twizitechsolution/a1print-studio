@@ -47,6 +47,19 @@ interface DetectedField {
   selected: boolean;
 }
 
+const DEFAULT_PRESET_TEMPLATES: TemplateOption[] = [
+  {
+    id: 'tmpl-prod-1788932131885',
+    title: 'Baby Frames (Current Product)',
+    canvaDesignId: 'active-canva-design',
+  },
+  {
+    id: 'tmpl-prod-1788931892471',
+    title: 'Baby Birth Frame',
+    canvaDesignId: 'active-canva-design',
+  },
+];
+
 export const CanvaFieldSyncApp: React.FC = () => {
   const [isCanvaEnvironment, setIsCanvaEnvironment] = useState<boolean>(false);
   const [isScanning, setIsScanning] = useState<boolean>(false);
@@ -56,8 +69,9 @@ export const CanvaFieldSyncApp: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string>('');
 
   const [designId, setDesignId] = useState<string>('');
-  const [templateId, setTemplateId] = useState<string>('');
-  const [templatesList, setTemplatesList] = useState<TemplateOption[]>([]);
+  const [templateId, setTemplateId] = useState<string>('tmpl-prod-1788932131885');
+  const [templatesList, setTemplatesList] = useState<TemplateOption[]>(DEFAULT_PRESET_TEMPLATES);
+  const [isCustomTemplateInput, setIsCustomTemplateInput] = useState<boolean>(false);
   const [isLoadingTemplates, setIsLoadingTemplates] = useState<boolean>(false);
   const [pageDimensions, setPageDimensions] = useState<{ width: number; height: number }>({
     width: 1200,
@@ -82,13 +96,15 @@ export const CanvaFieldSyncApp: React.FC = () => {
       const res = await fetch(`${apiBase}/api/canva?action=recent-templates`);
       if (res.ok) {
         const data = await res.json();
-        if (data.templates && Array.isArray(data.templates)) {
-          setTemplatesList(data.templates);
-          if (!currentTId && !templateId && data.templates.length > 0) {
-            setTemplateId(data.templates[0].id);
-            if (data.templates[0].canvaDesignId) {
-              setDesignId(data.templates[0].canvaDesignId);
-            }
+        if (data.templates && Array.isArray(data.templates) && data.templates.length > 0) {
+          // Merge API templates with default presets
+          const combined = [
+            ...data.templates,
+            ...DEFAULT_PRESET_TEMPLATES.filter((p) => !data.templates.some((t: any) => t.id === p.id)),
+          ];
+          setTemplatesList(combined);
+          if (!currentTId && !templateId) {
+            setTemplateId(combined[0].id);
           }
         }
       }
