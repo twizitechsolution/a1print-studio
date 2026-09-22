@@ -642,9 +642,9 @@ export const VisualTemplateEditor: React.FC<VisualTemplateEditorProps> = ({
         label: 'Baby Main Photo',
         shape: 'circle',
         x: 50,
-        y: 31,
-        width: 36,
-        height: 27,
+        y: 36,
+        width: 33,
+        height: 23,
         rotation: 0,
         zIndex: 1,
         visibleToCustomer: true,
@@ -652,30 +652,46 @@ export const VisualTemplateEditor: React.FC<VisualTemplateEditorProps> = ({
         defaultPhotoUrl: 'https://images.unsplash.com/photo-1519689680058-324335c77eba?auto=format&fit=crop&q=80&w=600',
       });
 
-      // 2. Bottom Circle Photo Slot
+      // 2. Bottom-Left Photo Slot (Big Sister & Brother)
       generatedSlots.push({
-        id: `slot-baby-sec-${Date.now().toString(36)}`,
-        label: 'Baby Second Photo',
-        shape: 'circle',
-        x: 35,
-        y: 84,
-        width: 25,
-        height: 19,
+        id: `slot-baby-sibling-${Date.now().toString(36)}`,
+        label: 'Big Sister & Brother Photo',
+        shape: 'rounded',
+        x: 34,
+        y: 81,
+        width: 23,
+        height: 16,
         rotation: 0,
         zIndex: 2,
         visibleToCustomer: true,
-        required: true,
+        required: false,
         defaultPhotoUrl: 'https://images.unsplash.com/photo-1544126592-807ade215a0b?auto=format&fit=crop&q=80&w=600',
       });
 
-      // 3. Baby Full Name
+      // 3. Bottom-Right Photo Slot (Dad & Mom)
+      generatedSlots.push({
+        id: `slot-baby-parents-${Date.now().toString(36)}`,
+        label: 'Dad & Mom Photo',
+        shape: 'rounded',
+        x: 66,
+        y: 81,
+        width: 23,
+        height: 16,
+        rotation: 0,
+        zIndex: 3,
+        visibleToCustomer: true,
+        required: false,
+        defaultPhotoUrl: 'https://images.unsplash.com/photo-1511895426328-dc8714191300?auto=format&fit=crop&q=80&w=600',
+      });
+
+      // 4. Baby Full Name
       generatedZones.push({
         id: `zone-baby-name-${Date.now().toString(36)}`,
         label: 'Baby Full Name',
         defaultValue: 'Baby Name',
         x: 50,
         y: 13,
-        maxWidth: 75,
+        maxWidth: 78,
         fontSize: 34,
         fontFamily: 'Playfair Display',
         color: '#111827',
@@ -688,14 +704,14 @@ export const VisualTemplateEditor: React.FC<VisualTemplateEditorProps> = ({
         autoShrinkToFit: true,
       });
 
-      // 4. Born In (Date)
+      // 5. Born In (Date)
       generatedZones.push({
         id: `zone-born-in-${Date.now().toString(36)}`,
-        label: 'Born In (Date / Place)',
-        defaultValue: '22 Oct 2024',
-        x: 38,
-        y: 50,
-        maxWidth: 28,
+        label: 'Born In (Date)',
+        defaultValue: '22.05.2026',
+        x: 37,
+        y: 51,
+        maxWidth: 24,
         fontSize: 18,
         fontFamily: 'Poppins',
         color: '#1e293b',
@@ -708,14 +724,14 @@ export const VisualTemplateEditor: React.FC<VisualTemplateEditorProps> = ({
         autoShrinkToFit: true,
       });
 
-      // 5. Born At (Time)
+      // 6. Born At (Time)
       generatedZones.push({
         id: `zone-born-at-${Date.now().toString(36)}`,
         label: 'Born At (Time)',
         defaultValue: '10:45 AM',
-        x: 62,
-        y: 50,
-        maxWidth: 28,
+        x: 63,
+        y: 51,
+        maxWidth: 24,
         fontSize: 18,
         fontFamily: 'Poppins',
         color: '#1e293b',
@@ -728,14 +744,14 @@ export const VisualTemplateEditor: React.FC<VisualTemplateEditorProps> = ({
         autoShrinkToFit: true,
       });
 
-      // 6. Birth Weight
+      // 7. Birth Weight
       generatedZones.push({
         id: `zone-weight-${Date.now().toString(36)}`,
         label: 'Birth Weight',
         defaultValue: '3.2 Kg',
-        x: 38,
+        x: 37,
         y: 73,
-        maxWidth: 24,
+        maxWidth: 22,
         fontSize: 18,
         fontFamily: 'Poppins',
         color: '#1e293b',
@@ -748,14 +764,14 @@ export const VisualTemplateEditor: React.FC<VisualTemplateEditorProps> = ({
         autoShrinkToFit: true,
       });
 
-      // 7. Hospital
+      // 8. Hospital / Doctor Name
       generatedZones.push({
         id: `zone-hospital-${Date.now().toString(36)}`,
-        label: 'Hospital Name',
+        label: 'Hospital / Doctor Name',
         defaultValue: 'City Hospital',
-        x: 50,
+        x: 63,
         y: 73,
-        maxWidth: 24,
+        maxWidth: 22,
         fontSize: 18,
         fontFamily: 'Poppins',
         color: '#1e293b',
@@ -768,15 +784,15 @@ export const VisualTemplateEditor: React.FC<VisualTemplateEditorProps> = ({
         autoShrinkToFit: true,
       });
 
-      // 8. Blood Group
+      // 9. Big Sister & Brother Label
       generatedZones.push({
-        id: `zone-blood-grp-${Date.now().toString(36)}`,
-        label: 'Blood Group',
-        defaultValue: 'O+',
-        x: 62,
-        y: 73,
-        maxWidth: 24,
-        fontSize: 18,
+        id: `zone-siblings-${Date.now().toString(36)}`,
+        label: 'Sister & Brother Label',
+        defaultValue: 'Big Sister & Big Brother',
+        x: 34,
+        y: 94,
+        maxWidth: 30,
+        fontSize: 15,
         fontFamily: 'Poppins',
         color: '#1e293b',
         align: 'center',
@@ -788,15 +804,15 @@ export const VisualTemplateEditor: React.FC<VisualTemplateEditorProps> = ({
         autoShrinkToFit: true,
       });
 
-      // 9. Dad & Mom
+      // 10. Dad & Mom Label
       generatedZones.push({
         id: `zone-parents-${Date.now().toString(36)}`,
-        label: 'Dad & Mom Names',
-        defaultValue: 'Parents Names',
-        x: 65,
-        y: 84,
-        maxWidth: 42,
-        fontSize: 19,
+        label: 'Dad & Mom Label',
+        defaultValue: 'Dad & Mom',
+        x: 66,
+        y: 94,
+        maxWidth: 30,
+        fontSize: 15,
         fontFamily: 'Poppins',
         color: '#1e293b',
         align: 'center',
