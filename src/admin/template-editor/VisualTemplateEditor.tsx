@@ -45,6 +45,7 @@ import {
   HelpCircle,
   AlertCircle,
   ExternalLink,
+  ChevronDown,
 } from 'lucide-react';
 
 interface VisualTemplateEditorProps {
@@ -235,6 +236,7 @@ export const VisualTemplateEditor: React.FC<VisualTemplateEditorProps> = ({
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [isImportingPsd, setIsImportingPsd] = useState<boolean>(false);
   const [isCanvaModalOpen, setIsCanvaModalOpen] = useState<boolean>(false);
+  const [isPresetsMenuOpen, setIsPresetsMenuOpen] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const psdInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -628,6 +630,296 @@ export const VisualTemplateEditor: React.FC<VisualTemplateEditorProps> = ({
     pushHistory(next);
   };
 
+  // 1-Click Auto-Layout Presets (Baby Birth Frame, Couple Anniversary, etc.)
+  const handleApplyLayoutPreset = (presetType: 'baby-birth' | 'couple-anniversary' | 'single-hero') => {
+    let generatedSlots: PhotoSlotConfig[] = [];
+    let generatedZones: TextZoneConfig[] = [];
+
+    if (presetType === 'baby-birth') {
+      // 1. Top Hero Circle Photo Slot
+      generatedSlots.push({
+        id: `slot-baby-hero-${Date.now().toString(36)}`,
+        label: 'Baby Main Photo',
+        shape: 'circle',
+        x: 50,
+        y: 31,
+        width: 36,
+        height: 27,
+        rotation: 0,
+        zIndex: 1,
+        visibleToCustomer: true,
+        required: true,
+        defaultPhotoUrl: 'https://images.unsplash.com/photo-1519689680058-324335c77eba?auto=format&fit=crop&q=80&w=600',
+      });
+
+      // 2. Bottom Circle Photo Slot
+      generatedSlots.push({
+        id: `slot-baby-sec-${Date.now().toString(36)}`,
+        label: 'Baby Second Photo',
+        shape: 'circle',
+        x: 35,
+        y: 84,
+        width: 25,
+        height: 19,
+        rotation: 0,
+        zIndex: 2,
+        visibleToCustomer: true,
+        required: true,
+        defaultPhotoUrl: 'https://images.unsplash.com/photo-1544126592-807ade215a0b?auto=format&fit=crop&q=80&w=600',
+      });
+
+      // 3. Baby Full Name
+      generatedZones.push({
+        id: `zone-baby-name-${Date.now().toString(36)}`,
+        label: 'Baby Full Name',
+        defaultValue: 'Baby Name',
+        x: 50,
+        y: 13,
+        maxWidth: 75,
+        fontSize: 34,
+        fontFamily: 'Playfair Display',
+        color: '#111827',
+        align: 'center',
+        type: 'text',
+        rotation: 0,
+        zIndex: 10,
+        visibleToCustomer: true,
+        required: true,
+        autoShrinkToFit: true,
+      });
+
+      // 4. Born In (Date)
+      generatedZones.push({
+        id: `zone-born-in-${Date.now().toString(36)}`,
+        label: 'Born In (Date / Place)',
+        defaultValue: '22 Oct 2024',
+        x: 38,
+        y: 50,
+        maxWidth: 28,
+        fontSize: 18,
+        fontFamily: 'Poppins',
+        color: '#1e293b',
+        align: 'center',
+        type: 'date',
+        rotation: 0,
+        zIndex: 11,
+        visibleToCustomer: true,
+        required: false,
+        autoShrinkToFit: true,
+      });
+
+      // 5. Born At (Time)
+      generatedZones.push({
+        id: `zone-born-at-${Date.now().toString(36)}`,
+        label: 'Born At (Time)',
+        defaultValue: '10:45 AM',
+        x: 62,
+        y: 50,
+        maxWidth: 28,
+        fontSize: 18,
+        fontFamily: 'Poppins',
+        color: '#1e293b',
+        align: 'center',
+        type: 'time',
+        rotation: 0,
+        zIndex: 12,
+        visibleToCustomer: true,
+        required: false,
+        autoShrinkToFit: true,
+      });
+
+      // 6. Birth Weight
+      generatedZones.push({
+        id: `zone-weight-${Date.now().toString(36)}`,
+        label: 'Birth Weight',
+        defaultValue: '3.2 Kg',
+        x: 38,
+        y: 73,
+        maxWidth: 24,
+        fontSize: 18,
+        fontFamily: 'Poppins',
+        color: '#1e293b',
+        align: 'center',
+        type: 'text',
+        rotation: 0,
+        zIndex: 13,
+        visibleToCustomer: true,
+        required: false,
+        autoShrinkToFit: true,
+      });
+
+      // 7. Hospital
+      generatedZones.push({
+        id: `zone-hospital-${Date.now().toString(36)}`,
+        label: 'Hospital Name',
+        defaultValue: 'City Hospital',
+        x: 50,
+        y: 73,
+        maxWidth: 24,
+        fontSize: 18,
+        fontFamily: 'Poppins',
+        color: '#1e293b',
+        align: 'center',
+        type: 'text',
+        rotation: 0,
+        zIndex: 14,
+        visibleToCustomer: true,
+        required: false,
+        autoShrinkToFit: true,
+      });
+
+      // 8. Blood Group
+      generatedZones.push({
+        id: `zone-blood-grp-${Date.now().toString(36)}`,
+        label: 'Blood Group',
+        defaultValue: 'O+',
+        x: 62,
+        y: 73,
+        maxWidth: 24,
+        fontSize: 18,
+        fontFamily: 'Poppins',
+        color: '#1e293b',
+        align: 'center',
+        type: 'text',
+        rotation: 0,
+        zIndex: 15,
+        visibleToCustomer: true,
+        required: false,
+        autoShrinkToFit: true,
+      });
+
+      // 9. Dad & Mom
+      generatedZones.push({
+        id: `zone-parents-${Date.now().toString(36)}`,
+        label: 'Dad & Mom Names',
+        defaultValue: 'Parents Names',
+        x: 65,
+        y: 84,
+        maxWidth: 42,
+        fontSize: 19,
+        fontFamily: 'Poppins',
+        color: '#1e293b',
+        align: 'center',
+        type: 'text',
+        rotation: 0,
+        zIndex: 16,
+        visibleToCustomer: true,
+        required: false,
+        autoShrinkToFit: true,
+      });
+    } else if (presetType === 'couple-anniversary') {
+      generatedSlots.push({
+        id: `slot-couple-1-${Date.now().toString(36)}`,
+        label: 'Partner 1 Photo',
+        shape: 'heart',
+        x: 35,
+        y: 42,
+        width: 32,
+        height: 32,
+        rotation: 0,
+        zIndex: 1,
+        visibleToCustomer: true,
+        required: true,
+      });
+      generatedSlots.push({
+        id: `slot-couple-2-${Date.now().toString(36)}`,
+        label: 'Partner 2 Photo',
+        shape: 'heart',
+        x: 65,
+        y: 42,
+        width: 32,
+        height: 32,
+        rotation: 0,
+        zIndex: 2,
+        visibleToCustomer: true,
+        required: true,
+      });
+      generatedZones.push({
+        id: `zone-couple-names-${Date.now().toString(36)}`,
+        label: 'Couple Names',
+        defaultValue: 'Raj & Simran',
+        x: 50,
+        y: 16,
+        maxWidth: 80,
+        fontSize: 36,
+        fontFamily: 'Great Vibes',
+        color: '#111827',
+        align: 'center',
+        type: 'text',
+        zIndex: 10,
+        visibleToCustomer: true,
+        required: true,
+      });
+      generatedZones.push({
+        id: `zone-anni-date-${Date.now().toString(36)}`,
+        label: 'Anniversary Date',
+        defaultValue: '14 February 2024',
+        x: 50,
+        y: 72,
+        maxWidth: 60,
+        fontSize: 20,
+        fontFamily: 'Poppins',
+        color: '#475569',
+        align: 'center',
+        type: 'date',
+        zIndex: 11,
+        visibleToCustomer: true,
+      });
+    } else if (presetType === 'single-hero') {
+      generatedSlots.push({
+        id: `slot-hero-${Date.now().toString(36)}`,
+        label: 'Center Photo',
+        shape: 'rounded',
+        x: 50,
+        y: 45,
+        width: 60,
+        height: 50,
+        rotation: 0,
+        zIndex: 1,
+        visibleToCustomer: true,
+        required: true,
+      });
+      generatedZones.push({
+        id: `zone-title-${Date.now().toString(36)}`,
+        label: 'Title Text',
+        defaultValue: 'Cherished Memories',
+        x: 50,
+        y: 12,
+        maxWidth: 80,
+        fontSize: 34,
+        fontFamily: 'Playfair Display',
+        color: '#111827',
+        align: 'center',
+        type: 'text',
+        zIndex: 10,
+        visibleToCustomer: true,
+        required: true,
+      });
+    }
+
+    const next: UniversalFrameTemplate = {
+      ...template,
+      photoSlots: generatedSlots,
+      textZones: generatedZones,
+    };
+
+    setTemplate(next);
+    if (generatedSlots.length > 0) {
+      setSelectedLayer({ type: 'slot', id: generatedSlots[0].id });
+    } else if (generatedZones.length > 0) {
+      setSelectedLayer({ type: 'zone', id: generatedZones[0].id });
+    }
+    setRightPanelTab('layer');
+    pushHistory(next);
+    setStatusMessage({
+      text: `✨ Applied ${
+        presetType === 'baby-birth' ? 'Baby Birth Frame' : 'Layout'
+      } preset! (${generatedSlots.length} Photo Slots, ${generatedZones.length} Text Zones). Drag to nudge or click Save Template.`,
+      type: 'success',
+    });
+    setTimeout(() => setStatusMessage(null), 6000);
+  };
+
   const handleDeleteSelected = () => {
     if (!selectedLayer) return;
     let next = { ...template };
@@ -1002,6 +1294,77 @@ export const VisualTemplateEditor: React.FC<VisualTemplateEditorProps> = ({
               <Type className="w-3.5 h-3.5" />
               <span>Add Text Zone</span>
             </button>
+
+            <div className="h-4 w-[1px] bg-slate-800 mx-1" />
+
+            {/* 1-Click Auto-Layout Presets */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setIsPresetsMenuOpen(!isPresetsMenuOpen)}
+                className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-[#F82BA9]/20 to-purple-600/20 hover:from-[#F82BA9]/30 hover:to-purple-600/30 text-pink-300 text-xs font-bold flex items-center gap-1.5 border border-pink-500/40 shadow-xs transition-all cursor-pointer"
+                title="1-Click Auto-Layout Presets"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-pink-400" />
+                <span>Auto-Layout Presets</span>
+                <ChevronDown className="w-3 h-3 text-pink-400" />
+              </button>
+
+              {isPresetsMenuOpen && (
+                <div className="absolute top-full left-0 mt-1.5 w-64 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl p-1.5 z-30 space-y-1 text-xs animate-in fade-in zoom-in-95 duration-150">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleApplyLayoutPreset('baby-birth');
+                      setIsPresetsMenuOpen(false);
+                    }}
+                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-200 hover:text-white flex items-start gap-2.5 transition-colors cursor-pointer"
+                  >
+                    <span className="text-base">🍼</span>
+                    <div>
+                      <p className="font-bold text-pink-400">Baby Birth Frame</p>
+                      <p className="text-[10px] text-slate-400 leading-tight">
+                        2 Photo Circles + 7 Details (Name, Born In, Born At, Weight, Hospital, Blood, Parents)
+                      </p>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleApplyLayoutPreset('couple-anniversary');
+                      setIsPresetsMenuOpen(false);
+                    }}
+                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-200 hover:text-white flex items-start gap-2.5 transition-colors cursor-pointer"
+                  >
+                    <span className="text-base">💍</span>
+                    <div>
+                      <p className="font-bold text-purple-400">Couple & Anniversary</p>
+                      <p className="text-[10px] text-slate-400 leading-tight">
+                        2 Heart Cutouts + Names + Date + Quote
+                      </p>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleApplyLayoutPreset('single-hero');
+                      setIsPresetsMenuOpen(false);
+                    }}
+                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-200 hover:text-white flex items-start gap-2.5 transition-colors cursor-pointer"
+                  >
+                    <span className="text-base">🖼️</span>
+                    <div>
+                      <p className="font-bold text-blue-400">Single Hero Frame</p>
+                      <p className="text-[10px] text-slate-400 leading-tight">
+                        1 Center Photo + Title + Subtitle
+                      </p>
+                    </div>
+                  </button>
+                </div>
+              )}
+            </div>
 
             <div className="h-4 w-[1px] bg-slate-800 mx-1" />
 
