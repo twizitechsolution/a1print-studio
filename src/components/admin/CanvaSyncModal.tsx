@@ -94,12 +94,38 @@ export const CanvaSyncModal: React.FC<CanvaSyncModalProps> = ({
     setIsLicenseError(false);
 
     try {
+      let finalImageUrl = currentBaseImageUrl;
+
+      // If currentBaseImageUrl is a local base64 Data URL or blob, upload directly to Cloudinary first
+      if (finalImageUrl && (finalImageUrl.startsWith('data:') || finalImageUrl.startsWith('blob:'))) {
+        try {
+          const cloudFormData = new FormData();
+          cloudFormData.append('file', finalImageUrl);
+          cloudFormData.append('upload_preset', 'a1print_products');
+          cloudFormData.append('folder', 'a1print/canva_imports');
+
+          const cRes = await fetch('https://api.cloudinary.com/v1_1/dcnnn0ogm/image/upload', {
+            method: 'POST',
+            body: cloudFormData,
+          });
+
+          if (cRes.ok) {
+            const cData = await cRes.json();
+            if (cData.secure_url) {
+              finalImageUrl = cData.secure_url;
+            }
+          }
+        } catch (cErr) {
+          console.warn('Direct Cloudinary pre-upload failed, falling back to server handler:', cErr);
+        }
+      }
+
       const res = await fetch('/api/canva?action=import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           templateId,
-          imageUrl: currentBaseImageUrl,
+          imageUrl: finalImageUrl,
           title: templateTitle,
           canvaDesignId: activeDesignId || canvaDesignId,
         }),
