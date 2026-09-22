@@ -14,7 +14,16 @@ import {
   CheckSquare,
   Square,
   Sliders,
+  ChevronDown,
 } from 'lucide-react';
+
+interface TemplateOption {
+  id: string;
+  title: string;
+  category?: string;
+  baseImageUrl?: string;
+  canvaDesignId?: string;
+}
 
 interface DetectedField {
   fieldId: string;
@@ -24,6 +33,9 @@ interface DetectedField {
   top: number;
   width: number;
   height?: number;
+  centerX?: number;
+  centerY?: number;
+  shape?: 'circle' | 'rounded' | 'rectangle' | 'heart';
   rotation?: number;
   color?: string;
   fontSize?: number;
@@ -45,6 +57,8 @@ export const CanvaFieldSyncApp: React.FC = () => {
 
   const [designId, setDesignId] = useState<string>('');
   const [templateId, setTemplateId] = useState<string>('');
+  const [templatesList, setTemplatesList] = useState<TemplateOption[]>([]);
+  const [isLoadingTemplates, setIsLoadingTemplates] = useState<boolean>(false);
   const [pageDimensions, setPageDimensions] = useState<{ width: number; height: number }>({
     width: 1200,
     height: 1600,
@@ -56,6 +70,34 @@ export const CanvaFieldSyncApp: React.FC = () => {
     textCount: number;
     syncedAt: string;
   } | null>(null);
+
+  // Fetch recent templates from backend for 1-click selection
+  const fetchRecentTemplates = useCallback(async (currentTId?: string) => {
+    setIsLoadingTemplates(true);
+    try {
+      const apiBase =
+        window.location.origin.includes('vercel.app') || window.location.origin.includes('localhost')
+          ? ''
+          : 'https://a1print-studio.vercel.app';
+      const res = await fetch(`${apiBase}/api/canva?action=recent-templates`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.templates && Array.isArray(data.templates)) {
+          setTemplatesList(data.templates);
+          if (!currentTId && !templateId && data.templates.length > 0) {
+            setTemplateId(data.templates[0].id);
+            if (data.templates[0].canvaDesignId) {
+              setDesignId(data.templates[0].canvaDesignId);
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Could not fetch templates list:', err);
+    } finally {
+      setIsLoadingTemplates(false);
+    }
+  }, [templateId]);
 
   // Read URL query parameters (?templateId=... or ?designId=...)
   useEffect(() => {
@@ -69,7 +111,8 @@ export const CanvaFieldSyncApp: React.FC = () => {
     const inIframe = window.self !== window.top;
     setIsCanvaEnvironment(inIframe);
 
-    // Initial scan
+    // Initial scan and template list load
+    fetchRecentTemplates(tId);
     scanDesignElements();
   }, []);
 
@@ -150,14 +193,22 @@ export const CanvaFieldSyncApp: React.FC = () => {
                 ? tokenMatch[1].trim().toUpperCase().replace(/\s+/g, '_')
                 : `text-${textIndex++}`;
 
+              const left = el.left ?? 0;
+              const top = el.top ?? 0;
+              const centerX = left + width / 2;
+              const centerY = top + height / 2;
+
               scanned.push({
                 fieldId,
                 label: formatLabel(textContent),
                 defaultValue: textContent,
                 type: 'text',
-                left: el.left ?? 0,
-                top: el.top ?? 0,
-                width: el.width ?? 250,
+                left,
+                top,
+                width,
+                height,
+                centerX,
+                centerY,
                 rotation: el.rotation ?? 0,
                 color: el.color || '#111827',
                 fontSize: el.fontSize || 24,
@@ -181,14 +232,25 @@ export const CanvaFieldSyncApp: React.FC = () => {
 
             if (isVisualElement && width >= 40 && height >= 40) {
               const slotId = `photo-${photoIndex++}`;
+              const left = el.left ?? 0;
+              const top = el.top ?? 0;
+              const centerX = left + width / 2;
+              const centerY = top + height / 2;
+              const aspect = width / height;
+              const shape: 'circle' | 'rounded' | 'rectangle' | 'heart' =
+                el.shapeType === 'circle' || (aspect >= 0.82 && aspect <= 1.22) ? 'circle' : 'rounded';
+
               scanned.push({
                 fieldId: slotId,
                 label: `Photo Slot ${photoIndex - 1}`,
                 type: 'photo',
-                left: el.left ?? 0,
-                top: el.top ?? 0,
-                width: width,
-                height: height,
+                shape,
+                left,
+                top,
+                width,
+                height,
+                centerX,
+                centerY,
                 rotation: el.rotation ?? 0,
                 originalTransparency: el.transparency ?? 0,
                 elementRef: el,
@@ -342,8 +404,11 @@ export const CanvaFieldSyncApp: React.FC = () => {
         fields: selectedFields.map((f) => ({
           fieldId: f.fieldId,
           type: f.type,
+          shape: f.shape,
           left: f.left,
           top: f.top,
+          centerX: f.centerX,
+          centerY: f.centerY,
           width: f.width,
           height: f.height,
           rotation: f.rotation,
@@ -461,26 +526,48 @@ export const CanvaFieldSyncApp: React.FC = () => {
             </span>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 text-xs">
+          <div className="space-y-2 text-xs">
             <div>
-              <label className="text-[10px] text-slate-500 font-medium block mb-0.5">Template ID</label>
-              <input
-                type="text"
-                value={templateId}
-                onChange={(e) => setTemplateId(e.target.value)}
-                placeholder="tmpl-prod-..."
-                className="w-full text-xs font-mono px-2 py-1.5 rounded-md border border-slate-200 focus:outline-none focus:ring-1 focus:ring-purple-500"
-              />
+              <div className="flex items-center justify-between mb-0.5">
+                <label className="text-[10px] text-slate-500 font-medium">Select A1Print Template</label>
+                {isLoadingTemplates && <span className="text-[9px] text-purple-600 animate-pulse">Loading templates...</span>}
+              </div>
+              {templatesList.length > 0 ? (
+                <div className="relative">
+                  <select
+                    value={templateId}
+                    onChange={(e) => {
+                      const selectedId = e.target.value;
+                      setTemplateId(selectedId);
+                      const matched = templatesList.find((t) => t.id === selectedId);
+                      if (matched?.canvaDesignId && !designId) {
+                        setDesignId(matched.canvaDesignId);
+                      }
+                    }}
+                    className="w-full text-xs font-medium px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-800 focus:outline-none focus:ring-1 focus:ring-purple-500 shadow-xs appearance-none pr-7 cursor-pointer"
+                  >
+                    {templatesList.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.title} ({t.id.replace(/^tmpl-/, '')})
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+              ) : (
+                <input
+                  type="text"
+                  value={templateId}
+                  onChange={(e) => setTemplateId(e.target.value)}
+                  placeholder="tmpl-prod-..."
+                  className="w-full text-xs font-mono px-2 py-1.5 rounded-md border border-slate-200 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                />
+              )}
             </div>
-            <div>
-              <label className="text-[10px] text-slate-500 font-medium block mb-0.5">Canva Design ID</label>
-              <input
-                type="text"
-                value={designId}
-                onChange={(e) => setDesignId(e.target.value)}
-                placeholder="Auto-detected"
-                className="w-full text-xs font-mono px-2 py-1.5 rounded-md border border-slate-200 focus:outline-none focus:ring-1 focus:ring-purple-500"
-              />
+
+            <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-100">
+              <span>Target ID: <code className="font-mono text-purple-600">{templateId || 'None'}</code></span>
+              {designId && <span>Canva: <code className="font-mono text-slate-400">{designId.slice(0, 10)}...</code></span>}
             </div>
           </div>
         </div>

@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:canva": "vite build --config vite.canva.config.ts",
     "lint": "eslint .",
     "preview": "vite preview"
   },

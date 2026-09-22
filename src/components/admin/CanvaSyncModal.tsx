@@ -310,12 +310,12 @@ export const CanvaSyncModal: React.FC<CanvaSyncModalProps> = ({
                 </p>
               </div>
 
-              {/* Automatic Field Sync Convention Box */}
-              <div className="bg-slate-950/40 border border-slate-800 rounded-2xl p-3 text-xs space-y-2">
+              {/* Automatic Field Sync Guidance */}
+              <div className="bg-purple-950/40 border border-purple-800/40 rounded-2xl p-3.5 text-xs space-y-2.5">
                 <div className="flex items-center justify-between text-purple-300 font-bold">
-                  <span className="flex items-center gap-1.5">
+                  <span className="flex items-center gap-1.5 text-xs">
                     <Sparkles className="w-3.5 h-3.5 text-purple-400" />
-                    Automatic Field Sync (Inside Canva App)
+                    Automatic Layer Sync (Inside Canva)
                   </span>
                   <a
                     href={`/canva-app?templateId=${encodeURIComponent(templateId)}&designId=${encodeURIComponent(activeDesignId || '')}`}
@@ -323,27 +323,12 @@ export const CanvaSyncModal: React.FC<CanvaSyncModalProps> = ({
                     rel="noreferrer"
                     className="text-[10px] text-purple-400 hover:text-purple-300 underline flex items-center gap-1"
                   >
-                    Open App Panel <ExternalLink className="w-2.5 h-2.5" />
+                    Preview App <ExternalLink className="w-2.5 h-2.5" />
                   </a>
                 </div>
-                <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-300">
-                  <div className="bg-slate-900/90 p-2 rounded-xl border border-slate-800 space-y-1">
-                    <span className="font-semibold text-pink-400 flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full bg-[#ff00ff]" /> Photo Slots
-                    </span>
-                    <p className="text-[10px] text-slate-400">
-                      Draw a rectangle filled with <code className="text-pink-300 font-mono">#ff00ff</code> (pure magenta).
-                    </p>
-                  </div>
-                  <div className="bg-slate-900/90 p-2 rounded-xl border border-slate-800 space-y-1">
-                    <span className="font-semibold text-blue-400 flex items-center gap-1">
-                      <span className="font-mono">{`{{T}}`}</span> Text Zones
-                    </span>
-                    <p className="text-[10px] text-slate-400">
-                      Type field placeholder like <code className="text-blue-300 font-mono">{`{{NAME}}`}</code> or <code className="text-blue-300 font-mono">{`{{DATE}}`}</code>.
-                    </p>
-                  </div>
-                </div>
+                <p className="text-[11px] text-slate-300 leading-relaxed">
+                  Inside Canva: Add any photo frames or text boxes freely. Then click <strong>Apps</strong> on Canva's left dock &rarr; <strong>A1Print Layer Sync</strong> &rarr; <strong>Sync Layers to A1Print</strong>. All elements will automatically appear as editable layers in Admin!
+                </p>
               </div>
 
               <button
@@ -390,7 +375,15 @@ export const CanvaSyncModal: React.FC<CanvaSyncModalProps> = ({
                   <span>Reopen Canva Editor Tab</span>
                   <ExternalLink className="w-3 h-3" />
                 </button>
-              )}
+              <div className="bg-purple-950/40 border border-purple-800/40 rounded-xl p-3 text-left text-xs space-y-1">
+                <span className="font-bold text-purple-300 flex items-center gap-1.5 text-[11px]">
+                  <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+                  Sync Layers directly from Canva:
+                </span>
+                <p className="text-[11px] text-slate-300 leading-relaxed">
+                  Before clicking below, open <strong>Apps &rarr; A1Print Layer Sync</strong> in Canva's left sidebar and click <strong>Sync Layers to A1Print</strong> to automatically pull in all photo frames and texts!
+                </p>
+              </div>
 
               <div className="pt-2 space-y-2">
                 <button

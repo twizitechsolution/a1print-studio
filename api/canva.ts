@@ -180,6 +180,29 @@ async function deleteFirestoreDoc(collection: string, docId: string): Promise<bo
   }
 }
 
+async function getFirestoreCollection(collection: string): Promise<any[]> {
+  try {
+    const url = `${FIRESTORE_BASE_URL}/${collection}?${REST_AUTH_PARAM}`;
+    const res = await fetch(url);
+    if (!res.ok) return [];
+    const json = await res.json();
+    const docs = json.documents || [];
+    return docs
+      .map((d: any) => {
+        const item = fromFirestoreDoc(d);
+        if (item && d.name) {
+          const parts = d.name.split('/');
+          if (!item.id) item.id = parts[parts.length - 1];
+        }
+        return item;
+      })
+      .filter(Boolean);
+  } catch (err: any) {
+    console.warn(`Firestore GET collection exception for ${collection}:`, err?.message);
+    return [];
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Helpers: PKCE & Stateless HMAC-Signed OAuth State
 // ---------------------------------------------------------------------------
@@ -993,11 +1016,43 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         canvaLastSyncedAt: nowIso,
       }).catch(() => {});
 
+      const existingDoc =
+        (await getFirestoreDoc('universal_templates', templateId)) ||
+        (await getFirestoreDoc('frame_templates', templateId));
+
       return res.status(200).json({
         success: true,
         baseImageUrl: permanentCloudinaryUrl,
         canvaLastSyncedAt: nowIso,
+        photoSlots: existingDoc?.photoSlots || [],
+        textZones: existingDoc?.textZones || [],
       });
+    }
+
+    // -------------------------------------------------------------------------
+    // 5.5 recent-templates: List recent templates for Canva App selection
+    // -------------------------------------------------------------------------
+    if (action === 'recent-templates') {
+      try {
+        const list = await getFirestoreCollection('universal_templates');
+        const sorted = list
+          .filter((t: any) => t && t.id)
+          .sort((a: any, b: any) => (b.updatedAt || '').localeCompare(a.updatedAt || ''))
+          .slice(0, 30)
+          .map((t: any) => ({
+            id: t.id,
+            title: t.title || 'Untitled Frame',
+            category: t.category || '',
+            baseImageUrl: t.baseImageUrl || '',
+            canvaDesignId: t.canvaDesignId || '',
+            photoSlotsCount: t.photoSlots?.length || 0,
+            textZonesCount: t.textZones?.length || 0,
+            updatedAt: t.updatedAt || '',
+          }));
+        return res.status(200).json({ success: true, templates: sorted });
+      } catch (err: any) {
+        return res.status(500).json({ error: err?.message || 'Failed to list templates' });
+      }
     }
 
     // -------------------------------------------------------------------------
@@ -1097,17 +1152,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const height = Number(field.height) || width;
         const rotation = Math.round((Number(field.rotation) || 0) * 10) / 10;
 
-        const pctX = Math.max(0, Math.min(100, Math.round((left / pW) * 10000) / 100));
-        const pctY = Math.max(0, Math.min(100, Math.round((top / pH) * 10000) / 100));
+        // In A1Print, slot and zone (x, y) represent CENTER coordinate percentages!
+        // In Canva, left and top represent the top-left of the bounding box.
+        const centerX = field.centerX !== undefined ? Number(field.centerX) : left + width / 2;
+        const centerY = field.centerY !== undefined ? Number(field.centerY) : top + height / 2;
+
+        const pctX = Math.max(0, Math.min(100, Math.round((centerX / pW) * 10000) / 100));
+        const pctY = Math.max(0, Math.min(100, Math.round((centerY / pH) * 10000) / 100));
         const pctW = Math.max(1, Math.min(100, Math.round((width / pW) * 10000) / 100));
         const pctH = Math.max(1, Math.min(100, Math.round((height / pH) * 10000) / 100));
 
         if (field.type === 'photo') {
           const existingSlot = existingPhotoSlots.find((s) => s.id === rawId);
+          let shape: 'circle' | 'rounded' | 'rectangle' | 'heart' = field.shape || existingSlot?.shape;
+          if (!shape) {
+            const aspect = width / height;
+            shape = aspect >= 0.82 && aspect <= 1.22 ? 'circle' : 'rounded';
+          }
           newPhotoSlots.push({
             id: rawId,
             label: field.label || existingSlot?.label || toHumanLabel(rawId),
-            shape: existingSlot?.shape || 'rectangle',
+            shape,
             x: pctX,
             y: pctY,
             width: pctW,
