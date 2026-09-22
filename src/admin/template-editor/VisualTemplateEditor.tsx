@@ -1927,18 +1927,23 @@ export const VisualTemplateEditor: React.FC<VisualTemplateEditorProps> = ({
         currentBaseImageUrl={template.baseImageUrl}
         canvaDesignId={template.canvaDesignId}
         canvaLastSyncedAt={template.canvaLastSyncedAt}
-        onSyncSuccess={(newBaseImageUrl, canvaLastSyncedAt) => {
+        onSyncSuccess={(newBaseImageUrl, canvaLastSyncedAt, newPhotoSlots, newTextZones) => {
           const updated: UniversalFrameTemplate = {
             ...template,
             baseImageUrl: newBaseImageUrl,
             cleanBaseImageUrl: newBaseImageUrl,
+            photoSlots: newPhotoSlots && newPhotoSlots.length > 0 ? newPhotoSlots : template.photoSlots,
+            textZones: newTextZones && newTextZones.length > 0 ? newTextZones : template.textZones,
             canvaLastSyncedAt,
             updatedAt: new Date().toISOString(),
           };
           setTemplate(updated);
           pushHistory(updated);
           setStatusMessage({
-            text: 'Artwork updated from Canva! Please review your slot & zone positions.',
+            text:
+              newPhotoSlots || newTextZones
+                ? `Artwork & fields successfully synced from Canva! (${updated.photoSlots?.length || 0} photo slots, ${updated.textZones?.length || 0} text zones)`
+                : 'Artwork updated from Canva! Please review your slot & zone positions.',
             type: 'success',
           });
           setTimeout(() => setStatusMessage(null), 6000);

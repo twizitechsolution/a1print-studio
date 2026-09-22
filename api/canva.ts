@@ -987,6 +987,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         baseImageUrl: permanentCloudinaryUrl,
         canvaLastSyncedAt: nowIso,
       }).catch(() => {});
+      setFirestoreDoc('universal_templates', templateId, {
+        baseImageUrl: permanentCloudinaryUrl,
+        cleanBaseImageUrl: permanentCloudinaryUrl,
+        canvaLastSyncedAt: nowIso,
+      }).catch(() => {});
 
       return res.status(200).json({
         success: true,
@@ -996,7 +1001,191 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // -------------------------------------------------------------------------
-    // 6. design-status: Query Canva design metadata
+    // 6. field-sync: Automatic field extraction and clean export from Canva App
+    // -------------------------------------------------------------------------
+    if (action === 'field-sync') {
+      if (req.method !== 'POST') {
+        return res.status(405).json({ error: 'Method not allowed. Use POST.' });
+      }
+
+      const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
+      const {
+        canvaDesignId,
+        templateId,
+        pageWidth = 1000,
+        pageHeight = 1000,
+        fields = [],
+        skipExport = false,
+      } = body;
+
+      if (!canvaDesignId && !templateId) {
+        return res.status(400).json({ error: 'canvaDesignId or templateId is required' });
+      }
+
+      let activeDesignId = canvaDesignId;
+      let targetTemplateId = templateId;
+      let existingTemplate: any = null;
+
+      // If templateId provided, load existing template
+      if (targetTemplateId) {
+        existingTemplate =
+          (await getFirestoreDoc('universal_templates', targetTemplateId)) ||
+          (await getFirestoreDoc('frame_templates', targetTemplateId));
+        if (existingTemplate && !activeDesignId) {
+          activeDesignId = existingTemplate.canvaDesignId;
+        }
+      }
+
+      // If only canvaDesignId provided, fallback template ID
+      if (!targetTemplateId && activeDesignId) {
+        targetTemplateId = `tmpl-${activeDesignId.replace(/[^\w-]/g, '')}`;
+      }
+
+      const accessToken = await getValidCanvaAccessToken(req, res);
+
+      // Helper: format field token to clean label
+      const toHumanLabel = (token: string): string => {
+        if (!token) return 'Field';
+        return token
+          .replace(/^\{\{|\}\}$/g, '')
+          .replace(/[_-]+/g, ' ')
+          .replace(/([a-z])([A-Z])/g, '$1 $2')
+          .split(' ')
+          .filter(Boolean)
+          .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+          .join(' ');
+      };
+
+      // Helper: determine zone type from token
+      const determineZoneType = (token: string): 'text' | 'date' | 'time' | 'number' | 'message' => {
+        const upper = token.toUpperCase();
+        if (upper.includes('DATE') || upper.includes('DOB') || upper.includes('DAY') || upper.includes('YEAR')) return 'date';
+        if (upper.includes('TIME') || upper.includes('HOUR')) return 'time';
+        if (upper.includes('MESSAGE') || upper.includes('WISH') || upper.includes('NOTE') || upper.includes('QUOTE')) return 'message';
+        if (upper.includes('AGE') || upper.includes('NUM') || upper.includes('WEIGHT') || upper.includes('COUNT')) return 'number';
+        return 'text';
+      };
+
+      // 1. Perform clean export if activeDesignId is present and skipExport !== true
+      let permanentCloudinaryUrl = existingTemplate?.baseImageUrl || '';
+      if (activeDesignId && !skipExport) {
+        try {
+          const canvaDownloadUrl = await exportCanvaDesign(accessToken, activeDesignId);
+          permanentCloudinaryUrl = await uploadCanvaExportToCloudinary(canvaDownloadUrl);
+        } catch (exportErr: any) {
+          console.warn('Canva export during field-sync had notice:', exportErr.message);
+        }
+      }
+
+      // 2. Convert incoming fields to UniversalFrameTemplate coordinates (percentages 0-100)
+      const pW = Math.max(1, Number(pageWidth) || 1000);
+      const pH = Math.max(1, Number(pageHeight) || 1000);
+
+      const existingPhotoSlots: any[] = existingTemplate?.photoSlots || [];
+      const existingTextZones: any[] = existingTemplate?.textZones || [];
+
+      const newPhotoSlots: any[] = [];
+      const newTextZones: any[] = [];
+
+      fields.forEach((field: any, idx: number) => {
+        const rawId = (field.fieldId || '').trim();
+        if (!rawId) return;
+
+        const left = Number(field.left) || 0;
+        const top = Number(field.top) || 0;
+        const width = Number(field.width) || 100;
+        const height = Number(field.height) || width;
+        const rotation = Math.round((Number(field.rotation) || 0) * 10) / 10;
+
+        const pctX = Math.max(0, Math.min(100, Math.round((left / pW) * 10000) / 100));
+        const pctY = Math.max(0, Math.min(100, Math.round((top / pH) * 10000) / 100));
+        const pctW = Math.max(1, Math.min(100, Math.round((width / pW) * 10000) / 100));
+        const pctH = Math.max(1, Math.min(100, Math.round((height / pH) * 10000) / 100));
+
+        if (field.type === 'photo') {
+          const existingSlot = existingPhotoSlots.find((s) => s.id === rawId);
+          newPhotoSlots.push({
+            id: rawId,
+            label: existingSlot?.label || toHumanLabel(rawId),
+            shape: existingSlot?.shape || 'rectangle',
+            x: pctX,
+            y: pctY,
+            width: pctW,
+            height: pctH,
+            rotation,
+            zIndex: existingSlot?.zIndex ?? (idx + 1),
+            visibleToCustomer: existingSlot?.visibleToCustomer ?? true,
+            required: existingSlot?.required ?? false,
+          });
+        } else if (field.type === 'text') {
+          const cleanToken = rawId.replace(/^\{\{|\}\}$/g, '').trim();
+          const existingZone = existingTextZones.find((z) => z.id === cleanToken || z.id === rawId);
+          const zoneType = existingZone?.type || determineZoneType(cleanToken);
+
+          newTextZones.push({
+            id: cleanToken,
+            label: existingZone?.label || toHumanLabel(cleanToken),
+            defaultValue: existingZone?.defaultValue || `Enter ${toHumanLabel(cleanToken)}`,
+            x: pctX,
+            y: pctY,
+            maxWidth: Math.max(10, Math.min(100, pctW)),
+            fontSize: field.fontSize || existingZone?.fontSize || 24,
+            fontFamily: field.fontFamily || existingZone?.fontFamily || 'Inter',
+            color: field.color || existingZone?.color || '#111827',
+            align: field.align || existingZone?.align || 'center',
+            type: zoneType,
+            rotation,
+            zIndex: existingZone?.zIndex ?? (10 + idx),
+            visibleToCustomer: existingZone?.visibleToCustomer ?? true,
+            required: existingZone?.required ?? false,
+            autoShrinkToFit: true,
+          });
+        }
+      });
+
+      // Preserve existing custom fields if no markers were sent for them
+      const finalPhotoSlots = [
+        ...newPhotoSlots,
+        ...existingPhotoSlots.filter((ex) => !newPhotoSlots.some((n) => n.id === ex.id)),
+      ];
+
+      const finalTextZones = [
+        ...newTextZones,
+        ...existingTextZones.filter((ex) => !newTextZones.some((n) => n.id === ex.id)),
+      ];
+
+      const nowIso = new Date().toISOString();
+      const updatedTemplateData = {
+        ...(existingTemplate || {}),
+        id: targetTemplateId,
+        baseImageUrl: permanentCloudinaryUrl || existingTemplate?.baseImageUrl,
+        cleanBaseImageUrl: permanentCloudinaryUrl || existingTemplate?.cleanBaseImageUrl,
+        photoSlots: finalPhotoSlots,
+        textZones: finalTextZones,
+        canvaDesignId: activeDesignId,
+        canvaLastSyncedAt: nowIso,
+        updatedAt: nowIso,
+      };
+
+      if (targetTemplateId) {
+        setFirestoreDoc('universal_templates', targetTemplateId, updatedTemplateData).catch(() => {});
+        setFirestoreDoc('frame_templates', targetTemplateId, updatedTemplateData).catch(() => {});
+      }
+
+      return res.status(200).json({
+        success: true,
+        templateId: targetTemplateId,
+        baseImageUrl: permanentCloudinaryUrl || existingTemplate?.baseImageUrl,
+        photoSlots: finalPhotoSlots,
+        textZones: finalTextZones,
+        photoSlotsCount: finalPhotoSlots.length,
+        textZonesCount: finalTextZones.length,
+        canvaLastSyncedAt: nowIso,
+      });
+    }
+
+    // -------------------------------------------------------------------------
+    // 7. design-status: Query Canva design metadata
     // -------------------------------------------------------------------------
     if (action === 'design-status') {
       const { designId } = req.query;

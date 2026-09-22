@@ -23,8 +23,19 @@ import { CartDrawer } from './components/cart/CartDrawer';
 import { ProductGrid } from './components/catalog/ProductGrid';
 import { ShopProductGrid } from './components/catalog/ShopProductGrid';
 import { CustomerAuthModal } from './components/auth/CustomerAuthModal';
+import { CanvaFieldSyncApp } from './canva-app/CanvaFieldSyncApp';
 
 export const App: React.FC = () => {
+  // Check if loaded for Canva App side-panel
+  const isCanvaApp =
+    window.location.pathname === '/canva-app' ||
+    window.location.pathname.startsWith('/canva-app') ||
+    window.location.hash === '#canva-app';
+
+  if (isCanvaApp) {
+    return <CanvaFieldSyncApp />;
+  }
+
   // Check URL pathname for secret /admin route
   const isInitialAdminPath = window.location.pathname === '/admin' || window.location.hash === '#admin';
   const [currentPage, setCurrentPage] = useState<string>(isInitialAdminPath ? 'admin' : 'home');

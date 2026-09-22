@@ -19,7 +19,12 @@ interface CanvaSyncModalProps {
   currentBaseImageUrl: string;
   canvaDesignId?: string;
   canvaLastSyncedAt?: string;
-  onSyncSuccess: (newBaseImageUrl: string, canvaLastSyncedAt: string) => void;
+  onSyncSuccess: (
+    newBaseImageUrl: string,
+    canvaLastSyncedAt: string,
+    photoSlots?: any[],
+    textZones?: any[]
+  ) => void;
 }
 
 type ModalStep = 'idle' | 'importing' | 'editing' | 'exporting' | 'success' | 'error';
@@ -191,7 +196,12 @@ export const CanvaSyncModal: React.FC<CanvaSyncModalProps> = ({
       }
 
       setStep('success');
-      onSyncSuccess(data.baseImageUrl, data.canvaLastSyncedAt || new Date().toISOString());
+      onSyncSuccess(
+        data.baseImageUrl,
+        data.canvaLastSyncedAt || new Date().toISOString(),
+        data.photoSlots,
+        data.textZones
+      );
     } catch (err: any) {
       console.error('Canva export error:', err);
       setErrorMessage(err.message || 'Failed to pull changes from Canva.');
@@ -298,6 +308,42 @@ export const CanvaSyncModal: React.FC<CanvaSyncModalProps> = ({
                   <br />
                   3. Return here and click <strong>"Sync now"</strong> to pull the updated artwork straight into this product.
                 </p>
+              </div>
+
+              {/* Automatic Field Sync Convention Box */}
+              <div className="bg-slate-950/40 border border-slate-800 rounded-2xl p-3 text-xs space-y-2">
+                <div className="flex items-center justify-between text-purple-300 font-bold">
+                  <span className="flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+                    Automatic Field Sync (Inside Canva App)
+                  </span>
+                  <a
+                    href={`/canva-app?templateId=${encodeURIComponent(templateId)}&designId=${encodeURIComponent(activeDesignId || '')}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[10px] text-purple-400 hover:text-purple-300 underline flex items-center gap-1"
+                  >
+                    Open App Panel <ExternalLink className="w-2.5 h-2.5" />
+                  </a>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-300">
+                  <div className="bg-slate-900/90 p-2 rounded-xl border border-slate-800 space-y-1">
+                    <span className="font-semibold text-pink-400 flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-[#ff00ff]" /> Photo Slots
+                    </span>
+                    <p className="text-[10px] text-slate-400">
+                      Draw a rectangle filled with <code className="text-pink-300 font-mono">#ff00ff</code> (pure magenta).
+                    </p>
+                  </div>
+                  <div className="bg-slate-900/90 p-2 rounded-xl border border-slate-800 space-y-1">
+                    <span className="font-semibold text-blue-400 flex items-center gap-1">
+                      <span className="font-mono">{`{{T}}`}</span> Text Zones
+                    </span>
+                    <p className="text-[10px] text-slate-400">
+                      Type field placeholder like <code className="text-blue-300 font-mono">{`{{NAME}}`}</code> or <code className="text-blue-300 font-mono">{`{{DATE}}`}</code>.
+                    </p>
+                  </div>
+                </div>
               </div>
 
               <button
