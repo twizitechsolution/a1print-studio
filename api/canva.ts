@@ -397,83 +397,173 @@ async function ensurePublicCloudinaryImageUrl(imageUrl: string): Promise<string>
   return imageUrl;
 }
 
+/**
+ * Uploads an image asset to Canva (via URL asset upload or binary stream)
+ * and creates a Canva design featuring that asset.
+ */
 async function importUrlToCanva(
   accessToken: string,
   title: string,
   imageUrl: string
 ): Promise<{ designId: string; editUrl: string }> {
-  let initRes = await fetch(`${CANVA_API_BASE}/url-imports`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      title: title.slice(0, 255),
-      url: imageUrl,
-    }),
-  });
+  const sanitizedTitle = (title || 'Template Artwork')
+    .replace(/[^\w\s-]/gi, '')
+    .trim()
+    .slice(0, 50) || 'Template Artwork';
 
-  if (!initRes.ok && initRes.status === 404) {
-    initRes = await fetch(`${CANVA_API_BASE}/imports`, {
+  let assetId: string | null = null;
+
+  // -------------------------------------------------------------------------
+  // Step 1: Upload Asset to Canva (Try url-asset-uploads first)
+  // -------------------------------------------------------------------------
+  try {
+    const uploadRes = await fetch(`${CANVA_API_BASE}/url-asset-uploads`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        title: title.slice(0, 255),
+        name: sanitizedTitle,
         url: imageUrl,
       }),
     });
-  }
 
-  if (!initRes.ok) {
-    const errText = await initRes.text();
-    throw new Error(`Canva URL Import failed (${initRes.status}): ${errText}`);
-  }
+    if (uploadRes.ok) {
+      const uploadData = await uploadRes.json();
+      const jobId = uploadData?.job?.id || uploadData?.id;
 
-  const initData = await initRes.json();
-  const jobId = initData?.job?.id || initData?.id;
-  if (!jobId) {
-    throw new Error('Canva did not return a valid import job ID.');
-  }
+      if (jobId) {
+        // Poll asset upload status
+        const maxAttempts = 25;
+        for (let i = 0; i < maxAttempts; i++) {
+          await new Promise((r) => setTimeout(r, 1000));
 
-  const maxAttempts = 25;
-  for (let i = 0; i < maxAttempts; i++) {
-    await new Promise((r) => setTimeout(r, 1000));
+          const statusRes = await fetch(
+            `${CANVA_API_BASE}/url-asset-uploads/${encodeURIComponent(jobId)}`,
+            { headers: { Authorization: `Bearer ${accessToken}` } }
+          );
 
-    let statusRes = await fetch(`${CANVA_API_BASE}/url-imports/${encodeURIComponent(jobId)}`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-    if (!statusRes.ok && statusRes.status === 404) {
-      statusRes = await fetch(`${CANVA_API_BASE}/imports/${encodeURIComponent(jobId)}`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-    }
+          if (!statusRes.ok) continue;
 
-    if (!statusRes.ok) continue;
+          const statusData = await statusRes.json();
+          const job = statusData?.job || statusData;
 
-    const statusData = await statusRes.json();
-    const job = statusData?.job || statusData;
+          if (job?.status === 'success' && job?.asset?.id) {
+            assetId = job.asset.id;
+            break;
+          }
 
-    if (job?.status === 'success') {
-      const design = job?.result?.designs?.[0] || job?.designs?.[0];
-      const designId = design?.id;
-      const editUrl = design?.urls?.edit_url || design?.urls?.edit;
-      if (!designId) {
-        throw new Error('Import job succeeded but no Canva design was returned.');
+          if (job?.status === 'failed') {
+            console.warn('Canva URL asset upload failed:', job?.error?.message);
+            break;
+          }
+        }
       }
-      return { designId, editUrl: editUrl || '' };
     }
+  } catch (err: any) {
+    console.warn('URL asset upload error, attempting binary stream upload:', err?.message);
+  }
 
-    if (job?.status === 'failed') {
-      const msg = job?.error?.message || 'Canva import job reported failure.';
-      throw new Error(`Canva import failed: ${msg}`);
+  // -------------------------------------------------------------------------
+  // Step 1 Fallback: Binary Asset Upload if URL upload failed
+  // -------------------------------------------------------------------------
+  if (!assetId) {
+    try {
+      const imageFetchRes = await fetch(imageUrl);
+      if (!imageFetchRes.ok) {
+        throw new Error(`Failed to fetch image from Cloudinary for Canva upload (${imageFetchRes.status})`);
+      }
+      const arrayBuffer = await imageFetchRes.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+
+      const metadata = JSON.stringify({
+        name_base64: Buffer.from(sanitizedTitle).toString('base64'),
+      });
+
+      const binaryUploadRes = await fetch(`${CANVA_API_BASE}/asset-uploads`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Asset-Upload-Metadata': metadata,
+          'Content-Type': 'application/octet-stream',
+        },
+        body: buffer,
+      });
+
+      if (binaryUploadRes.ok) {
+        const binData = await binaryUploadRes.json();
+        const jobId = binData?.job?.id || binData?.id;
+
+        if (jobId) {
+          const maxAttempts = 25;
+          for (let i = 0; i < maxAttempts; i++) {
+            await new Promise((r) => setTimeout(r, 1000));
+
+            const statusRes = await fetch(
+              `${CANVA_API_BASE}/asset-uploads/${encodeURIComponent(jobId)}`,
+              { headers: { Authorization: `Bearer ${accessToken}` } }
+            );
+
+            if (!statusRes.ok) continue;
+
+            const statusData = await statusRes.json();
+            const job = statusData?.job || statusData;
+
+            if (job?.status === 'success' && job?.asset?.id) {
+              assetId = job.asset.id;
+              break;
+            }
+
+            if (job?.status === 'failed') {
+              throw new Error(`Canva binary asset upload failed: ${job?.error?.message || 'Unknown error'}`);
+            }
+          }
+        }
+      } else {
+        const errText = await binaryUploadRes.text();
+        console.warn(`Canva binary asset upload responded (${binaryUploadRes.status}):`, errText);
+      }
+    } catch (binErr: any) {
+      console.warn('Binary asset upload error:', binErr?.message);
     }
   }
 
-  throw new Error('Timed out waiting for Canva import job to complete.');
+  if (!assetId) {
+    throw new Error('Failed to upload template artwork asset to Canva. Please try again.');
+  }
+
+  // -------------------------------------------------------------------------
+  // Step 2: Create Canva Design with the uploaded asset
+  // -------------------------------------------------------------------------
+  const designRes = await fetch(`${CANVA_API_BASE}/designs`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      type: 'type_and_asset',
+      asset_id: assetId,
+      title: sanitizedTitle,
+    }),
+  });
+
+  if (!designRes.ok) {
+    const errText = await designRes.text();
+    throw new Error(`Failed to create Canva design from asset (${designRes.status}): ${errText}`);
+  }
+
+  const designData = await designRes.json();
+  const design = designData?.design || designData;
+  const designId = design?.id;
+  const editUrl = design?.urls?.edit_url || design?.urls?.edit;
+
+  if (!designId || !editUrl) {
+    throw new Error('Canva created the design but did not return a valid edit URL.');
+  }
+
+  return { designId, editUrl };
 }
 
 async function getCanvaDesign(
