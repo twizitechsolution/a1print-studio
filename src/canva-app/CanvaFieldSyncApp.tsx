@@ -49,13 +49,13 @@ interface DetectedField {
 
 const DEFAULT_PRESET_TEMPLATES: TemplateOption[] = [
   {
-    id: 'tmpl-prod-1788932131885',
+    id: 'tmpl-prod-1788931962289',
     title: 'Baby Frames (Current Product)',
     canvaDesignId: 'active-canva-design',
   },
   {
-    id: 'tmpl-prod-1788931892471',
-    title: 'Baby Birth Frame',
+    id: 'tmpl-prod-1788932131885',
+    title: 'Baby Birth Frame (Hot Air Balloon)',
     canvaDesignId: 'active-canva-design',
   },
 ];
@@ -69,7 +69,7 @@ export const CanvaFieldSyncApp: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string>('');
 
   const [designId, setDesignId] = useState<string>('');
-  const [templateId, setTemplateId] = useState<string>('tmpl-prod-1788932131885');
+  const [templateId, setTemplateId] = useState<string>('tmpl-prod-1788931962289');
   const [templatesList, setTemplatesList] = useState<TemplateOption[]>(DEFAULT_PRESET_TEMPLATES);
   const [isCustomTemplateInput, setIsCustomTemplateInput] = useState<boolean>(false);
   const [isLoadingTemplates, setIsLoadingTemplates] = useState<boolean>(false);
@@ -89,12 +89,17 @@ export const CanvaFieldSyncApp: React.FC = () => {
   const fetchRecentTemplates = useCallback(async (currentTId?: string) => {
     setIsLoadingTemplates(true);
     try {
-      const apiBase =
-        window.location.origin.includes('vercel.app') || window.location.origin.includes('localhost')
-          ? ''
-          : 'https://a1print-studio.vercel.app';
-      const res = await fetch(`${apiBase}/api/canva?action=recent-templates`);
-      if (res.ok) {
+      let res: Response | null = null;
+      try {
+        res = await fetch('http://localhost:8080/api/recent-templates');
+      } catch {
+        const apiBase =
+          window.location.origin.includes('vercel.app') || window.location.origin.includes('localhost')
+            ? ''
+            : 'https://a1print-studio.vercel.app';
+        res = await fetch(`${apiBase}/api/canva?action=recent-templates`);
+      }
+      if (res && res.ok) {
         const data = await res.json();
         if (data.templates && Array.isArray(data.templates) && data.templates.length > 0) {
           // Merge API templates with default presets
@@ -285,67 +290,103 @@ export const CanvaFieldSyncApp: React.FC = () => {
 
         const sampleFields: DetectedField[] = [
           {
-            fieldId: 'photo-1',
-            label: 'Photo Slot 1 (Top Left)',
+            fieldId: 'slot-center-main',
+            label: 'Main Baby Photo (Center Cutout)',
             type: 'photo',
-            left: 80,
-            top: 380,
-            width: 320,
-            height: 320,
+            shape: 'rounded',
+            left: 384,
+            top: 768,
+            width: 432,
+            height: 480,
+            centerX: 600,
+            centerY: 1008,
             rotation: 0,
             originalTransparency: 0,
             selected: true,
           },
           {
-            fieldId: 'photo-2',
-            label: 'Photo Slot 2 (Top Center)',
+            fieldId: 'slot-bottom',
+            label: 'Baby Milestone Photo (Bottom Cutout)',
             type: 'photo',
-            left: 440,
-            top: 380,
-            width: 320,
-            height: 320,
+            shape: 'rounded',
+            left: 492,
+            top: 1200,
+            width: 216,
+            height: 192,
+            centerX: 600,
+            centerY: 1296,
             rotation: 0,
             originalTransparency: 0,
             selected: true,
           },
           {
-            fieldId: 'photo-3',
-            label: 'Photo Slot 3 (Center Star Frame)',
-            type: 'photo',
-            left: 400,
-            top: 750,
-            width: 400,
-            height: 400,
-            rotation: 0,
-            originalTransparency: 0,
-            selected: true,
-          },
-          {
-            fieldId: 'subheading-1',
-            label: 'Add a Subheading',
-            defaultValue: 'Add a subheading',
+            fieldId: 'zone-baby-name',
+            label: 'Baby Name (Top Heading)',
+            defaultValue: 'Baby Name',
             type: 'text',
             left: 200,
-            top: 240,
+            top: 220,
             width: 800,
+            centerX: 600,
+            centerY: 230,
             rotation: 0,
             color: '#1e293b',
             fontSize: 34,
+            fontFamily: 'Playfair Display',
             align: 'center',
             originalTransparency: 0,
             selected: true,
           },
           {
-            fieldId: 'message-bottom',
-            label: 'Celebrating One Year of Joy!',
-            defaultValue: 'Celebrating One Year of Joy!',
+            fieldId: 'zone-subheading',
+            label: 'Birth Details / Subheading',
+            defaultValue: 'Date & Time of Birth',
             type: 'text',
-            left: 150,
-            top: 1220,
-            width: 900,
+            left: 250,
+            top: 288,
+            width: 700,
+            centerX: 600,
+            centerY: 295,
+            rotation: 0,
+            color: '#475569',
+            fontSize: 22,
+            fontFamily: 'Inter',
+            align: 'center',
+            originalTransparency: 0,
+            selected: true,
+          },
+          {
+            fieldId: 'zone-welcome',
+            label: 'Welcome Text',
+            defaultValue: 'Welcome world',
+            type: 'text',
+            left: 300,
+            top: 352,
+            width: 600,
+            centerX: 600,
+            centerY: 355,
+            rotation: 0,
+            color: '#0f172a',
+            fontSize: 28,
+            fontFamily: 'Dancing Script',
+            align: 'center',
+            originalTransparency: 0,
+            selected: true,
+          },
+          {
+            fieldId: 'zone-parents',
+            label: 'Proud Parents',
+            defaultValue: 'Proud Parents',
+            type: 'text',
+            left: 350,
+            top: 1120,
+            width: 500,
+            centerX: 600,
+            centerY: 1125,
             rotation: 0,
             color: '#334155',
-            fontSize: 26,
+            fontSize: 24,
+            fontFamily: 'Great Vibes',
             align: 'center',
             originalTransparency: 0,
             selected: true,
@@ -436,16 +477,26 @@ export const CanvaFieldSyncApp: React.FC = () => {
         })),
       };
 
-      const apiBase =
-        window.location.origin.includes('vercel.app') || window.location.origin.includes('localhost')
-          ? ''
-          : 'https://a1print-studio.vercel.app';
+      let res: Response;
+      try {
+        res = await fetch('http://localhost:8080/api/field-sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+      } catch (localErr) {
+        console.warn('Local dev proxy not reachable, falling back to Vercel API:', localErr);
+        const apiBase =
+          window.location.origin.includes('vercel.app') || window.location.origin.includes('localhost')
+            ? ''
+            : 'https://a1print-studio.vercel.app';
 
-      const res = await fetch(`${apiBase}/api/canva?action=field-sync`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+        res = await fetch(`${apiBase}/api/canva?action=field-sync`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+      }
 
       const data = await res.json();
 
