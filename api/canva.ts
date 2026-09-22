@@ -1106,7 +1106,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const existingSlot = existingPhotoSlots.find((s) => s.id === rawId);
           newPhotoSlots.push({
             id: rawId,
-            label: existingSlot?.label || toHumanLabel(rawId),
+            label: field.label || existingSlot?.label || toHumanLabel(rawId),
             shape: existingSlot?.shape || 'rectangle',
             x: pctX,
             y: pctY,
@@ -1124,8 +1124,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
           newTextZones.push({
             id: cleanToken,
-            label: existingZone?.label || toHumanLabel(cleanToken),
-            defaultValue: existingZone?.defaultValue || `Enter ${toHumanLabel(cleanToken)}`,
+            label: field.label || existingZone?.label || toHumanLabel(cleanToken),
+            defaultValue: field.defaultValue || existingZone?.defaultValue || cleanToken,
             x: pctX,
             y: pctY,
             maxWidth: Math.max(10, Math.min(100, pctW)),
@@ -1170,6 +1170,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (targetTemplateId) {
         setFirestoreDoc('universal_templates', targetTemplateId, updatedTemplateData).catch(() => {});
         setFirestoreDoc('frame_templates', targetTemplateId, updatedTemplateData).catch(() => {});
+
+        // Also update linked product in products collection so storefront immediately reflects new inputs
+        const targetProductId = existingTemplate?.productId || targetTemplateId.replace(/^tmpl-/, '');
+        if (targetProductId) {
+          setFirestoreDoc('products', targetProductId, {
+            photoSlots: finalPhotoSlots,
+            textZones: finalTextZones,
+            baseImageUrl: permanentCloudinaryUrl || existingTemplate?.baseImageUrl,
+            cleanBaseImageUrl: permanentCloudinaryUrl || existingTemplate?.cleanBaseImageUrl,
+            linkedFrameTemplateId: targetTemplateId,
+            updatedAt: nowIso,
+          }).catch(() => {});
+        }
       }
 
       return res.status(200).json({

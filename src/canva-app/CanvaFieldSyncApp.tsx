@@ -11,10 +11,14 @@ import {
   Info,
   ExternalLink,
   Sparkles,
+  CheckSquare,
+  Square,
+  Sliders,
 } from 'lucide-react';
 
 interface DetectedField {
   fieldId: string;
+  label: string;
   type: 'photo' | 'text';
   left: number;
   top: number;
@@ -25,8 +29,10 @@ interface DetectedField {
   fontSize?: number;
   fontFamily?: string;
   align?: 'center' | 'left' | 'right';
+  defaultValue?: string;
   originalTransparency?: number;
   elementRef?: any;
+  selected: boolean;
 }
 
 export const CanvaFieldSyncApp: React.FC = () => {
@@ -36,7 +42,7 @@ export const CanvaFieldSyncApp: React.FC = () => {
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
   const [statusMessage, setStatusMessage] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string>('');
-  
+
   const [designId, setDesignId] = useState<string>('');
   const [templateId, setTemplateId] = useState<string>('');
   const [pageDimensions, setPageDimensions] = useState<{ width: number; height: number }>({
@@ -45,14 +51,13 @@ export const CanvaFieldSyncApp: React.FC = () => {
   });
 
   const [detectedFields, setDetectedFields] = useState<DetectedField[]>([]);
-  const [duplicateTokens, setDuplicateTokens] = useState<string[]>([]);
   const [lastSyncedStats, setLastSyncedStats] = useState<{
     photoCount: number;
     textCount: number;
     syncedAt: string;
   } | null>(null);
 
-  // Read URL query parameters (e.g. ?templateId=... or ?designId=...)
+  // Read URL query parameters (?templateId=... or ?designId=...)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const tId = params.get('templateId') || params.get('template') || '';
@@ -60,32 +65,20 @@ export const CanvaFieldSyncApp: React.FC = () => {
     if (tId) setTemplateId(tId);
     if (dId) setDesignId(dId);
 
-    // Detect if loaded inside an iframe (like Canva's side panel)
+    // Detect if running inside Canva's iframe
     const inIframe = window.self !== window.top;
     setIsCanvaEnvironment(inIframe);
 
-    // Initialize scan
-    scanDesignElements(tId, dId);
+    // Initial scan
+    scanDesignElements();
   }, []);
 
-  // Helper: check if a color is the reserved pure magenta (#ff00ff)
-  const isPureMagenta = (colorStr: string | undefined): boolean => {
-    if (!colorStr) return false;
-    const clean = colorStr.trim().toLowerCase().replace(/\s+/g, '');
-    return (
-      clean === '#ff00ff' ||
-      clean === '#f0f' ||
-      clean === 'rgb(255,0,255)' ||
-      clean === 'rgba(255,0,255,1)' ||
-      clean === 'magenta'
-    );
-  };
-
-  // Helper: format field token to clean label
-  const toHumanLabel = (token: string): string => {
-    if (!token) return 'Field';
-    return token
-      .replace(/^\{\{|\}\}$/g, '')
+  // Format clean label from token or raw text
+  const formatLabel = (raw: string): string => {
+    if (!raw) return 'Field';
+    const clean = raw.replace(/^\{\{|\}\}$/g, '').trim();
+    if (clean.length > 30) return clean.slice(0, 27) + '...';
+    return clean
       .replace(/[_-]+/g, ' ')
       .replace(/([a-z])([A-Z])/g, '$1 $2')
       .split(' ')
@@ -94,8 +87,8 @@ export const CanvaFieldSyncApp: React.FC = () => {
       .join(' ');
   };
 
-  // Scan design elements (using Canva Design Editing API if available, or simulator)
-  const scanDesignElements = useCallback(async (customTId?: string, customDId?: string) => {
+  // Universal Canva Element Scanner
+  const scanDesignElements = useCallback(async () => {
     setIsScanning(true);
     setErrorMessage('');
     setSyncStatus('idle');
@@ -103,7 +96,6 @@ export const CanvaFieldSyncApp: React.FC = () => {
     try {
       let canvaDesignSdk: any = null;
       try {
-        // Attempt dynamic load of Canva Design SDK if inside Canva environment
         canvaDesignSdk = await (Function('return import("@canva/design")')().catch(() => null));
       } catch {
         canvaDesignSdk = null;
@@ -111,7 +103,7 @@ export const CanvaFieldSyncApp: React.FC = () => {
 
       if (canvaDesignSdk && typeof canvaDesignSdk.openDesign === 'function') {
         // -------------------------------------------------------------------
-        // Real Canva Environment: Run Design Editing API
+        // 1. LIVE CANVA RUNTIME: Universal Element Scan
         // -------------------------------------------------------------------
         await canvaDesignSdk.openDesign({ type: 'current_page' }, async (session: any) => {
           const page = session?.page;
@@ -122,17 +114,26 @@ export const CanvaFieldSyncApp: React.FC = () => {
           if (canvaDesignSdk.getDesignToken) {
             try {
               const token = await canvaDesignSdk.getDesignToken();
-              if (token && !designId) setDesignId('canva-active-design');
+              if (token && !designId) setDesignId('active-canva-design');
             } catch {}
           }
 
           const scanned: DetectedField[] = [];
-          const tokenSet = new Set<string>();
-          const duplicates: string[] = [];
           let photoIndex = 1;
+          let textIndex = 1;
 
           for (const el of elements) {
-            // 1. Text elements: Check for {{TOKEN}} pattern
+            const width = el.width ?? 100;
+            const height = el.height ?? 100;
+
+            // Skip background cover image if it spans almost 100% of the entire page
+            const isFullBackground =
+              width >= dims.width * 0.95 && height >= dims.height * 0.95 && el.left <= 10 && el.top <= 10;
+            if (isFullBackground) {
+              continue;
+            }
+
+            // A. TEXT ELEMENT: Any text box in Canva
             if (el.type === 'text' && el.text) {
               let textContent = '';
               if (typeof el.text.readPlaintext === 'function') {
@@ -141,132 +142,177 @@ export const CanvaFieldSyncApp: React.FC = () => {
                 textContent = el.text;
               }
 
-              const match = textContent.match(/\{\{\s*([\w\s-]+?)\s*\}\}/);
-              if (match && match[1]) {
-                const tokenId = match[1].trim().toUpperCase().replace(/\s+/g, '_');
-                if (tokenSet.has(tokenId)) {
-                  duplicates.push(tokenId);
-                } else {
-                  tokenSet.add(tokenId);
-                }
+              textContent = textContent.trim();
+              if (!textContent) continue;
 
-                scanned.push({
-                  fieldId: tokenId,
-                  type: 'text',
-                  left: el.left ?? 0,
-                  top: el.top ?? 0,
-                  width: el.width ?? 200,
-                  rotation: el.rotation ?? 0,
-                  color: el.color || '#111827',
-                  fontSize: el.fontSize || 24,
-                  fontFamily: el.fontFamily || 'Inter',
-                  align: el.textAlign || 'center',
-                  originalTransparency: el.transparency ?? 0,
-                  elementRef: el,
-                });
-              }
+              const tokenMatch = textContent.match(/\{\{\s*([\w\s-]+?)\s*\}\}/);
+              const fieldId = tokenMatch
+                ? tokenMatch[1].trim().toUpperCase().replace(/\s+/g, '_')
+                : `text-${textIndex++}`;
+
+              scanned.push({
+                fieldId,
+                label: formatLabel(textContent),
+                defaultValue: textContent,
+                type: 'text',
+                left: el.left ?? 0,
+                top: el.top ?? 0,
+                width: el.width ?? 250,
+                rotation: el.rotation ?? 0,
+                color: el.color || '#111827',
+                fontSize: el.fontSize || 24,
+                fontFamily: el.fontFamily || 'Inter',
+                align: el.textAlign || 'center',
+                originalTransparency: el.transparency ?? 0,
+                elementRef: el,
+                selected: true,
+              });
+              continue;
             }
 
-            // 2. Rectangle elements: Check for solid magenta fill (#ff00ff)
-            if (el.type === 'rect' || el.type === 'shape') {
-              const fill = el.fill;
-              const fillColor =
-                fill?.colorContainer?.ref?.color ||
-                fill?.color ||
-                fill?.hex ||
-                el.fillColor;
+            // B. PHOTO / FRAME / SHAPE ELEMENT: Any visual frame or image
+            const isVisualElement =
+              el.type === 'image' ||
+              el.type === 'rect' ||
+              el.type === 'shape' ||
+              el.type === 'frame' ||
+              el.type === 'grid' ||
+              Boolean(el.image);
 
-              if (isPureMagenta(fillColor)) {
-                const slotId = `photo-${photoIndex++}`;
-                scanned.push({
-                  fieldId: slotId,
-                  type: 'photo',
-                  left: el.left ?? 0,
-                  top: el.top ?? 0,
-                  width: el.width ?? 300,
-                  height: el.height ?? 300,
-                  rotation: el.rotation ?? 0,
-                  originalTransparency: el.transparency ?? 0,
-                  elementRef: el,
-                });
-              }
+            if (isVisualElement && width >= 40 && height >= 40) {
+              const slotId = `photo-${photoIndex++}`;
+              scanned.push({
+                fieldId: slotId,
+                label: `Photo Slot ${photoIndex - 1}`,
+                type: 'photo',
+                left: el.left ?? 0,
+                top: el.top ?? 0,
+                width: width,
+                height: height,
+                rotation: el.rotation ?? 0,
+                originalTransparency: el.transparency ?? 0,
+                elementRef: el,
+                selected: true,
+              });
             }
           }
 
           setDetectedFields(scanned);
-          setDuplicateTokens(duplicates);
         });
       } else {
         // -------------------------------------------------------------------
-        // Standalone Preview Mode (Outside Canva or during dev testing)
+        // 2. STANDALONE PREVIEW / SIMULATOR (Browser testing)
         // -------------------------------------------------------------------
-        await new Promise((r) => setTimeout(r, 600));
+        await new Promise((r) => setTimeout(r, 400));
 
-        // Sample initial fields for testing in the preview UI
         const sampleFields: DetectedField[] = [
           {
-            fieldId: 'BABY_NAME',
+            fieldId: 'photo-1',
+            label: 'Photo Slot 1 (Top Left)',
+            type: 'photo',
+            left: 80,
+            top: 380,
+            width: 320,
+            height: 320,
+            rotation: 0,
+            originalTransparency: 0,
+            selected: true,
+          },
+          {
+            fieldId: 'photo-2',
+            label: 'Photo Slot 2 (Top Center)',
+            type: 'photo',
+            left: 440,
+            top: 380,
+            width: 320,
+            height: 320,
+            rotation: 0,
+            originalTransparency: 0,
+            selected: true,
+          },
+          {
+            fieldId: 'photo-3',
+            label: 'Photo Slot 3 (Center Star Frame)',
+            type: 'photo',
+            left: 400,
+            top: 750,
+            width: 400,
+            height: 400,
+            rotation: 0,
+            originalTransparency: 0,
+            selected: true,
+          },
+          {
+            fieldId: 'subheading-1',
+            label: 'Add a Subheading',
+            defaultValue: 'Add a subheading',
             type: 'text',
             left: 200,
-            top: 250,
+            top: 240,
             width: 800,
             rotation: 0,
             color: '#1e293b',
-            fontSize: 32,
+            fontSize: 34,
             align: 'center',
             originalTransparency: 0,
+            selected: true,
           },
           {
-            fieldId: 'photo-1',
-            type: 'photo',
-            left: 150,
-            top: 400,
-            width: 900,
-            height: 700,
-            rotation: 0,
-            originalTransparency: 0,
-          },
-          {
-            fieldId: 'BIRTH_DATE',
+            fieldId: 'message-bottom',
+            label: 'Celebrating One Year of Joy!',
+            defaultValue: 'Celebrating One Year of Joy!',
             type: 'text',
-            left: 200,
-            top: 1180,
-            width: 800,
+            left: 150,
+            top: 1220,
+            width: 900,
             rotation: 0,
-            color: '#475569',
-            fontSize: 22,
+            color: '#334155',
+            fontSize: 26,
             align: 'center',
             originalTransparency: 0,
+            selected: true,
           },
         ];
 
         setDetectedFields(sampleFields);
-        setDuplicateTokens([]);
       }
     } catch (err: any) {
-      console.error('Scan error:', err);
+      console.error('Universal scan error:', err);
       setErrorMessage(err.message || 'Failed to scan design elements');
     } finally {
       setIsScanning(false);
     }
   }, [designId]);
 
+  // Toggle selection for a field
+  const toggleFieldSelection = (fieldId: string) => {
+    setDetectedFields((prev) =>
+      prev.map((f) => (f.fieldId === fieldId ? { ...f, selected: !f.selected } : f))
+    );
+  };
+
+  // Toggle all
+  const toggleSelectAll = (select: boolean) => {
+    setDetectedFields((prev) => prev.map((f) => ({ ...f, selected: select })));
+  };
+
   // Execute clean export & field sync
   const handleSyncToA1Print = async () => {
-    if (detectedFields.length === 0) {
-      setErrorMessage('No valid field markers found. Add at least one {{TOKEN}} or magenta rectangle.');
+    const selectedFields = detectedFields.filter((f) => f.selected);
+    if (selectedFields.length === 0) {
+      setErrorMessage('Please select at least one Photo Slot or Text Zone to sync.');
       return;
     }
 
     setIsSyncing(true);
     setSyncStatus('syncing');
     setErrorMessage('');
-    setStatusMessage('Hiding marker elements on canvas...');
+    setStatusMessage('Hiding dummy photos & texts to export clean base artwork...');
 
     const markerElementsWithOriginals: Array<{ element: any; origTransparency: number }> = [];
 
     try {
-      // Phase 3: Hide markers momentarily by setting transparency = 1
+      // 1. In Canva runtime: Hide selected customer elements so exported PNG has clean background
       let canvaDesignSdk: any = null;
       try {
         canvaDesignSdk = await (Function('return import("@canva/design")')().catch(() => null));
@@ -274,26 +320,26 @@ export const CanvaFieldSyncApp: React.FC = () => {
 
       if (canvaDesignSdk && typeof canvaDesignSdk.openDesign === 'function') {
         await canvaDesignSdk.openDesign({ type: 'current_page' }, async (session: any) => {
-          for (const item of detectedFields) {
+          for (const item of selectedFields) {
             if (item.elementRef) {
               const orig = item.originalTransparency ?? 0;
               markerElementsWithOriginals.push({ element: item.elementRef, origTransparency: orig });
-              item.elementRef.transparency = 1; // Full transparency (invisible)
+              item.elementRef.transparency = 1; // Temporarily invisible
             }
           }
           await session.sync();
         });
       }
 
-      setStatusMessage('Exporting clean artwork & syncing fields with A1Print...');
+      setStatusMessage('Exporting clean artwork & updating template layers in A1Print...');
 
-      // Phase 4: Send payload to A1Print backend endpoint
+      // 2. Prepare payload
       const payload = {
         canvaDesignId: designId || undefined,
         templateId: templateId || undefined,
         pageWidth: pageDimensions.width,
         pageHeight: pageDimensions.height,
-        fields: detectedFields.map((f) => ({
+        fields: selectedFields.map((f) => ({
           fieldId: f.fieldId,
           type: f.type,
           left: f.left,
@@ -305,6 +351,7 @@ export const CanvaFieldSyncApp: React.FC = () => {
           fontSize: f.fontSize,
           fontFamily: f.fontFamily,
           align: f.align,
+          defaultValue: f.defaultValue,
         })),
       };
 
@@ -327,17 +374,17 @@ export const CanvaFieldSyncApp: React.FC = () => {
 
       setSyncStatus('success');
       setLastSyncedStats({
-        photoCount: data.photoSlotsCount ?? detectedFields.filter((f) => f.type === 'photo').length,
-        textCount: data.textZonesCount ?? detectedFields.filter((f) => f.type === 'text').length,
+        photoCount: data.photoSlotsCount ?? selectedFields.filter((f) => f.type === 'photo').length,
+        textCount: data.textZonesCount ?? selectedFields.filter((f) => f.type === 'text').length,
         syncedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       });
-      setStatusMessage('Template successfully updated in A1Print!');
+      setStatusMessage('Template successfully updated! All layers are now active.');
     } catch (err: any) {
       console.error('Field sync error:', err);
       setSyncStatus('error');
       setErrorMessage(err.message || 'Failed to sync fields to A1Print');
     } finally {
-      // Phase 3 Step 4: Always restore transparency so admin view is unchanged
+      // 3. Always restore original element visibility in Canva so designer sees everything
       try {
         let canvaDesignSdk: any = null;
         try {
@@ -353,13 +400,14 @@ export const CanvaFieldSyncApp: React.FC = () => {
           });
         }
       } catch (restoreErr) {
-        console.warn('Could not restore marker transparency:', restoreErr);
+        console.warn('Could not restore element visibility:', restoreErr);
       }
 
       setIsSyncing(false);
     }
   };
 
+  const selectedCount = detectedFields.filter((f) => f.selected).length;
   const photoFields = detectedFields.filter((f) => f.type === 'photo');
   const textFields = detectedFields.filter((f) => f.type === 'text');
 
@@ -373,15 +421,15 @@ export const CanvaFieldSyncApp: React.FC = () => {
           </div>
           <div>
             <h1 className="text-sm font-bold text-slate-900 tracking-tight leading-tight">
-              A1Print Field Sync
+              A1Print Layer Sync
             </h1>
-            <p className="text-[11px] text-slate-500 font-medium">Automatic Template Sync</p>
+            <p className="text-[11px] text-slate-500 font-medium">Automatic Field Detection</p>
           </div>
         </div>
         <button
           onClick={() => scanDesignElements()}
           disabled={isScanning || isSyncing}
-          className="p-1.5 rounded-lg text-slate-600 hover:bg-slate-100 active:bg-slate-200 transition-colors disabled:opacity-50"
+          className="p-1.5 rounded-lg text-slate-600 hover:bg-slate-100 active:bg-slate-200 transition-colors disabled:opacity-50 cursor-pointer"
           title="Rescan Design Elements"
         >
           <RefreshCw className={`w-4 h-4 ${isScanning ? 'animate-spin text-purple-600' : ''}`} />
@@ -389,19 +437,19 @@ export const CanvaFieldSyncApp: React.FC = () => {
       </header>
 
       {/* Main Container */}
-      <main className="flex-1 px-4 py-3 space-y-3.5 max-w-md mx-auto w-full">
-        {/* Environment Alert if tested in regular browser */}
+      <main className="flex-1 px-4 py-3 space-y-3 max-w-md mx-auto w-full">
+        {/* Environment Alert */}
         {!isCanvaEnvironment && (
           <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-start gap-2">
             <Info className="w-4 h-4 shrink-0 mt-0.5 text-amber-600" />
             <div>
-              <span className="font-semibold">Browser Preview Mode:</span> Running outside Canva.
-              Showing simulated markers. Inside Canva, this docks in the editor sidebar!
+              <span className="font-semibold">Browser Preview:</span> Displaying simulated layers.
+              Inside Canva, this app automatically reads every photo and text box you add!
             </div>
           </div>
         )}
 
-        {/* Template & Design Link Bar */}
+        {/* Template Connection Bar */}
         <div className="bg-white rounded-xl p-3 border border-slate-200 shadow-xs space-y-2">
           <div className="flex items-center justify-between text-xs font-semibold text-slate-700">
             <span className="flex items-center gap-1.5">
@@ -437,82 +485,71 @@ export const CanvaFieldSyncApp: React.FC = () => {
           </div>
         </div>
 
-        {/* Convention Guide Accordion */}
-        <div className="bg-purple-50/60 rounded-xl p-3 border border-purple-100 text-xs space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="font-semibold text-purple-900 flex items-center gap-1.5">
-              <Eye className="w-3.5 h-3.5 text-purple-700" />
-              Canva Marker Conventions
-            </span>
-            <span className="text-[10px] text-purple-600 font-medium">Automatic</span>
-          </div>
-          <div className="space-y-1.5 text-[11px] text-purple-950">
-            <div className="flex items-center gap-2 bg-white/80 p-2 rounded-lg border border-purple-100">
-              <span className="w-3 h-3 rounded-full bg-[#ff00ff] shrink-0 border border-slate-300" />
-              <div>
-                <span className="font-semibold">Photo Slots:</span> Draw rectangle with fill{' '}
-                <code className="font-mono bg-purple-100 px-1 py-0.2 rounded text-[10px]">#ff00ff</code> (pure magenta)
-              </div>
-            </div>
-            <div className="flex items-center gap-2 bg-white/80 p-2 rounded-lg border border-purple-100">
-              <Type className="w-3 h-3 text-purple-600 shrink-0" />
-              <div>
-                <span className="font-semibold">Text Fields:</span> Wrap text in braces, e.g.{' '}
-                <code className="font-mono bg-purple-100 px-1 py-0.2 rounded text-[10px]">{`{{BABY_NAME}}`}</code>
-              </div>
-            </div>
-          </div>
+        {/* How It Works Card */}
+        <div className="bg-purple-50/70 rounded-xl p-3 border border-purple-100 text-xs text-purple-900 space-y-1.5">
+          <p className="font-bold flex items-center gap-1.5 text-purple-800">
+            <Sliders className="w-3.5 h-3.5" />
+            Automatic Layer Conversion
+          </p>
+          <p className="text-[11px] text-purple-800/80 leading-relaxed">
+            All photos and text boxes you place in Canva are detected below. Check the layers that customers should customize on the shop page.
+          </p>
         </div>
 
-        {/* Duplicate Warning */}
-        {duplicateTokens.length > 0 && (
-          <div className="p-2.5 rounded-lg bg-red-50 border border-red-200 text-red-800 text-xs flex items-start gap-2">
-            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-red-600" />
-            <div>
-              <span className="font-semibold">Duplicate Field Token:</span> Multiple text elements use{' '}
-              {duplicateTokens.map((t) => (
-                <code key={t} className="bg-red-100 font-mono px-1 rounded mx-0.5 text-[11px]">
-                  {`{{${t}}}`}
-                </code>
-              ))}
-              . Please make each token unique.
-            </div>
-          </div>
-        )}
-
-        {/* Detected Elements Summary */}
+        {/* Detected Layers List */}
         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
           <div className="px-3.5 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
             <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
               <Layers className="w-3.5 h-3.5 text-slate-500" />
-              Detected Elements
+              Detected Elements ({detectedFields.length})
             </span>
-            <div className="flex items-center gap-1.5 text-[10px] font-semibold">
-              <span className="px-2 py-0.5 rounded-full bg-pink-100 text-pink-700">
-                {photoFields.length} Photos
-              </span>
-              <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
-                {textFields.length} Texts
-              </span>
+            <div className="flex items-center gap-2 text-[10px]">
+              <button
+                type="button"
+                onClick={() => toggleSelectAll(selectedCount !== detectedFields.length)}
+                className="text-purple-600 hover:text-purple-700 font-semibold cursor-pointer underline"
+              >
+                {selectedCount === detectedFields.length ? 'Deselect All' : 'Select All'}
+              </button>
             </div>
           </div>
 
-          <div className="divide-y divide-slate-100 max-h-56 overflow-y-auto p-1">
+          <div className="divide-y divide-slate-100 max-h-64 overflow-y-auto">
             {detectedFields.length === 0 ? (
               <div className="py-8 text-center px-4 space-y-2">
                 <div className="w-10 h-10 mx-auto rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
                   <AlertTriangle className="w-5 h-5" />
                 </div>
-                <p className="text-xs font-semibold text-slate-700">No field markers detected yet</p>
+                <p className="text-xs font-semibold text-slate-700">No elements detected on canvas</p>
                 <p className="text-[11px] text-slate-500 leading-relaxed">
-                  Add text with <code className="font-mono text-purple-600">{`{{NAME}}`}</code> or a rectangle
-                  filled with <code className="font-mono text-pink-600">#ff00ff</code>, then click Rescan.
+                  Add photos, frames, or text boxes in Canva, then click the Rescan button above.
                 </p>
               </div>
             ) : (
               detectedFields.map((field) => (
-                <div key={field.fieldId} className="px-3 py-2 flex items-center justify-between hover:bg-slate-50">
+                <div
+                  key={field.fieldId}
+                  onClick={() => toggleFieldSelection(field.fieldId)}
+                  className={`px-3 py-2.5 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer ${
+                    !field.selected ? 'opacity-40 bg-slate-50/50' : ''
+                  }`}
+                >
                   <div className="flex items-center gap-2.5 min-w-0">
+                    <button
+                      type="button"
+                      className="text-purple-600 shrink-0"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleFieldSelection(field.fieldId);
+                      }}
+                    >
+                      {field.selected ? (
+                        <CheckSquare className="w-4 h-4 text-purple-600 fill-purple-50" />
+                      ) : (
+                        <Square className="w-4 h-4 text-slate-400" />
+                      )}
+                    </button>
+
                     {field.type === 'photo' ? (
                       <div className="w-6 h-6 rounded bg-pink-100 text-pink-600 flex items-center justify-center shrink-0">
                         <ImageIcon className="w-3.5 h-3.5" />
@@ -522,23 +559,24 @@ export const CanvaFieldSyncApp: React.FC = () => {
                         <Type className="w-3.5 h-3.5" />
                       </div>
                     )}
+
                     <div className="truncate">
-                      <p className="text-xs font-bold text-slate-800 truncate">
-                        {toHumanLabel(field.fieldId)}
-                      </p>
+                      <p className="text-xs font-bold text-slate-800 truncate">{field.label}</p>
                       <p className="text-[10px] text-slate-400 font-mono truncate">
-                        {field.fieldId} • {Math.round(field.left)}, {Math.round(field.top)}
+                        {field.fieldId} • {Math.round(field.left)}, {Math.round(field.top)} ({Math.round(field.width)}×
+                        {Math.round(field.height || field.width)})
                       </p>
                     </div>
                   </div>
+
                   <span
-                    className={`text-[10px] font-semibold px-1.5 py-0.5 rounded capitalize shrink-0 ${
+                    className={`text-[10px] font-semibold px-2 py-0.5 rounded capitalize shrink-0 ${
                       field.type === 'photo'
                         ? 'bg-pink-50 text-pink-700 border border-pink-200'
                         : 'bg-blue-50 text-blue-700 border border-blue-200'
                     }`}
                   >
-                    {field.type}
+                    {field.type === 'photo' ? 'Photo Slot' : 'Text Zone'}
                   </span>
                 </div>
               ))
@@ -563,8 +601,8 @@ export const CanvaFieldSyncApp: React.FC = () => {
             <div>
               <p className="font-bold">Successfully Synced to A1Print!</p>
               <p className="text-[11px] text-emerald-700">
-                Updated {lastSyncedStats?.photoCount} photo slots & {lastSyncedStats?.textCount} text fields at{' '}
-                {lastSyncedStats?.syncedAt}. Clean print artwork exported.
+                Created {lastSyncedStats?.photoCount} photo slots & {lastSyncedStats?.textCount} text zones at{' '}
+                {lastSyncedStats?.syncedAt}. Clean background exported.
               </p>
             </div>
           </div>
@@ -583,8 +621,8 @@ export const CanvaFieldSyncApp: React.FC = () => {
         {/* Primary Action Button */}
         <button
           onClick={handleSyncToA1Print}
-          disabled={isSyncing || detectedFields.length === 0}
-          className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 active:from-purple-800 active:to-indigo-800 text-white font-bold text-xs shadow-md shadow-purple-500/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:pointer-events-none"
+          disabled={isSyncing || selectedCount === 0}
+          className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 active:from-purple-800 active:to-indigo-800 text-white font-bold text-xs shadow-md shadow-purple-500/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
         >
           {isSyncing ? (
             <>
@@ -594,14 +632,14 @@ export const CanvaFieldSyncApp: React.FC = () => {
           ) : (
             <>
               <Send className="w-4 h-4" />
-              <span>Sync to A1Print ({detectedFields.length} fields)</span>
+              <span>Sync {selectedCount} Layers to A1Print</span>
             </>
           )}
         </button>
 
         {/* Footer info */}
         <p className="text-center text-[10px] text-slate-400 font-medium">
-          A1Print Studio • Canva Design Editing API v1
+          A1Print Studio • Universal Canva Layer Engine
         </p>
       </main>
     </div>
