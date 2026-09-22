@@ -308,7 +308,12 @@ export const CanvaFieldSyncApp: React.FC = () => {
         })),
       };
 
-      const res = await fetch('/api/canva?action=field-sync', {
+      const apiBase =
+        window.location.origin.includes('vercel.app') || window.location.origin.includes('localhost')
+          ? ''
+          : 'https://a1print-studio.vercel.app';
+
+      const res = await fetch(`${apiBase}/api/canva?action=field-sync`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
