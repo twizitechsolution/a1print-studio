@@ -1,5 +1,6 @@
 import {
   UniversalFrameTemplate,
+  ArtworkLayer,
   PhotoSlotConfig,
   TextZoneConfig,
   normalizeTemplateLayerDefaults,
@@ -7,11 +8,11 @@ import {
 import {
   loadImage,
   drawImageCover,
-  applyShapeClip,
   drawCalendarGrid,
   resolvePSDWebFontSpec,
   ensureWebFontsReady,
 } from '../utils/templateCompositor';
+import { getShapeById } from './shapeLibrary';
 
 /**
  * EXACT SINGLE SOURCE OF TRUTH FRAME COMPOSITOR
@@ -21,13 +22,18 @@ import {
  * 3. Customer-Facing Storefront Live Preview (UniversalFrameCustomizer)
  * 4. High-Res Checkout / Print Exporter (300 DPI)
  *
- * Fixed, non-negotiable draw order:
- * 1. Draw baseImageUrl (or cleanBaseImageUrl) scaled to targetWidth.
- * 2. Merge photoSlots and textZones into one array, sort by zIndex ascending (default 0), draw in that order.
- * 3. For each photo slot: build a clip path for shape at x/y/width/height (with rotation), draw the slot's photo
- *    inside that clip only — this replaces pixels in that region, it never composites on top of the original artwork.
- * 4. For each text zone: set fontFamily/fontSize/color/align (with rotation); if autoShrinkToFit and measured width
- *    exceeds maxWidth, reduce fontSize in a loop (or wrap lines) until it fits; draw at x/y.
+ * Core Principle:
+ * - Customer photos are ALWAYS plain rectangles at render time.
+ * - All visual shape, softness, shadow, and overlap come from the designer's artwork PNG(s),
+ *   which are interleaved with photo slots & text zones using real alpha transparency.
+ *
+ * Fixed draw order:
+ * 1. Build unified composite list: artworkLayers, photoSlots, and textZones.
+ * 2. Sort by zIndex ascending.
+ * 3. Walk sorted list and draw:
+ *    - Artwork layer: draw PNG at full canvas size preserving real alpha transparency.
+ *    - Photo slot: draw photo as plain filled rectangle (drawImageCover) — ZERO shape clipping.
+ *    - Text zone: draw text with font/size/color/align/autoShrinkToFit.
  */
 export async function renderFrameComposite(
   rawTemplate: UniversalFrameTemplate,
@@ -37,19 +43,27 @@ export async function renderFrameComposite(
 ): Promise<HTMLCanvasElement> {
   const template = normalizeTemplateLayerDefaults(rawTemplate);
 
-  // 1. Resolve Base Image Source & Canvas Dimensions
-  const baseSrc = template.cleanBaseImageUrl || template.baseImageUrl;
-  if (!baseSrc) {
-    throw new Error('Template baseImageUrl is missing.');
+  // 1. Resolve Primary Image Source & Canvas Dimensions
+  const primarySrc =
+    template.artworkLayers?.[0]?.imageUrl ||
+    template.cleanBaseImageUrl ||
+    template.baseImageUrl;
+
+  let naturalAspect = 0.8; // default 4:5 frame poster ratio
+  if (primarySrc) {
+    try {
+      const primaryImg = await loadImage(primarySrc);
+      if (primaryImg.naturalWidth && primaryImg.naturalHeight) {
+        naturalAspect = primaryImg.naturalWidth / primaryImg.naturalHeight;
+      }
+    } catch (e) {
+      console.warn('Could not measure aspect ratio from primary image, checking dimensions:', e);
+    }
   }
 
-  const baseImg = await loadImage(baseSrc);
-  const naturalAspect =
-    baseImg.naturalWidth && baseImg.naturalHeight
-      ? baseImg.naturalWidth / baseImg.naturalHeight
-      : template.documentDimensions?.width && template.documentDimensions?.height
-      ? template.documentDimensions.width / template.documentDimensions.height
-      : 0.8; // default 4:5 frame poster ratio
+  if (template.documentDimensions?.width && template.documentDimensions?.height) {
+    naturalAspect = template.documentDimensions.width / template.documentDimensions.height;
+  }
 
   const targetHeight = Math.round(targetWidth / naturalAspect);
 
@@ -60,27 +74,29 @@ export async function renderFrameComposite(
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Could not create 2D canvas context');
 
-  // Clear & Draw Base Image
+  // Clear & fill base canvas with solid white
   ctx.clearRect(0, 0, targetWidth, targetHeight);
   ctx.fillStyle = '#FFFFFF';
   ctx.fillRect(0, 0, targetWidth, targetHeight);
-  drawImageCover(ctx, baseImg, 0, 0, targetWidth, targetHeight);
 
   // Ensure fonts are loaded before computing measurements or rendering text
   await ensureWebFontsReady();
 
-  // 2. Merge Photo Slots and Text Zones into one unified layer array
+  // 2. Merge Artwork Layers, Photo Slots, and Text Zones into one unified layer array
   type CompositeItem =
+    | { kind: 'artwork'; data: ArtworkLayer }
     | { kind: 'slot'; data: PhotoSlotConfig }
     | { kind: 'zone'; data: TextZoneConfig };
 
   const mergedLayers: CompositeItem[] = [
+    ...(template.artworkLayers || []).map((art) => ({ kind: 'artwork' as const, data: art })),
     ...(template.photoSlots || []).map((s) => ({ kind: 'slot' as const, data: s })),
     ...(template.textZones || []).map((z) => ({ kind: 'zone' as const, data: z })),
   ];
 
-  // Sort by zIndex ascending (default 0).
-  // If pairedWithId matches, ensure shadow draws first so primary sits on top!
+  // Sort by zIndex ascending.
+  // When zIndex is identical, stable ordering: artwork first (0), slots next (1), zones top (2).
+  // If paired text zones (e.g. shadow + primary), shadow draws first.
   mergedLayers.sort((a, b) => {
     const zA = a.data.zIndex ?? 0;
     const zB = b.data.zIndex ?? 0;
@@ -90,12 +106,76 @@ export async function renderFrameComposite(
       if (a.data.pairedWithId === b.data.id) return -1;
       if (b.data.pairedWithId === a.data.id) return 1;
     }
-    return 0;
+
+    const kindPriority: Record<string, number> = { artwork: 0, slot: 1, zone: 2 };
+    return (kindPriority[a.kind] ?? 0) - (kindPriority[b.kind] ?? 0);
   });
 
   // 3. Draw layers sequentially according to zIndex
   for (const item of mergedLayers) {
-    if (item.kind === 'slot') {
+    if (item.kind === 'artwork') {
+      const art = item.data;
+      if (!art.imageUrl) continue;
+
+      try {
+        const artImg = await loadImage(art.imageUrl);
+        const naturalW = artImg.naturalWidth || targetWidth;
+        const naturalH = artImg.naturalHeight || targetHeight;
+        const imgAspect = naturalW / naturalH;
+
+        const isFullBleedBase =
+          art.x === undefined &&
+          art.y === undefined &&
+          art.width === undefined &&
+          art.height === undefined &&
+          art.scale === undefined &&
+          !art.rotation;
+
+        if (isFullBleedBase) {
+          // Draw full-canvas PNG preserving native alpha transparency
+          drawImageCover(ctx, artImg, 0, 0, targetWidth, targetHeight);
+        } else {
+          // Scaled and positioned overlay layer (e.g. logos, stickers, custom frame overlays)
+          const scaleFactor = (art.scale ?? 60) / 100;
+
+          let sw: number;
+          let sh: number;
+
+          if (art.width !== undefined && art.height !== undefined) {
+            sw = (art.width / 100) * targetWidth * scaleFactor;
+            sh = (art.height / 100) * targetHeight * scaleFactor;
+          } else if (art.width !== undefined) {
+            sw = (art.width / 100) * targetWidth * scaleFactor;
+            sh = sw / imgAspect;
+          } else if (art.height !== undefined) {
+            sh = (art.height / 100) * targetHeight * scaleFactor;
+            sw = sh * imgAspect;
+          } else {
+            // Default: preserve natural aspect ratio relative to canvas width
+            sw = targetWidth * 0.5 * scaleFactor;
+            sh = sw / imgAspect;
+          }
+
+          const cx = ((art.x ?? 50) / 100) * targetWidth;
+          const cy = ((art.y ?? 50) / 100) * targetHeight;
+          const rotation = art.rotation || 0;
+
+          ctx.save();
+          if (art.opacity !== undefined) {
+            ctx.globalAlpha = art.opacity;
+          }
+          if (rotation) {
+            ctx.translate(cx, cy);
+            ctx.rotate((rotation * Math.PI) / 180);
+            ctx.translate(-cx, -cy);
+          }
+          ctx.drawImage(artImg, cx - sw / 2, cy - sh / 2, sw, sh);
+          ctx.restore();
+        }
+      } catch (err) {
+        console.warn(`Failed to render artwork layer ${art.id}:`, err);
+      }
+    } else if (item.kind === 'slot') {
       const slot = item.data;
       const photoSrc = photoValues[slot.id] || slot.defaultPhotoUrl;
       if (!photoSrc) continue;
@@ -108,6 +188,8 @@ export async function renderFrameComposite(
         const sh = (slot.height / 100) * targetHeight;
         const rotation = slot.rotation || 0;
 
+        const shape = getShapeById(slot.shapeId);
+
         ctx.save();
         if (rotation) {
           ctx.translate(cx, cy);
@@ -115,12 +197,98 @@ export async function renderFrameComposite(
           ctx.translate(-cx, -cy);
         }
 
-        // Clip strictly inside designated aperture shape
-        applyShapeClip(ctx, slot.shape, cx, cy, sw, sh);
-        ctx.clip();
+        if (shape) {
+          // Vector Shape Masking with Uniform Aspect Ratio (always perfect circle, heart, etc.)
+          const shapeDim = Math.min(sw, sh);
+          const shapeLeft = cx - shapeDim / 2;
+          const shapeTop = cy - shapeDim / 2;
 
-        // Draw photo with object-fit: cover inside aperture bounds
-        drawImageCover(ctx, photoImg, cx - sw / 2, cy - sh / 2, sw, sh);
+          ctx.save();
+          ctx.translate(shapeLeft, shapeTop);
+          ctx.scale(shapeDim / 100, shapeDim / 100);
+          const path = new Path2D(shape.svgPath);
+          ctx.clip(path);
+          ctx.scale(100 / shapeDim, 100 / shapeDim);
+
+          // Calculate cover dimensions inside the shape bounding square
+          const imgW = photoImg.naturalWidth || shapeDim;
+          const imgH = photoImg.naturalHeight || shapeDim;
+          const coverScale = Math.max(shapeDim / imgW, shapeDim / imgH);
+          const zoom = Math.max(0.2, slot.photoScale ?? 1.0);
+          const drawW = imgW * coverScale * zoom;
+          const drawH = imgH * coverScale * zoom;
+
+          // Apply pan offsets (% of shape size)
+          const offsetX = ((slot.photoOffsetX ?? 0) / 100) * shapeDim;
+          const offsetY = ((slot.photoOffsetY ?? 0) / 100) * shapeDim;
+
+          // Draw photo centered in shape square + pan offset
+          ctx.drawImage(
+            photoImg,
+            shapeDim / 2 + offsetX - drawW / 2,
+            shapeDim / 2 + offsetY - drawH / 2,
+            drawW,
+            drawH
+          );
+          ctx.restore();
+
+          // Draw border around the shape contour if configured
+          if (slot.borderWidth && slot.borderWidth > 0) {
+            ctx.save();
+            ctx.translate(shapeLeft, shapeTop);
+            ctx.scale(shapeDim / 100, shapeDim / 100);
+            const borderPath = new Path2D(shape.svgPath);
+            ctx.strokeStyle = slot.borderColor || '#EF4444';
+            ctx.lineWidth = (slot.borderWidth * (targetWidth / 1200)) / (shapeDim / 100);
+            ctx.lineJoin = 'round';
+            ctx.lineCap = 'round';
+            ctx.stroke(borderPath);
+            ctx.restore();
+          }
+        } else {
+          // Plain Rectangle slot: check if custom framing pan/zoom is set
+          const hasFraming =
+            (slot.photoScale !== undefined && slot.photoScale !== 1) ||
+            Boolean(slot.photoOffsetX) ||
+            Boolean(slot.photoOffsetY);
+
+          if (hasFraming) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(cx - sw / 2, cy - sh / 2, sw, sh);
+            ctx.clip();
+
+            const imgW = photoImg.naturalWidth || sw;
+            const imgH = photoImg.naturalHeight || sh;
+            const coverScale = Math.max(sw / imgW, sh / imgH);
+            const zoom = Math.max(0.2, slot.photoScale ?? 1.0);
+            const drawW = imgW * coverScale * zoom;
+            const drawH = imgH * coverScale * zoom;
+            const offsetX = ((slot.photoOffsetX ?? 0) / 100) * sw;
+            const offsetY = ((slot.photoOffsetY ?? 0) / 100) * sh;
+
+            ctx.drawImage(
+              photoImg,
+              cx + offsetX - drawW / 2,
+              cy + offsetY - drawH / 2,
+              drawW,
+              drawH
+            );
+            ctx.restore();
+          } else {
+            // Draw photo as plain filled rectangle
+            drawImageCover(ctx, photoImg, cx - sw / 2, cy - sh / 2, sw, sh);
+          }
+
+          // Draw border around the rectangle slot if configured
+          if (slot.borderWidth && slot.borderWidth > 0) {
+            ctx.save();
+            ctx.strokeStyle = slot.borderColor || '#EF4444';
+            ctx.lineWidth = slot.borderWidth * (targetWidth / 1200);
+            ctx.strokeRect(cx - sw / 2, cy - sh / 2, sw, sh);
+            ctx.restore();
+          }
+        }
         ctx.restore();
       } catch (err) {
         console.warn(`Failed to render photo slot ${slot.id}:`, err);

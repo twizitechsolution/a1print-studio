@@ -1,4 +1,4 @@
-import { PhotoSlotConfig, TextZoneConfig } from './template';
+import { PhotoSlotConfig, TextZoneConfig, ArtworkLayer, UniversalFrameTemplate } from './template';
 
 export * from './admin';
 
@@ -68,6 +68,10 @@ export interface Product {
   frames: FrameOption[];
   photoSlots?: PhotoSlotConfig[];
   textZones?: TextZoneConfig[];
+  artworkLayers?: ArtworkLayer[];
+  cleanBaseImageUrl?: string;
+  frameTemplate?: UniversalFrameTemplate;
+  documentDimensions?: { width: number; height: number };
   linkedFrameTemplateId?: string; // References UniversalFrameTemplate.id
   stockQuantity?: number;
   stockLogs?: StockLogItem[];

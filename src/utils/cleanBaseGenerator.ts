@@ -246,7 +246,7 @@ export async function renderUnifiedTemplateComposite({
         const sh = (slot.height / 100) * targetHeight;
 
         ctx.save();
-        applyShapeClip(ctx, slot.shape, cx, cy, sw, sh);
+        applyShapeClip(ctx, slot.shape || 'rectangle', cx, cy, sw, sh);
         ctx.clip();
         drawImageCover(ctx, photoImg, cx - sw / 2, cy - sh / 2, sw, sh);
         ctx.restore();

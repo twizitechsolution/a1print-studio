@@ -1,6 +1,6 @@
 import { PhotoSlotConfig, TextZoneConfig, UniversalFrameTemplate } from '../../types/template';
 
-export type LayerType = 'slot' | 'zone';
+export type LayerType = 'slot' | 'zone' | 'artwork';
 
 export interface SelectedLayer {
   type: LayerType;

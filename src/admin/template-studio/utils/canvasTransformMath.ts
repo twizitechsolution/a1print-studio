@@ -1,4 +1,4 @@
-import { PhotoSlotConfig, TextZoneConfig } from '../../../types/template';
+import { PhotoSlotConfig, TextZoneConfig, ArtworkLayer } from '../../../types/template';
 import { ResizeHandle } from '../types';
 
 export interface BoundingBox {
@@ -13,6 +13,31 @@ export interface BoundingBox {
 }
 
 export const HANDLE_SIZE = 10; // in canvas pixels
+
+export function getArtworkBoundingBox(
+  art: ArtworkLayer,
+  canvasW: number,
+  canvasH: number
+): BoundingBox {
+  const scaleFactor = (art.scale ?? 60) / 100;
+  const w = ((art.width ?? 50) / 100) * canvasW * scaleFactor;
+  const h = ((art.height ?? 50) / 100) * canvasH * scaleFactor;
+  const cx = ((art.x ?? 50) / 100) * canvasW;
+  const cy = ((art.y ?? 50) / 100) * canvasH;
+  const l = cx - w / 2;
+  const t = cy - h / 2;
+
+  return {
+    left: l,
+    top: t,
+    width: w,
+    height: h,
+    right: l + w,
+    bottom: t + h,
+    centerX: cx,
+    centerY: cy,
+  };
+}
 
 export function getSlotBoundingBox(
   slot: PhotoSlotConfig,

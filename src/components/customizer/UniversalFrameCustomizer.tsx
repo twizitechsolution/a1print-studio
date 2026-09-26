@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { UniversalFrameTemplate } from '../../types/template';
+import { UniversalFrameTemplate, PhotoSlotConfig, TextZoneConfig } from '../../types/template';
 import { PhotoCropModal } from './PhotoCropModal';
 import { generateHighResPrintFile } from '../../utils/printExporter';
 import { Eye, ArrowRight, Image as ImageIcon, Sparkles, Loader2, X, ShieldCheck, Truck, CreditCard, RefreshCw, Star, Tag, Clock, Flame, Wand2 } from 'lucide-react';
@@ -422,6 +422,43 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
     [rawTextZones]
   );
 
+  // Unified ordered customization elements (Photo Slots + Text Zones) matching admin layer ordering
+  const orderedCustomizerElements = useMemo(() => {
+    const slotsMap = new Map<string, PhotoSlotConfig>(visiblePhotoSlots.map((s) => [s.id, s]));
+    const zonesMap = new Map<string, TextZoneConfig>(visibleTextZones.map((z) => [z.id, z]));
+
+    if (template.fieldOrder && template.fieldOrder.length > 0) {
+      const result: ({ kind: 'slot'; data: PhotoSlotConfig } | { kind: 'zone'; data: TextZoneConfig })[] = [];
+      const handled = new Set<string>();
+
+      template.fieldOrder.forEach((id) => {
+        if (slotsMap.has(id)) {
+          result.push({ kind: 'slot', data: slotsMap.get(id)! });
+          handled.add(id);
+        } else if (zonesMap.has(id)) {
+          result.push({ kind: 'zone', data: zonesMap.get(id)! });
+          handled.add(id);
+        }
+      });
+
+      // Append any remaining slots/zones not in fieldOrder
+      visiblePhotoSlots.forEach((s) => {
+        if (!handled.has(s.id)) result.push({ kind: 'slot', data: s });
+      });
+      visibleTextZones.forEach((z) => {
+        if (!handled.has(z.id)) result.push({ kind: 'zone', data: z });
+      });
+
+      return result;
+    }
+
+    // Default: photo slots first, then text zones
+    return [
+      ...visiblePhotoSlots.map((s) => ({ kind: 'slot' as const, data: s })),
+      ...visibleTextZones.map((z) => ({ kind: 'zone' as const, data: z })),
+    ];
+  }, [visiblePhotoSlots, visibleTextZones, template.fieldOrder]);
+
   // Handle Photo Select -> Opens Crop Modal
   const handleOpenCropModal = (slotId: string) => {
     const slot = rawPhotoSlots.find((s) => s.id === slotId);
@@ -626,25 +663,25 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
             {template.title}
           </h1>
 
-          {/* Price Range & Ratings Bar (LovecraftbySE Style) */}
+          {/* Dynamic Price & Ratings Bar */}
           <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
             <div className="flex items-baseline gap-2">
               <span className="font-extrabold text-xl sm:text-2xl text-[#F82BA9]">
-                Rs.699.00 – Rs.999.00
+                {String(selectedSize).toUpperCase().includes('A3') ? 'Rs.999.00' : 'Rs.699.00'}
+              </span>
+              <span className="text-xs sm:text-sm text-gray-400 line-through">
+                {String(selectedSize).toUpperCase().includes('A3') ? 'Rs.1,499.00' : 'Rs.999.00'}
+              </span>
+              <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                {String(selectedSize).toUpperCase().includes('A3') ? '33% OFF' : '30% OFF'}
               </span>
             </div>
 
             <div className="flex items-center gap-1.5 bg-pink-100/70 text-[#F82BA9] px-3 py-1 rounded-full text-xs font-extrabold border border-pink-200">
               <Star className="w-3.5 h-3.5 fill-[#F82BA9] text-[#F82BA9]" />
-              <span>4.3 3 Reviews</span>
+              <span>4.3 • 3 Reviews</span>
             </div>
           </div>
-        </div>
-
-        {/* Green Raksha Bandhan Offer Banner */}
-        <div className="p-3.5 bg-emerald-600 text-white rounded-2xl shadow-md text-xs sm:text-sm font-bold flex items-center gap-2">
-          <span className="text-base">🎁</span>
-          <span>🔥 Raksha Bandhan Discount, Order Today & Get 9% OFF on Prepaid Orders!! 🎁</span>
         </div>
 
         {/* Urgency & Trending Badges Row */}
@@ -673,259 +710,242 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
           </div>
         </div>
 
-        {/* Size Selection Cards (LovecraftbySE Style) */}
+        {/* Size Selection Cards: A4 by default, A3 optional */}
         <div className="space-y-2 pt-1">
           <label className="block text-xs font-extrabold text-gray-800">
             Size (Select frame size)
           </label>
           <div className="grid grid-cols-2 gap-3">
-            <div
-              onClick={() => setSelectedSize('A3')}
-              className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${
-                selectedSize === 'A3'
-                  ? 'border-[#F82BA9] bg-[#F82BA9]/5 ring-2 ring-[#F82BA9]'
-                  : 'border-gray-200 bg-white hover:border-gray-300'
-              }`}
-            >
-              <h4 className="font-extrabold text-sm text-[#160E4B]">A3 (12x18 Inch)</h4>
-              <div className="flex items-baseline gap-1.5 mt-1">
-                <span className="font-extrabold text-sm text-gray-900">Rs.999.00</span>
-                <span className="text-xs text-gray-400 line-through">Rs.1,499.00</span>
-              </div>
-            </div>
-
+            {/* A4 Size (Default) */}
             <div
               onClick={() => setSelectedSize('A4')}
               className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${
-                selectedSize === 'A4'
+                !String(selectedSize).toUpperCase().includes('A3')
                   ? 'border-[#F82BA9] bg-[#F82BA9]/5 ring-2 ring-[#F82BA9]'
                   : 'border-gray-200 bg-white hover:border-gray-300'
               }`}
             >
-              <h4 className="font-extrabold text-sm text-[#160E4B]">A4 (8x12 Inch)</h4>
+              <div className="flex items-center justify-between">
+                <h4 className="font-extrabold text-sm text-[#160E4B]">A4 (8x12 Inch)</h4>
+                <span className="text-[10px] font-bold px-1.5 py-0.5 bg-pink-100 text-[#F82BA9] rounded-md">Default</span>
+              </div>
               <div className="flex items-baseline gap-1.5 mt-1">
                 <span className="font-extrabold text-sm text-[#F82BA9]">Rs.699.00</span>
                 <span className="text-xs text-gray-400 line-through">Rs.999.00</span>
               </div>
             </div>
+
+            {/* A3 Size */}
+            <div
+              onClick={() => setSelectedSize('A3')}
+              className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${
+                String(selectedSize).toUpperCase().includes('A3')
+                  ? 'border-[#F82BA9] bg-[#F82BA9]/5 ring-2 ring-[#F82BA9]'
+                  : 'border-gray-200 bg-white hover:border-gray-300'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <h4 className="font-extrabold text-sm text-[#160E4B]">A3 (12x18 Inch)</h4>
+                <span className="text-[10px] font-bold px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded-md">Large</span>
+              </div>
+              <div className="flex items-baseline gap-1.5 mt-1">
+                <span className="font-extrabold text-sm text-gray-900">Rs.999.00</span>
+                <span className="text-xs text-gray-400 line-through">Rs.1,499.00</span>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Scrollable Customization Box (Contains Photo Uploads & Text Inputs cleanly!) */}
-        {(visiblePhotoSlots.length > 0 || visibleTextZones.length > 0) && (
-          <div className="p-4 sm:p-5 bg-purple-50/40 rounded-2xl border border-purple-100 max-h-[420px] overflow-y-auto space-y-5 scrollbar-thin">
+        {/* Scrollable Customization Box (Photo Uploads & Text Inputs in exact admin order) */}
+        {orderedCustomizerElements.length > 0 && (
+          <div className="p-4 sm:p-5 bg-purple-50/40 rounded-2xl border border-purple-100 max-h-[440px] overflow-y-auto space-y-4 scrollbar-thin">
             
-            {/* Dynamic Photo Slot Upload Buttons - Renders ONLY IF visiblePhotoSlots exist! */}
-            {visiblePhotoSlots.length > 0 && (
-              <div className="space-y-4">
-                <h4 className="font-extrabold text-xs text-[#160E4B] uppercase tracking-wider flex items-center gap-1.5">
-                  <ImageIcon className="w-4 h-4 text-[#F82BA9]" /> Photo Uploads
-                </h4>
-                
-                {/* Validation Error Alert Banner */}
-                {validationError && (
-                  <div className="p-3.5 bg-rose-50 border border-rose-300 rounded-2xl text-rose-800 text-xs font-bold flex items-center justify-between shadow-xs">
-                    <span>{validationError}</span>
-                    <button onClick={() => setValidationError(null)} className="text-rose-600 hover:text-rose-900 font-extrabold text-sm ml-2 cursor-pointer">✕</button>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {visiblePhotoSlots.map((slot) => {
-                    const vis = resolveVisibility(slot.visibility);
-                    const displayLabel = vis.userLabel || slot.label;
-                    const isEditable = vis.userEditable;
-                    const isRequired = slot.required || vis.required;
-                    const isMissing = missingSlotIds.has(slot.id);
-
-                    return (
-                      <div
-                        key={slot.id}
-                        className={`p-3 bg-white rounded-xl border ${
-                          isMissing ? 'border-rose-500 ring-2 ring-rose-500/20 bg-rose-50/20' : 'border-purple-100'
-                        } flex items-center justify-between gap-3 shadow-2xs transition-all`}
-                      >
-                        <div className="space-y-0.5">
-                          <span className="text-xs font-bold text-gray-900 block flex items-center gap-1">
-                            {displayLabel}
-                            {isRequired && <span className="text-rose-500 font-extrabold">*</span>}
-                          </span>
-                          <span className="text-[10px] text-gray-400">Shape: {slot.shape || 'rectangle'}</span>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          {(photoValues[slot.id] || slot.defaultPhotoUrl) && (
-                            <div className="w-10 h-10 rounded-lg border border-gray-300 overflow-hidden shrink-0">
-                              <img src={photoValues[slot.id] || slot.defaultPhotoUrl} alt={displayLabel} className="w-full h-full object-cover" />
-                            </div>
-                          )}
-
-                          {isEditable ? (
-                            <button
-                              type="button"
-                              onClick={() => handleOpenCropModal(slot.id)}
-                              className="px-2.5 py-1.5 bg-[#F82BA9] hover:bg-[#D61B90] text-white text-[11px] font-extrabold rounded-xl shadow-xs transition-colors flex items-center gap-1 cursor-pointer shrink-0"
-                            >
-                              <ImageIcon className="w-3 h-3" /> {(photoValues[slot.id] || slot.defaultPhotoUrl) ? 'Change' : 'Upload'}
-                            </button>
-                          ) : (
-                            <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded-lg">
-                              Fixed
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+            {/* Validation Error Alert Banner */}
+            {validationError && (
+              <div className="p-3.5 bg-rose-50 border border-rose-300 rounded-2xl text-rose-800 text-xs font-bold flex items-center justify-between shadow-xs">
+                <span>{validationError}</span>
+                <button onClick={() => setValidationError(null)} className="text-rose-600 hover:text-rose-900 font-extrabold text-sm ml-2 cursor-pointer">✕</button>
               </div>
             )}
 
-            {/* Dynamic Text Input Fields & Dropdown Date/Time Pickers */}
-            {visibleTextZones.length > 0 && (
-              <div className="space-y-4 pt-2 border-t border-purple-100">
-                <h4 className="font-extrabold text-xs text-[#160E4B] uppercase tracking-wider flex items-center gap-1.5">
-                  <Sparkles className="w-4 h-4 text-[#F82BA9]" /> Custom Text Details
-                </h4>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {visibleTextZones.map((zone) => {
-                    const vis = resolveVisibility(zone.visibility);
-                    const displayLabel = vis.userLabel || zone.label;
-                    const isEditable = vis.userEditable;
-                    const isRequired = zone.required || vis.required;
-                    const isMissing = missingZoneIds.has(zone.id);
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {orderedCustomizerElements.map((item) => {
+                if (item.kind === 'slot') {
+                  const slot = item.data;
+                  const vis = resolveVisibility(slot.visibility);
+                  const displayLabel = vis.userLabel || slot.label;
+                  const isEditable = vis.userEditable;
+                  const isRequired = slot.required || vis.required;
+                  const isMissing = missingSlotIds.has(slot.id);
 
-                    const labelLower = (zone.label || '').toLowerCase();
-                    const idLower = (zone.id || '').toLowerCase();
-                    
-                    const isArabicDate = labelLower.includes('arabic') || labelLower.includes('islamic') || idLower.includes('arabic') || idLower.includes('islamic');
-                    const isDateField = !isArabicDate && (zone.isCalendar || zone.type === 'calendar' || zone.type === 'date' || labelLower.includes('date') || labelLower.includes('dob') || idLower.includes('date'));
-                    const isTimeField = zone.type === 'time' || labelLower.includes('time') || idLower.includes('time');
-                    const isMessageField = zone.type === 'message' || zone.isAIMessage === true;
-                    const isSelectField = zone.type === 'select' || (Array.isArray(zone.selectOptions) && zone.selectOptions.length > 0);
+                  return (
+                    <div
+                      key={slot.id}
+                      className={`p-3 bg-white rounded-xl border ${
+                        isMissing ? 'border-rose-500 ring-2 ring-rose-500/20 bg-rose-50/20' : 'border-purple-100'
+                      } flex items-center justify-between gap-3 shadow-2xs transition-all sm:col-span-1`}
+                    >
+                      <div className="space-y-0.5 min-w-0 pr-2">
+                        <span className="text-xs font-bold text-gray-900 block truncate">
+                          {displayLabel}
+                          {isRequired && <span className="text-rose-500 font-extrabold ml-0.5">*</span>}
+                        </span>
+                      </div>
 
-                    const handleTextChange = (val: string) => {
-                      if (!isEditable) return;
-                      setTextValue(zone.id, val);
-                      if (missingZoneIds.has(zone.id)) {
-                        setMissingZoneIds((prev) => {
-                          const next = new Set(prev);
-                          next.delete(zone.id);
-                          return next;
-                        });
-                      }
-                    };
-
-                    if (isSelectField) {
-                      return (
-                        <div key={zone.id} className="space-y-1 sm:col-span-1">
-                          <label className="text-xs font-bold text-gray-800 block">
-                            {displayLabel} {isRequired && <span className="text-rose-500 font-extrabold">*</span>} :
-                          </label>
-                          <select
-                            disabled={!isEditable}
-                            value={textValues[zone.id] !== undefined ? textValues[zone.id] : (zone.defaultValue || zone.selectOptions?.[0] || '')}
-                            onChange={(e) => handleTextChange(e.target.value)}
-                            className={`w-full px-3 py-2 text-xs bg-white border ${
-                              isMissing ? 'border-rose-500 ring-2 ring-rose-500/20' : 'border-gray-300'
-                            } rounded-xl focus:outline-hidden focus:border-[#F82BA9] font-medium disabled:bg-slate-100 cursor-pointer`}
+                      <div className="flex items-center gap-2 shrink-0">
+                        {isEditable ? (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenCropModal(slot.id)}
+                            className="px-3 py-1.5 bg-[#F82BA9] hover:bg-[#D61B90] text-white text-[11px] font-extrabold rounded-xl shadow-xs transition-colors flex items-center gap-1 cursor-pointer shrink-0"
                           >
-                            {(zone.selectOptions || []).map((opt) => (
-                              <option key={opt} value={opt}>
-                                {opt}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      );
-                    }
+                            <ImageIcon className="w-3.5 h-3.5" /> {(photoValues[slot.id] || slot.defaultPhotoUrl) ? 'Change' : 'Upload'}
+                          </button>
+                        ) : (
+                          <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded-lg">
+                            Fixed
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                }
 
-                    if (isDateField) {
-                      return (
-                        <div key={zone.id} className={`${!isEditable ? 'pointer-events-none opacity-80' : ''} ${isMissing ? 'p-1 rounded-xl bg-rose-50 border border-rose-400' : ''}`}>
-                          <DatePickerControl
-                            label={`${displayLabel}${isRequired ? ' *' : ''}`}
-                            value={textValues[zone.id] !== undefined ? textValues[zone.id] : (zone.defaultValue || '')}
-                            onChange={handleTextChange}
-                          />
-                        </div>
-                      );
-                    }
+                // item.kind === 'zone'
+                const zone = item.data;
+                const vis = resolveVisibility(zone.visibility);
+                const displayLabel = vis.userLabel || zone.label;
+                const isEditable = vis.userEditable;
+                const isRequired = zone.required || vis.required;
+                const isMissing = missingZoneIds.has(zone.id);
 
-                    if (isTimeField) {
-                      return (
-                        <div key={zone.id} className={`${!isEditable ? 'pointer-events-none opacity-80' : ''} ${isMissing ? 'p-1 rounded-xl bg-rose-50 border border-rose-400' : ''}`}>
-                          <TimePickerControl
-                            label={`${displayLabel}${isRequired ? ' *' : ''}`}
-                            value={textValues[zone.id] !== undefined ? textValues[zone.id] : (zone.defaultValue || '')}
-                            onChange={handleTextChange}
-                          />
-                        </div>
-                      );
-                    }
+                const labelLower = (zone.label || '').toLowerCase();
+                const idLower = (zone.id || '').toLowerCase();
+                
+                const isArabicDate = labelLower.includes('arabic') || labelLower.includes('islamic') || idLower.includes('arabic') || idLower.includes('islamic');
+                const isDateField = !isArabicDate && (zone.isCalendar || zone.type === 'calendar' || zone.type === 'date' || labelLower.includes('date') || labelLower.includes('dob') || idLower.includes('date'));
+                const isTimeField = zone.type === 'time' || labelLower.includes('time') || idLower.includes('time');
+                const isMessageField = zone.type === 'message' || zone.isAIMessage === true;
+                const isSelectField = zone.type === 'select' || (Array.isArray(zone.selectOptions) && zone.selectOptions.length > 0);
 
-                    if (isMessageField) {
-                      const hasBeenGenerated = generatedZones[zone.id];
-                      return (
-                        <div key={zone.id} className="space-y-1.5 sm:col-span-2">
-                          <div className="flex items-center justify-between">
-                            <label className="text-xs font-bold text-gray-800">
-                              {displayLabel} {isRequired && <span className="text-rose-500 font-extrabold">*</span>} :
-                            </label>
-                            {isEditable && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const newMsg = getRandomBirthdayMessage(textValues[zone.id] || zone.defaultValue);
-                                  handleTextChange(newMsg);
-                                  setGeneratedZones((prev) => ({ ...prev, [zone.id]: true }));
-                                }}
-                                className="text-[11px] font-extrabold text-[#F82BA9] hover:text-pink-700 bg-pink-50 hover:bg-pink-100 px-3 py-1 rounded-xl border border-pink-200 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                                title="Click to generate or regenerate custom message"
-                              >
-                                {hasBeenGenerated ? '🔄 Regenerate' : '✨ Generate'}
-                              </button>
-                            )}
-                          </div>
-                          <textarea
-                            rows={2}
-                            disabled={!isEditable}
-                            value={textValues[zone.id] || ''}
-                            onChange={(e) => handleTextChange(e.target.value)}
-                            className={`w-full px-3 py-2 text-xs bg-white border ${
-                              isMissing ? 'border-rose-500 ring-2 ring-rose-500/20' : 'border-gray-300'
-                            } rounded-xl focus:outline-hidden focus:border-[#F82BA9] font-medium disabled:bg-slate-100`}
-                            placeholder={isEditable ? (zone.defaultValue ? `e.g. ${zone.defaultValue}` : `Type ${displayLabel}...`) : zone.defaultValue}
-                          />
-                        </div>
-                      );
-                    }
+                const handleTextChange = (val: string) => {
+                  if (!isEditable) return;
+                  setTextValue(zone.id, val);
+                  if (missingZoneIds.has(zone.id)) {
+                    setMissingZoneIds((prev) => {
+                      const next = new Set(prev);
+                      next.delete(zone.id);
+                      return next;
+                    });
+                  }
+                };
 
-                    const samplePlaceholder = zone.defaultValue ? `e.g. ${zone.defaultValue}` : `Enter ${displayLabel}...`;
+                if (isSelectField) {
+                  return (
+                    <div key={zone.id} className="space-y-1 sm:col-span-1">
+                      <label className="text-xs font-bold text-gray-800 block">
+                        {displayLabel} {isRequired && <span className="text-rose-500 font-extrabold">*</span>} :
+                      </label>
+                      <select
+                        disabled={!isEditable}
+                        value={textValues[zone.id] !== undefined ? textValues[zone.id] : (zone.defaultValue || zone.selectOptions?.[0] || '')}
+                        onChange={(e) => handleTextChange(e.target.value)}
+                        className={`w-full px-3 py-2 text-xs bg-white border ${
+                          isMissing ? 'border-rose-500 ring-2 ring-rose-500/20' : 'border-gray-300'
+                        } rounded-xl focus:outline-hidden focus:border-[#F82BA9] font-medium disabled:bg-slate-100 cursor-pointer`}
+                      >
+                        {(zone.selectOptions || []).map((opt: string) => (
+                          <option key={opt} value={opt}>
+                            {opt}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  );
+                }
 
-                    return (
-                      <div key={zone.id} className="space-y-1 sm:col-span-1">
-                        <label className="text-xs font-bold text-gray-800 block">
+                if (isDateField) {
+                  return (
+                    <div key={zone.id} className={`sm:col-span-2 ${!isEditable ? 'pointer-events-none opacity-80' : ''} ${isMissing ? 'p-1 rounded-xl bg-rose-50 border border-rose-400' : ''}`}>
+                      <DatePickerControl
+                        label={`${displayLabel}${isRequired ? ' *' : ''}`}
+                        value={textValues[zone.id] !== undefined ? textValues[zone.id] : (zone.defaultValue || '')}
+                        onChange={handleTextChange}
+                      />
+                    </div>
+                  );
+                }
+
+                if (isTimeField) {
+                  return (
+                    <div key={zone.id} className={`sm:col-span-2 ${!isEditable ? 'pointer-events-none opacity-80' : ''} ${isMissing ? 'p-1 rounded-xl bg-rose-50 border border-rose-400' : ''}`}>
+                      <TimePickerControl
+                        label={`${displayLabel}${isRequired ? ' *' : ''}`}
+                        value={textValues[zone.id] !== undefined ? textValues[zone.id] : (zone.defaultValue || '')}
+                        onChange={handleTextChange}
+                      />
+                    </div>
+                  );
+                }
+
+                if (isMessageField) {
+                  const hasBeenGenerated = generatedZones[zone.id];
+                  return (
+                    <div key={zone.id} className="space-y-1.5 sm:col-span-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-gray-800">
                           {displayLabel} {isRequired && <span className="text-rose-500 font-extrabold">*</span>} :
                         </label>
-                        <input
-                          type="text"
-                          disabled={!isEditable}
-                          value={textValues[zone.id] || ''}
-                          onChange={(e) => handleTextChange(e.target.value)}
-                          className={`w-full px-3 py-2 text-xs bg-white border ${
-                            isMissing ? 'border-rose-500 ring-2 ring-rose-500/20' : 'border-gray-300'
-                          } rounded-xl focus:outline-hidden focus:border-[#F82BA9] font-medium disabled:bg-slate-100`}
-                          placeholder={isEditable ? samplePlaceholder : zone.defaultValue}
-                        />
+                        {isEditable && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newMsg = getRandomBirthdayMessage(textValues[zone.id] || zone.defaultValue);
+                              handleTextChange(newMsg);
+                              setGeneratedZones((prev) => ({ ...prev, [zone.id]: true }));
+                            }}
+                            className="text-[11px] font-extrabold text-[#F82BA9] hover:text-pink-700 bg-pink-50 hover:bg-pink-100 px-3 py-1 rounded-xl border border-pink-200 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                            title="Click to generate or regenerate custom message"
+                          >
+                            {hasBeenGenerated ? '🔄 Regenerate' : '✨ Generate'}
+                          </button>
+                        )}
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+                      <textarea
+                        rows={2}
+                        disabled={!isEditable}
+                        value={textValues[zone.id] || ''}
+                        onChange={(e) => handleTextChange(e.target.value)}
+                        className={`w-full px-3 py-2 text-xs bg-white border ${
+                          isMissing ? 'border-rose-500 ring-2 ring-rose-500/20' : 'border-gray-300'
+                        } rounded-xl focus:outline-hidden focus:border-[#F82BA9] font-medium disabled:bg-slate-100`}
+                        placeholder={isEditable ? (zone.defaultValue ? `e.g. ${zone.defaultValue}` : `Type ${displayLabel}...`) : zone.defaultValue}
+                      />
+                    </div>
+                  );
+                }
 
+                const samplePlaceholder = zone.defaultValue ? `e.g. ${zone.defaultValue}` : `Enter ${displayLabel}...`;
+
+                return (
+                  <div key={zone.id} className="space-y-1 sm:col-span-1">
+                    <label className="text-xs font-bold text-gray-800 block">
+                      {displayLabel} {isRequired && <span className="text-rose-500 font-extrabold">*</span>} :
+                    </label>
+                    <input
+                      type="text"
+                      disabled={!isEditable}
+                      value={textValues[zone.id] || ''}
+                      onChange={(e) => handleTextChange(e.target.value)}
+                      className={`w-full px-3 py-2 text-xs bg-white border ${
+                        isMissing ? 'border-rose-500 ring-2 ring-rose-500/20' : 'border-gray-300'
+                      } rounded-xl focus:outline-hidden focus:border-[#F82BA9] font-medium disabled:bg-slate-100`}
+                      placeholder={isEditable ? samplePlaceholder : zone.defaultValue}
+                    />
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
 
@@ -1012,6 +1032,9 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
         imageSrc={tempUploadedImage}
         aspectRatio={activeSlotForCrop?.width && activeSlotForCrop?.height ? activeSlotForCrop.width / activeSlotForCrop.height : 1}
         shape={activeSlotForCrop?.shape || 'rectangle'}
+        shapeId={activeSlotForCrop?.shapeId}
+        borderWidth={activeSlotForCrop?.borderWidth}
+        borderColor={activeSlotForCrop?.borderColor}
         onCropAndSubmit={handleCropAndSubmit}
         onCancel={() => {
           setCropModalOpen(false);

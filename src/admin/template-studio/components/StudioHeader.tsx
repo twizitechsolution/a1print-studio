@@ -62,9 +62,38 @@ export const StudioHeader: React.FC<StudioHeaderProps> = ({
 
     setIsUploadingBase(true);
     try {
+      // 1. Measure natural dimensions from the image
+      const img = new Image();
+      const objectUrl = URL.createObjectURL(file);
+      await new Promise((resolve, reject) => {
+        img.onload = () => resolve(true);
+        img.onerror = () => reject(new Error('Failed to load image file'));
+        img.src = objectUrl;
+      });
+      const naturalWidth = img.naturalWidth || 1200;
+      const naturalHeight = img.naturalHeight || 1600;
+      URL.revokeObjectURL(objectUrl);
+
       // Direct Cloudinary upload
       const uploadedUrl = await uploadCategoryImage(template.category || 'templates', file, `base-${Date.now()}`);
-      onUpdateTemplateMeta({ baseImageUrl: uploadedUrl });
+
+      const existingLayers = template.artworkLayers && template.artworkLayers.length > 0
+        ? template.artworkLayers
+        : [{ id: 'art-1', imageUrl: uploadedUrl, zIndex: 0, label: 'Base Artwork' }];
+
+      const updatedLayers = existingLayers.map((art, idx) =>
+        idx === 0 ? { ...art, imageUrl: uploadedUrl, label: 'Base Artwork' } : art
+      );
+
+      onUpdateTemplateMeta({
+        baseImageUrl: uploadedUrl,
+        cleanBaseImageUrl: uploadedUrl,
+        artworkLayers: updatedLayers,
+        documentDimensions: {
+          width: naturalWidth,
+          height: naturalHeight,
+        },
+      });
     } catch (err) {
       console.warn('Base poster upload error, fallback to data url:', err);
       const reader = new FileReader();
@@ -245,13 +274,14 @@ export const StudioHeader: React.FC<StudioHeaderProps> = ({
           onClick={() => fileInputRef.current?.click()}
           disabled={isUploadingBase}
           className="px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50"
+          title="Replace Base Artwork (Replaces Z:0 layer & auto-resizes canvas)"
         >
           {isUploadingBase ? (
             <Loader2 className="w-4 h-4 animate-spin text-pink-500" />
           ) : (
-            <Upload className="w-4 h-4 text-pink-400" />
+            <Upload className="w-4 h-4 text-blue-400" />
           )}
-          <span>{isUploadingBase ? 'Uploading Poster...' : 'Upload Base Artwork'}</span>
+          <span>{isUploadingBase ? 'Uploading Artwork...' : 'Replace Base Artwork'}</span>
         </button>
 
         {onTestCustomizer && (

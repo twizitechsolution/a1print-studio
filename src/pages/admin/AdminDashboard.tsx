@@ -152,6 +152,33 @@ const AdminDashboardInner: React.FC<AdminDashboardProps> = ({ orders: initialOrd
     return <AdminLogin onLoginSuccess={handleLoginSuccess} />;
   }
 
+  const openProductInStudio = (product?: Product) => {
+    if (product && product.id) {
+      setStudioInitialTemplate({
+        id: product.linkedFrameTemplateId || `tmpl-${product.id}`,
+        productId: product.id,
+        title: product.title,
+        category: product.category || 'all',
+        basePrice: product.sizes?.[0]?.price || 699,
+        originalPrice: product.sizes?.[0]?.originalPrice || 999,
+        baseImageUrl: product.baseImageUrl || product.thumbnail || product.images?.[0] || '',
+        cleanBaseImageUrl: (product as any).cleanBaseImageUrl || '',
+        artworkLayers: product.artworkLayers || (product as any).frameTemplate?.artworkLayers || undefined,
+        documentDimensions: product.documentDimensions || (product as any).frameTemplate?.documentDimensions || undefined,
+        photoSlots: product.photoSlots || [],
+        textZones: product.textZones || [],
+        canvaDesignId: (product as any).canvaDesignId || undefined,
+        canvaLastSyncedAt: (product as any).canvaLastSyncedAt || undefined,
+        status: 'published',
+        createdAt: product.createdAt || new Date().toISOString(),
+      });
+    } else {
+      setStudioInitialTemplate(undefined);
+    }
+    setStudioEditorMode('visual');
+    setActiveTab('template_studio');
+  };
+
   if (editingTemplateProduct) {
     return (
       <AdminTemplateEditor
@@ -464,159 +491,31 @@ const AdminDashboardInner: React.FC<AdminDashboardProps> = ({ orders: initialOrd
             <>
               {activeTab === 'catalog' && (
                 <AdminCatalogManager
-                  onEditTemplate={(product) => {
-                    if (product && product.id) {
-                      setStudioInitialTemplate({
-                        id: product.linkedFrameTemplateId || `tmpl-${product.id}`,
-                        productId: product.id,
-                        title: product.title,
-                        category: product.category || 'all',
-                        basePrice: product.sizes?.[0]?.price || 699,
-                        originalPrice: product.sizes?.[0]?.originalPrice || 999,
-                        baseImageUrl: product.baseImageUrl || product.thumbnail || product.images?.[0] || '',
-                        cleanBaseImageUrl: (product as any).cleanBaseImageUrl || '',
-                        photoSlots: product.photoSlots || [],
-                        textZones: product.textZones || [],
-                        status: 'published',
-                        createdAt: product.createdAt || new Date().toISOString(),
-                      });
-                    } else {
-                      setStudioInitialTemplate(undefined);
-                    }
-                    setStudioEditorMode('visual');
-                    setActiveTab('template_studio');
-                  }}
-                  onOpenTemplateEditor={(product) => {
-                    if (product && product.id) {
-                      setStudioInitialTemplate({
-                        id: product.linkedFrameTemplateId || `tmpl-${product.id}`,
-                        productId: product.id,
-                        title: product.title,
-                        category: product.category || 'all',
-                        basePrice: product.sizes?.[0]?.price || 699,
-                        originalPrice: product.sizes?.[0]?.originalPrice || 999,
-                        baseImageUrl: product.baseImageUrl || product.thumbnail || product.images?.[0] || '',
-                        cleanBaseImageUrl: (product as any).cleanBaseImageUrl || '',
-                        photoSlots: product.photoSlots || [],
-                        textZones: product.textZones || [],
-                        status: 'published',
-                        createdAt: product.createdAt || new Date().toISOString(),
-                      });
-                    } else {
-                      setStudioInitialTemplate(undefined);
-                    }
-                    setStudioEditorMode('visual');
-                    setActiveTab('template_studio');
-                  }}
-                  onOpenVisualEditor={(product) => {
-                    if (product && product.id) {
-                      setStudioInitialTemplate({
-                        id: product.linkedFrameTemplateId || `tmpl-${product.id}`,
-                        productId: product.id,
-                        title: product.title,
-                        category: product.category || 'all',
-                        basePrice: product.sizes?.[0]?.price || 699,
-                        originalPrice: product.sizes?.[0]?.originalPrice || 999,
-                        baseImageUrl: product.baseImageUrl || product.thumbnail || product.images?.[0] || '',
-                        cleanBaseImageUrl: (product as any).cleanBaseImageUrl || '',
-                        photoSlots: product.photoSlots || [],
-                        textZones: product.textZones || [],
-                        status: 'published',
-                        createdAt: product.createdAt || new Date().toISOString(),
-                      });
-                    } else {
-                      setStudioInitialTemplate(undefined);
-                    }
-                    setStudioEditorMode('visual');
-                    setActiveTab('template_studio');
-                  }}
+                  onEditTemplate={(product) => openProductInStudio(product)}
+                  onOpenTemplateEditor={(product) => openProductInStudio(product)}
+                  onOpenVisualEditor={(product) => openProductInStudio(product)}
                   onEditProductFullPage={(product) => setEditingProductFullPage({ active: true, product })}
-                  onOpenTemplateStudio={(product) => {
-                    if (product && product.id) {
-                      setStudioInitialTemplate({
-                        id: product.linkedFrameTemplateId || `tmpl-${product.id}`,
-                        productId: product.id,
-                        title: product.title,
-                        category: product.category || 'all',
-                        basePrice: product.sizes?.[0]?.price || 699,
-                        originalPrice: product.sizes?.[0]?.originalPrice || 999,
-                        baseImageUrl: product.baseImageUrl || product.thumbnail || product.images?.[0] || '',
-                        cleanBaseImageUrl: (product as any).cleanBaseImageUrl || '',
-                        photoSlots: product.photoSlots || [],
-                        textZones: product.textZones || [],
-                        status: 'published',
-                        createdAt: product.createdAt || new Date().toISOString(),
-                      });
-                    } else {
-                      setStudioInitialTemplate(undefined);
-                    }
-                    setStudioEditorMode('visual');
-                    setActiveTab('template_studio');
-                  }}
+                  onOpenTemplateStudio={(product) => openProductInStudio(product)}
                 />
               )}
             </>
           )}
 
-          {/* Module: Smart Layer Template Studio */}
+          {/* Module: Smart Layer Template Studio (Visual Template Editor v2) */}
           {activeTab === 'template_studio' && (
-            <div className="space-y-3">
-              {/* Engine Switcher (Feature Flag rollout) */}
-              <div className="flex items-center justify-between bg-slate-900/80 p-2.5 rounded-xl border border-slate-800 text-xs shadow-xs">
-                <div className="flex items-center gap-2.5">
-                  <span className="font-bold text-slate-300">Editor Engine:</span>
-                  <div className="flex rounded-lg bg-slate-950 p-0.5 border border-slate-800">
-                    <button
-                      onClick={() => setStudioEditorMode('visual')}
-                      className={`px-3 py-1 rounded-md font-semibold transition-all ${
-                        studioEditorMode === 'visual'
-                          ? 'bg-cyan-600 text-white shadow-xs'
-                          : 'text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      Visual Template Editor (v2)
-                    </button>
-                    <button
-                      onClick={() => setStudioEditorMode('legacy')}
-                      className={`px-3 py-1 rounded-md font-semibold transition-all ${
-                        studioEditorMode === 'legacy'
-                          ? 'bg-slate-700 text-white shadow-xs'
-                          : 'text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      Legacy Studio (v1)
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-2xl overflow-hidden border dark:border-zinc-800 border-slate-200 shadow-xl">
-                {studioEditorMode === 'visual' ? (
-                  <VisualTemplateEditor
-                    initialTemplate={studioInitialTemplate}
-                    onExit={() => {
-                      setStudioInitialTemplate(undefined);
-                      setActiveTab('catalog');
-                    }}
-                    onSaveSuccess={() => {
-                      setStudioInitialTemplate(undefined);
-                      setActiveTab('catalog');
-                    }}
-                  />
-                ) : (
-                  <TemplateStudio
-                    initialTemplate={studioInitialTemplate}
-                    onExit={() => {
-                      setStudioInitialTemplate(undefined);
-                      setActiveTab('catalog');
-                    }}
-                    onSaveSuccess={() => {
-                      setStudioInitialTemplate(undefined);
-                      setActiveTab('catalog');
-                    }}
-                  />
-                )}
-              </div>
+            <div className="rounded-2xl overflow-hidden border dark:border-zinc-800 border-slate-200 shadow-xl">
+              <VisualTemplateEditor
+                initialTemplate={studioInitialTemplate}
+                onExit={() => {
+                  setStudioInitialTemplate(undefined);
+                  setActiveTab('catalog');
+                }}
+                onSaveSuccess={(savedTemplate) => {
+                  if (savedTemplate) {
+                    setStudioInitialTemplate(savedTemplate);
+                  }
+                }}
+              />
             </div>
           )}
 
@@ -632,7 +531,10 @@ const AdminDashboardInner: React.FC<AdminDashboardProps> = ({ orders: initialOrd
               onUpdatePaymentStatus={updatePaymentStatus}
               onUpdateAdminRemark={updateOrderAdminRemark}
               onRecordOrderAction={recordOrderAction}
-              currentAdminUser={currentAdminUser}
+              currentAdminUser={{
+                name: currentAdminUser.name,
+                roleName: (currentAdminUser as any).roleName || currentAdminUser.role || 'Super Admin',
+              }}
             />
           )}
 

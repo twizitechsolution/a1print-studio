@@ -2,7 +2,7 @@ import React, { useRef } from 'react';
 import { PhotoSlotConfig, TextZoneConfig, FrameCutoutShape } from '../../../types/template';
 import { SelectedLayer } from '../types';
 import { StudioVisibilityInspector } from './StudioVisibilityInspector';
-import { Sliders, Shapes, Type, Palette, AlignLeft, AlignCenter, AlignRight, Image as ImageIcon, Upload } from 'lucide-react';
+import { Sliders, Type, Palette, AlignLeft, AlignCenter, AlignRight, Image as ImageIcon, Upload } from 'lucide-react';
 import { uploadCategoryImage } from '../../../config/firebase';
 
 interface StudioPropertiesPanelProps {
@@ -12,22 +12,6 @@ interface StudioPropertiesPanelProps {
   onUpdateSlot: (slot: PhotoSlotConfig) => void;
   onUpdateZone: (zone: TextZoneConfig) => void;
 }
-
-const SHAPES: { value: FrameCutoutShape; label: string; icon: string }[] = [
-  { value: 'circle', label: 'Circle', icon: '⭕' },
-  { value: 'rounded', label: 'Rounded', icon: '🔲' },
-  { value: 'rectangle', label: 'Rectangle', icon: '▭' },
-  { value: 'square', label: 'Square', icon: '⏹' },
-  { value: 'oval', label: 'Oval', icon: '⬭' },
-  { value: 'heart', label: 'Heart', icon: '❤️' },
-  { value: 'arch', label: 'Arch Window', icon: '🚪' },
-  { value: 'star', label: 'Star', icon: '⭐' },
-  { value: 'shield', label: 'Shield', icon: '🛡️' },
-  { value: 'diamond', label: 'Diamond', icon: '🔷' },
-  { value: 'hexagon', label: 'Hexagon', icon: '⬡' },
-  { value: 'cloud', label: 'Cloud', icon: '☁️' },
-  { value: 'polaroid', label: 'Polaroid', icon: '📷' },
-];
 
 const FONTS = [
   'Playfair Display',
@@ -103,26 +87,34 @@ export const StudioPropertiesPanel: React.FC<StudioPropertiesPanelProps> = ({
           />
         </div>
 
-        {/* Shape Mask Selector */}
-        <div className="space-y-1.5">
-          <label className="font-bold text-slate-300 flex items-center gap-1.5">
-            <Shapes className="w-3.5 h-3.5 text-pink-400" /> Cutout Shape Mask:
-          </label>
-          <div className="grid grid-cols-3 gap-1.5">
-            {SHAPES.map((s) => (
-              <button
-                key={s.value}
-                onClick={() => onUpdateSlot({ ...slot, shape: s.value })}
-                className={`p-2 rounded-xl border text-[11px] font-bold flex flex-col items-center justify-center gap-1 cursor-pointer transition-all ${
-                  slot.shape === s.value
-                    ? 'bg-pink-600/30 border-pink-500 text-white'
-                    : 'bg-slate-950 border-slate-800 hover:border-slate-700 text-slate-300'
-                }`}
-              >
-                <span className="text-base">{s.icon}</span>
-                <span className="truncate w-full text-center">{s.label}</span>
-              </button>
-            ))}
+        {/* Layer Stacking Order & Rotation */}
+        <div className="grid grid-cols-2 gap-2 bg-slate-950/60 p-3 rounded-2xl border border-slate-800">
+          <div>
+            <label className="text-[10px] text-slate-400 font-bold block mb-1">Stack Order (Z-Index)</label>
+            <input
+              type="number"
+              value={slot.zIndex ?? 1}
+              min={0}
+              max={100}
+              step={1}
+              onChange={(e) => onUpdateSlot({ ...slot, zIndex: Number(e.target.value) })}
+              className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-white font-mono text-xs"
+            />
+          </div>
+          <div>
+            <label className="text-[10px] text-slate-400 font-bold block mb-1">Rotation ({slot.rotation ?? 0}°)</label>
+            <input
+              type="number"
+              value={slot.rotation ?? 0}
+              min={0}
+              max={360}
+              step={1}
+              onChange={(e) => onUpdateSlot({ ...slot, rotation: Number(e.target.value) })}
+              className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-white font-mono text-xs"
+            />
+          </div>
+          <div className="col-span-2 text-[10px] text-slate-500 pt-1 border-t border-slate-800/60">
+            Photos render as plain rectangles. Cutout shape & feathered shadow are governed by the transparent artwork layer PNG above.
           </div>
         </div>
 

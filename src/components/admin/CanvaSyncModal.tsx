@@ -375,6 +375,7 @@ export const CanvaSyncModal: React.FC<CanvaSyncModalProps> = ({
                   <span>Reopen Canva Editor Tab</span>
                   <ExternalLink className="w-3 h-3" />
                 </button>
+              )}
               <div className="bg-purple-950/40 border border-purple-800/40 rounded-xl p-3 text-left text-xs space-y-1">
                 <span className="font-bold text-purple-300 flex items-center gap-1.5 text-[11px]">
                   <Sparkles className="w-3.5 h-3.5 text-purple-400" />

@@ -113,14 +113,24 @@ export const App: React.FC = () => {
   ) => {
     try {
       const prod = activeProduct;
-      const sizeOpt = prod?.sizes?.find((s) => s.id.includes(selectedSize.toLowerCase())) || prod?.sizes?.[0] || {
+      const isA3 = String(selectedSize).toUpperCase().includes('A3');
+      const sizeOpt = prod?.sizes?.find((s) =>
+        isA3 ? (s.id.toLowerCase().includes('a3') || s.name.toUpperCase().includes('A3')) : (s.id.toLowerCase().includes('a4') || s.name.toUpperCase().includes('A4'))
+      ) || (isA3 ? {
+        id: 'size-a3',
+        name: 'A3 (12x18 Inch)',
+        dimensions: '12x18 Inch',
+        price: 999,
+        originalPrice: 1499,
+        discountPercentage: 33,
+      } : {
         id: 'size-a4',
         name: 'A4 (8x12 Inch)',
         dimensions: '8x12 Inch',
         price: 699,
         originalPrice: 999,
         discountPercentage: 30,
-      };
+      });
       const frameOpt = prod?.frames?.[0] || {
         id: 'classic-black',
         name: 'Classic Black Wood',

@@ -152,6 +152,7 @@ export const ProductPage: React.FC<ProductPageProps> = ({
     originalPrice: safeSizes[0]?.originalPrice || 999,
     baseImageUrl: baseImg,
     cleanBaseImageUrl: cleanBase,
+    artworkLayers: linkedTemplate?.artworkLayers || product.artworkLayers || (product as any)?.frameTemplate?.artworkLayers,
     photoSlots: (effectiveConfig?.photoSlots && effectiveConfig.photoSlots.length > 0) ? effectiveConfig.photoSlots : (product.photoSlots || []),
     textZones: (effectiveConfig?.textZones && effectiveConfig.textZones.length > 0) ? effectiveConfig.textZones : (product.textZones || []),
     images: (product as any).angleImages || product.images || (baseImg ? [baseImg] : []),

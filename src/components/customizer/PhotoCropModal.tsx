@@ -1,11 +1,15 @@
 import React, { useState, useRef } from 'react';
 import { ZoomIn, ZoomOut, Check, X, Move } from 'lucide-react';
+import { getShapeById } from '../../lib/shapeLibrary';
 
 interface PhotoCropModalProps {
   isOpen: boolean;
   imageSrc: string | null;
   aspectRatio?: number;
   shape?: 'rectangle' | 'circle';
+  shapeId?: string;
+  borderWidth?: number;
+  borderColor?: string;
   onCropAndSubmit: (croppedUrl: string) => void;
   onCancel: () => void;
 }
@@ -15,17 +19,23 @@ export const PhotoCropModal: React.FC<PhotoCropModalProps> = ({
   imageSrc,
   aspectRatio = 1,
   shape = 'rectangle',
+  shapeId,
+  borderWidth = 0,
+  borderColor = '#EF4444',
   onCropAndSubmit,
   onCancel,
 }) => {
+  const shapeDef = getShapeById(shapeId);
+  const isShaped = Boolean(shapeDef || shape === 'circle');
+  const effectiveRatio = isShaped ? 1.0 : (aspectRatio > 0 ? aspectRatio : 1);
+
   const [scale, setScale] = useState<number>(1.0);
   const [position, setPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const dragStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const cropBoxRef = useRef<HTMLDivElement>(null);
 
   if (!isOpen || !imageSrc) return null;
-
-  const validRatio = aspectRatio > 0 ? aspectRatio : 1;
 
   const handleMouseDown = (e: React.MouseEvent) => {
     setIsDragging(true);
@@ -66,27 +76,48 @@ export const PhotoCropModal: React.FC<PhotoCropModalProps> = ({
   };
 
   const handleSubmit = () => {
-    // Generate scaled & cropped image using HTML5 Canvas matching slot aspect ratio
     const img = new Image();
     img.onload = () => {
+      const box = cropBoxRef.current?.getBoundingClientRect();
+      const boxW = box?.width || 300;
+      const boxH = box?.height || (boxW / effectiveRatio);
+
       const targetW = 800;
-      const targetH = Math.max(100, Math.round(800 / validRatio));
+      const targetH = Math.max(100, Math.round(800 / effectiveRatio));
       const canvas = document.createElement('canvas');
       canvas.width = targetW;
       canvas.height = targetH;
       const ctx = canvas.getContext('2d');
       if (!ctx) return onCropAndSubmit(imageSrc);
 
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fillRect(0, 0, targetW, targetH);
+      ctx.clearRect(0, 0, targetW, targetH);
 
-      const drawW = targetW * scale;
-      const drawH = (img.height / img.width) * drawW;
-      const drawX = (targetW - drawW) / 2 + position.x * (targetW / 300);
-      const drawY = (targetH - drawH) / 2 + position.y * (targetH / 300);
+      const canvasScale = targetW / boxW;
+      const imgRatio = (img.naturalWidth || 800) / (img.naturalHeight || 800);
+      const boxRatio = boxW / boxH;
+
+      let baseW = boxW;
+      let baseH = boxH;
+      if (imgRatio >= boxRatio) {
+        baseH = boxH;
+        baseW = boxH * imgRatio;
+      } else {
+        baseW = boxW;
+        baseH = boxW / imgRatio;
+      }
+
+      const renderedW = baseW * scale;
+      const renderedH = baseH * scale;
+      const renderedX = (boxW - renderedW) / 2 + position.x;
+      const renderedY = (boxH - renderedH) / 2 + position.y;
+
+      const drawX = renderedX * canvasScale;
+      const drawY = renderedY * canvasScale;
+      const drawW = renderedW * canvasScale;
+      const drawH = renderedH * canvasScale;
 
       ctx.drawImage(img, drawX, drawY, drawW, drawH);
-      const croppedResult = canvas.toDataURL('image/jpeg', 0.90);
+      const croppedResult = canvas.toDataURL('image/jpeg', 0.92);
       onCropAndSubmit(croppedResult);
     };
     img.onerror = () => onCropAndSubmit(imageSrc);
@@ -104,8 +135,9 @@ export const PhotoCropModal: React.FC<PhotoCropModalProps> = ({
           <span className="text-[10px] text-gray-400 font-bold">Drag to position photo</span>
         </div>
 
-        {/* Auto-Fitted Crop Window Container matching slot aspect ratio */}
+        {/* Auto-Fitted Crop Window Container */}
         <div
+          ref={cropBoxRef}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
@@ -113,24 +145,86 @@ export const PhotoCropModal: React.FC<PhotoCropModalProps> = ({
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleMouseUp}
-          className="relative w-full bg-gray-100 rounded-2xl overflow-hidden border-2 border-gray-300 flex items-center justify-center cursor-grab active:cursor-grabbing shadow-inner max-h-[300px]"
-          style={{ aspectRatio: `${validRatio}` }}
+          className="relative w-full bg-slate-900 rounded-2xl overflow-hidden border-2 border-gray-300 flex items-center justify-center cursor-grab active:cursor-grabbing shadow-inner max-h-[300px]"
+          style={{ aspectRatio: `${effectiveRatio}` }}
         >
           <img
             src={imageSrc}
             alt="Crop Preview"
-            className="max-w-full max-h-full object-contain pointer-events-none transition-transform duration-75"
+            className="pointer-events-none transition-transform duration-75 select-none"
             style={{
+              minWidth: '100%',
+              minHeight: '100%',
+              maxWidth: 'none',
+              maxHeight: 'none',
+              width: 'auto',
+              height: 'auto',
               transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
             }}
           />
 
           {/* Cutout Guide Overlay */}
-          <div
-            className={`absolute inset-3 border-2 border-dashed border-[#F82BA9]/80 pointer-events-none shadow-2xs ${
-              shape === 'circle' ? 'rounded-full' : 'rounded-xl'
-            }`}
-          />
+          {shapeDef ? (
+            <div className="absolute inset-0 pointer-events-none">
+              <svg
+                viewBox="0 0 100 100"
+                preserveAspectRatio="xMidYMid meet"
+                className="w-full h-full"
+              >
+                <defs>
+                  <mask id={`crop-mask-${shapeDef.id}`}>
+                    <rect width="100" height="100" fill="white" />
+                    <path d={shapeDef.svgPath} fill="black" />
+                  </mask>
+                </defs>
+                {/* Semi-transparent dark vignette outside the shape */}
+                <rect
+                  width="100"
+                  height="100"
+                  fill="rgba(0,0,0,0.58)"
+                  mask={`url(#crop-mask-${shapeDef.id})`}
+                />
+                {/* Border outline: renders styled solid border if configured, else guide outline */}
+                {borderWidth > 0 ? (
+                  <path
+                    d={shapeDef.svgPath}
+                    fill="none"
+                    stroke={borderColor || '#EF4444'}
+                    strokeWidth={Math.max(2.5, borderWidth * 0.7)}
+                    strokeLinejoin="round"
+                    strokeLinecap="round"
+                  />
+                ) : (
+                  <path
+                    d={shapeDef.svgPath}
+                    fill="none"
+                    stroke="#F82BA9"
+                    strokeWidth="2.2"
+                    strokeDasharray="4 3"
+                  />
+                )}
+              </svg>
+            </div>
+          ) : (
+            <div
+              className={`absolute inset-3 pointer-events-none ${
+                shape === 'circle' ? 'rounded-full' : 'rounded-xl'
+              } ${
+                borderWidth > 0
+                  ? ''
+                  : 'border-2 border-dashed border-[#F82BA9]/80 shadow-2xs'
+              }`}
+              style={
+                borderWidth > 0
+                  ? {
+                      borderWidth: `${Math.max(2, borderWidth * 0.7)}px`,
+                      borderColor: borderColor || '#EF4444',
+                      borderStyle: 'solid',
+                    }
+                  : undefined
+              }
+            />
+          )}
         </div>
 
         {/* Zoom Range Slider Control */}
