@@ -1035,6 +1035,7 @@ export const UniversalFrameCustomizer: React.FC<UniversalFrameCustomizerProps> =
         shapeId={activeSlotForCrop?.shapeId}
         borderWidth={activeSlotForCrop?.borderWidth}
         borderColor={activeSlotForCrop?.borderColor}
+        borderRadius={activeSlotForCrop?.borderRadius}
         onCropAndSubmit={handleCropAndSubmit}
         onCancel={() => {
           setCropModalOpen(false);

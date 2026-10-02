@@ -64,6 +64,8 @@ export interface PhotoSlotConfig {
   borderWidth?: number;
   /** Border color hex string (e.g. '#EF4444' or '#000000') */
   borderColor?: string;
+  /** Corner rounding (0 to 100, where 0 = sharp rectangular corners, 100 = full pill / circular) */
+  borderRadius?: number;
   visibility?: LayerVisibility; // Backward-compatible visibility metadata
   locked?: boolean;             // Admin-only: locks position/scale in Studio
   sourceLayerName?: string;     // PSD layer name / AI detection reference

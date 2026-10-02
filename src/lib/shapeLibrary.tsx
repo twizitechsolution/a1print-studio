@@ -164,6 +164,59 @@ export const SHAPES_LIBRARY: ShapeDefinition[] = [
     category: 'nature',
     svgPath: 'M 50, 2 C 50, 2 92, 44 92, 68 C 92, 85 74, 98 50, 98 C 26, 98 8, 85 8, 68 C 8, 44 50, 2 50, 2 Z',
   },
+
+  // ==========================================
+  // 6. NEW HIGH-QUALITY FRAMES & SEALS
+  // ==========================================
+  {
+    id: 'daisy-seal',
+    name: 'Daisy Seal',
+    category: 'retro',
+    viewBox: '0 0 256 256',
+    svgPath: 'M 128 0 C 147.68 0 164.04 14.213 167.377 32.934 C 182.974 22.055 204.594 23.574 218.51 37.49 C 232.426 51.406 233.944 73.025 223.066 88.622 C 241.787 91.96 256 108.32 256 128 C 256 147.68 241.787 164.04 223.065 167.377 C 233.944 182.974 232.426 204.594 218.51 218.51 C 204.594 232.426 182.974 233.944 167.377 223.065 C 164.04 241.787 147.68 256 128 256 C 108.32 256 91.959 241.787 88.622 223.065 C 73.025 233.944 51.406 232.426 37.49 218.51 C 23.574 204.594 22.055 182.974 32.934 167.377 C 14.213 164.04 0 147.68 0 128 C 0 108.32 14.213 91.96 32.934 88.622 C 22.056 73.025 23.574 51.406 37.49 37.49 C 51.406 23.574 73.025 22.055 88.622 32.934 C 91.96 14.213 108.32 0 128 0 Z',
+  },
+  {
+    id: 'award-seal',
+    name: 'Award Rosette',
+    category: 'retro',
+    viewBox: '0 0 480 480',
+    svgPath: 'm452.3 154.4 8.5-47.6A75.6 75.6 0 0 0 373.2 19l-47.4 8.5c-16.7 3-34 .2-49-7.8l-1.1-.6c-22.3-12-49-12-71.4 0l-1.2.6c-15 8-32.2 10.8-48.9 7.8L106.7 19A75.6 75.6 0 0 0 19 106.7l8.5 47.5c3 16.7.3 34-7.8 49l-.6 1.1c-12 22.3-12 49 0 71.3l.6 1.3c8 15 10.8 32.2 7.8 48.9L19 373.3a75.6 75.6 0 0 0 87.7 87.7l47.5-8.5c16.7-3 34-.3 49 7.8l1.1.6c22.3 12 49 12 71.3 0l1.3-.6c15-8 32.2-10.8 48.9-7.8l47.5 8.5a75.6 75.6 0 0 0 87.7-87.7l-8.4-47.2c-3-16.9-.2-34.3 8-49.4a75.5 75.5 0 0 0 .3-71.6l-1-1.8c-8-15-10.7-32.2-7.6-48.9Z',
+  },
+  {
+    id: 'cloud-bloom',
+    name: 'Cloud Bloom',
+    category: 'nature',
+    viewBox: '0 0 480 480',
+    svgPath: 'M480 240c0-29.1-20.7-55.8-55.2-76.5 9.7-39.1 5.5-72.6-15-93.2-20.7-20.6-54.2-24.8-93.3-15.1C295.8 20.7 269.1 0 240 0s-55.8 20.7-76.5 55.2c-39.1-9.7-72.6-5.5-93.2 15s-24.8 54.2-15.1 93.2C20.7 184.3 0 211 0 240s20.7 55.8 55.2 76.5c-9.7 39.1-5.5 72.6 15 93.2 20.7 20.6 54.2 24.8 93.2 15.1C184.3 459.3 211 480 240 480s55.8-20.7 76.5-55.2c39.1 9.7 72.6 5.5 93.2-15s24.8-54.2 15.1-93.2C459.3 295.8 480 269 480 240Z',
+  },
+  {
+    id: 'classic-square',
+    name: 'Classic Square',
+    category: 'basic',
+    viewBox: '0 0 480 480',
+    svgPath: 'M0 0h480v480H0z',
+  },
+  {
+    id: 'square-inset',
+    name: 'Square Inset',
+    category: 'basic',
+    viewBox: '0 0 480 480',
+    svgPath: 'M70.3 70.3h339.4v339.4H70.3z',
+  },
+  {
+    id: 'portrait-frame',
+    name: 'Portrait (2:3)',
+    category: 'basic',
+    viewBox: '0 0 480 480',
+    svgPath: 'M80 0h320v480H80z',
+  },
+  {
+    id: 'chamfered-square',
+    name: 'Cut Corner',
+    category: 'basic',
+    viewBox: '0 0 480 480',
+    svgPath: 'M339.4 0H140.6L0 140.6v198.8L140.6 480h198.8L480 339.4V140.6L339.4 0z',
+  },
 ];
 
 /**
@@ -186,6 +239,11 @@ export const ShapeThumbnail: React.FC<{
   selected?: boolean;
 }> = ({ shape, className = 'w-16 h-16', selected = false }) => {
   const clipId = `shape-thumb-clip-${shape.id}`;
+  const vb = shape.viewBox || '0 0 100 100';
+  const parts = vb.split(' ').map(Number);
+  const vbW = parts[2] || 100;
+  const vbH = parts[3] || 100;
+  const scaleRatio = vbW / 100;
 
   return (
     <div
@@ -196,7 +254,7 @@ export const ShapeThumbnail: React.FC<{
       }`}
     >
       <svg
-        viewBox="0 0 100 100"
+        viewBox={vb}
         className={`${className} transition-transform group-hover:scale-105 drop-shadow-sm`}
       >
         <defs>
@@ -205,22 +263,24 @@ export const ShapeThumbnail: React.FC<{
           </clipPath>
         </defs>
 
-        {/* Canva-Style Landscape Interior */}
+        {/* Canva-Style Landscape Interior, auto-scaled to viewBox */}
         <g clipPath={`url(#${clipId})`}>
-          {/* Blue Sky */}
-          <rect width="100" height="100" fill="#78C2F5" />
-          {/* Radiant Sun */}
-          <circle cx="80" cy="24" r="14" fill="#FFD15C" />
-          {/* Soft White Cloud */}
-          <path
-            d="M 15,30 Q 22,20 30,28 Q 38,20 46,28 Q 50,35 44,38 Q 18,38 15,30 Z"
-            fill="#FFFFFF"
-            opacity="0.9"
-          />
-          {/* Rolling Back Hill */}
-          <path d="M -10,105 Q 30,55 70,80 Q 95,95 110,105 Z" fill="#71BF43" />
-          {/* Rolling Front Hill */}
-          <path d="M 20,105 Q 60,65 110,80 L 110,105 Z" fill="#4B9E2B" />
+          <g transform={`scale(${scaleRatio}, ${vbH / 100})`}>
+            {/* Blue Sky */}
+            <rect width="100" height="100" fill="#78C2F5" />
+            {/* Radiant Sun */}
+            <circle cx="80" cy="24" r="14" fill="#FFD15C" />
+            {/* Soft White Cloud */}
+            <path
+              d="M 15,30 Q 22,20 30,28 Q 38,20 46,28 Q 50,35 44,38 Q 18,38 15,30 Z"
+              fill="#FFFFFF"
+              opacity="0.9"
+            />
+            {/* Rolling Back Hill */}
+            <path d="M -10,105 Q 30,55 70,80 Q 95,95 110,105 Z" fill="#71BF43" />
+            {/* Rolling Front Hill */}
+            <path d="M 20,105 Q 60,65 110,80 L 110,105 Z" fill="#4B9E2B" />
+          </g>
         </g>
 
         {/* Crisp Shape Outline */}
@@ -228,7 +288,7 @@ export const ShapeThumbnail: React.FC<{
           d={shape.svgPath}
           fill="none"
           stroke={selected ? '#3B82F6' : '#94A3B8'}
-          strokeWidth="1.8"
+          strokeWidth={Math.max(1.5, vbW * 0.018)}
           strokeLinejoin="round"
         />
       </svg>

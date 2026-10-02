@@ -199,16 +199,23 @@ export async function renderFrameComposite(
 
         if (shape) {
           // Vector Shape Masking with Uniform Aspect Ratio (always perfect circle, heart, etc.)
-          const shapeDim = Math.min(sw, sh);
+          const shapeDim = Math.min(sw, sw > 0 ? sh : sw);
           const shapeLeft = cx - shapeDim / 2;
           const shapeTop = cy - shapeDim / 2;
+          const vb = (shape.viewBox || '0 0 100 100').split(' ').map(Number);
+          const vbX = vb[0] || 0;
+          const vbY = vb[1] || 0;
+          const vbW = vb[2] || 100;
+          const vbH = vb[3] || 100;
 
           ctx.save();
           ctx.translate(shapeLeft, shapeTop);
-          ctx.scale(shapeDim / 100, shapeDim / 100);
+          ctx.scale(shapeDim / vbW, shapeDim / vbH);
+          if (vbX || vbY) ctx.translate(-vbX, -vbY);
           const path = new Path2D(shape.svgPath);
           ctx.clip(path);
-          ctx.scale(100 / shapeDim, 100 / shapeDim);
+          if (vbX || vbY) ctx.translate(vbX, vbY);
+          ctx.scale(vbW / shapeDim, vbH / shapeDim);
 
           // Calculate cover dimensions inside the shape bounding square
           const imgW = photoImg.naturalWidth || shapeDim;
@@ -236,28 +243,40 @@ export async function renderFrameComposite(
           if (slot.borderWidth && slot.borderWidth > 0) {
             ctx.save();
             ctx.translate(shapeLeft, shapeTop);
-            ctx.scale(shapeDim / 100, shapeDim / 100);
+            ctx.scale(shapeDim / vbW, shapeDim / vbH);
+            if (vbX || vbY) ctx.translate(-vbX, -vbY);
             const borderPath = new Path2D(shape.svgPath);
             ctx.strokeStyle = slot.borderColor || '#EF4444';
-            ctx.lineWidth = (slot.borderWidth * (targetWidth / 1200)) / (shapeDim / 100);
+            ctx.lineWidth = (slot.borderWidth * (targetWidth / 1200)) / (shapeDim / vbW);
             ctx.lineJoin = 'round';
             ctx.lineCap = 'round';
             ctx.stroke(borderPath);
             ctx.restore();
           }
         } else {
-          // Plain Rectangle slot: check if custom framing pan/zoom is set
+          // Plain or Rounded Rectangle slot: check if custom corner rounding is set
+          const maxRadius = Math.min(sw, sh) / 2;
+          const radius = slot.borderRadius && slot.borderRadius > 0 ? (slot.borderRadius / 100) * maxRadius : 0;
+
           const hasFraming =
             (slot.photoScale !== undefined && slot.photoScale !== 1) ||
             Boolean(slot.photoOffsetX) ||
             Boolean(slot.photoOffsetY);
 
-          if (hasFraming) {
-            ctx.save();
-            ctx.beginPath();
+          ctx.save();
+          ctx.beginPath();
+          if (radius > 0) {
+            if (typeof ctx.roundRect === 'function') {
+              ctx.roundRect(cx - sw / 2, cy - sh / 2, sw, sh, radius);
+            } else {
+              ctx.rect(cx - sw / 2, cy - sh / 2, sw, sh);
+            }
+          } else {
             ctx.rect(cx - sw / 2, cy - sh / 2, sw, sh);
-            ctx.clip();
+          }
+          ctx.clip();
 
+          if (hasFraming) {
             const imgW = photoImg.naturalWidth || sw;
             const imgH = photoImg.naturalHeight || sh;
             const coverScale = Math.max(sw / imgW, sh / imgH);
@@ -274,18 +293,24 @@ export async function renderFrameComposite(
               drawW,
               drawH
             );
-            ctx.restore();
           } else {
-            // Draw photo as plain filled rectangle
+            // Draw photo as cover inside clipped rect
             drawImageCover(ctx, photoImg, cx - sw / 2, cy - sh / 2, sw, sh);
           }
+          ctx.restore();
 
-          // Draw border around the rectangle slot if configured
+          // Draw border around rectangular/rounded slot if configured
           if (slot.borderWidth && slot.borderWidth > 0) {
             ctx.save();
             ctx.strokeStyle = slot.borderColor || '#EF4444';
             ctx.lineWidth = slot.borderWidth * (targetWidth / 1200);
-            ctx.strokeRect(cx - sw / 2, cy - sh / 2, sw, sh);
+            ctx.beginPath();
+            if (radius > 0 && typeof ctx.roundRect === 'function') {
+              ctx.roundRect(cx - sw / 2, cy - sh / 2, sw, sh, radius);
+            } else {
+              ctx.rect(cx - sw / 2, cy - sh / 2, sw, sh);
+            }
+            ctx.stroke();
             ctx.restore();
           }
         }

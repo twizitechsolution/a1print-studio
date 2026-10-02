@@ -10,6 +10,7 @@ interface PhotoCropModalProps {
   shapeId?: string;
   borderWidth?: number;
   borderColor?: string;
+  borderRadius?: number;
   onCropAndSubmit: (croppedUrl: string) => void;
   onCancel: () => void;
 }
@@ -22,6 +23,7 @@ export const PhotoCropModal: React.FC<PhotoCropModalProps> = ({
   shapeId,
   borderWidth = 0,
   borderColor = '#EF4444',
+  borderRadius = 0,
   onCropAndSubmit,
   onCancel,
 }) => {
@@ -36,6 +38,11 @@ export const PhotoCropModal: React.FC<PhotoCropModalProps> = ({
   const cropBoxRef = useRef<HTMLDivElement>(null);
 
   if (!isOpen || !imageSrc) return null;
+
+  const shapeVb = shapeDef?.viewBox || '0 0 100 100';
+  const shapeParts = shapeVb.split(' ').map(Number);
+  const vbW = shapeParts[2] || 100;
+  const vbH = shapeParts[3] || 100;
 
   const handleMouseDown = (e: React.MouseEvent) => {
     setIsDragging(true);
@@ -167,20 +174,20 @@ export const PhotoCropModal: React.FC<PhotoCropModalProps> = ({
           {shapeDef ? (
             <div className="absolute inset-0 pointer-events-none">
               <svg
-                viewBox="0 0 100 100"
+                viewBox={shapeVb}
                 preserveAspectRatio="xMidYMid meet"
                 className="w-full h-full"
               >
                 <defs>
                   <mask id={`crop-mask-${shapeDef.id}`}>
-                    <rect width="100" height="100" fill="white" />
+                    <rect width={vbW} height={vbH} fill="white" />
                     <path d={shapeDef.svgPath} fill="black" />
                   </mask>
                 </defs>
                 {/* Semi-transparent dark vignette outside the shape */}
                 <rect
-                  width="100"
-                  height="100"
+                  width={vbW}
+                  height={vbH}
                   fill="rgba(0,0,0,0.58)"
                   mask={`url(#crop-mask-${shapeDef.id})`}
                 />
@@ -190,7 +197,7 @@ export const PhotoCropModal: React.FC<PhotoCropModalProps> = ({
                     d={shapeDef.svgPath}
                     fill="none"
                     stroke={borderColor || '#EF4444'}
-                    strokeWidth={Math.max(2.5, borderWidth * 0.7)}
+                    strokeWidth={Math.max(2.5, borderWidth * 0.7) * (vbW / 100)}
                     strokeLinejoin="round"
                     strokeLinecap="round"
                   />
@@ -199,7 +206,7 @@ export const PhotoCropModal: React.FC<PhotoCropModalProps> = ({
                     d={shapeDef.svgPath}
                     fill="none"
                     stroke="#F82BA9"
-                    strokeWidth="2.2"
+                    strokeWidth={2.2 * (vbW / 100)}
                     strokeDasharray="4 3"
                   />
                 )}
@@ -208,21 +215,22 @@ export const PhotoCropModal: React.FC<PhotoCropModalProps> = ({
           ) : (
             <div
               className={`absolute inset-3 pointer-events-none ${
-                shape === 'circle' ? 'rounded-full' : 'rounded-xl'
+                shape === 'circle' ? 'rounded-full' : ''
               } ${
                 borderWidth > 0
                   ? ''
                   : 'border-2 border-dashed border-[#F82BA9]/80 shadow-2xs'
               }`}
-              style={
-                borderWidth > 0
-                  ? {
-                      borderWidth: `${Math.max(2, borderWidth * 0.7)}px`,
-                      borderColor: borderColor || '#EF4444',
-                      borderStyle: 'solid',
-                    }
-                  : undefined
-              }
+              style={{
+                borderRadius: borderRadius && borderRadius > 0
+                  ? `${Math.round((borderRadius / 100) * 45)}%`
+                  : shape === 'circle'
+                  ? '9999px'
+                  : '14px',
+                borderWidth: borderWidth > 0 ? `${Math.max(2, borderWidth * 0.7)}px` : undefined,
+                borderColor: borderWidth > 0 ? (borderColor || '#EF4444') : undefined,
+                borderStyle: borderWidth > 0 ? 'solid' : undefined,
+              }}
             />
           )}
         </div>

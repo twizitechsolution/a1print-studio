@@ -54,6 +54,7 @@ import {
   X,
   Hand,
   Palette,
+  Square,
 } from 'lucide-react';
 import {
   SHAPES_LIBRARY,
@@ -345,10 +346,10 @@ export const VisualTemplateEditor: React.FC<VisualTemplateEditorProps> = ({
             ctx.translate(-cx, -cy);
           }
 
-          // Thin dashed stroke — NEVER opaque fill over artwork!
-          ctx.strokeStyle = strokeColor;
+          // Canva-style clean purple outline
+          ctx.strokeStyle = '#8B5CF6';
           ctx.lineWidth = 1.8;
-          ctx.setLineDash([6, 4]);
+          ctx.setLineDash([]);
           ctx.strokeRect(box.left, box.top, box.width, box.height);
 
           // If shaped slot, also draw vector shape outline inside bounding box
@@ -361,46 +362,94 @@ export const VisualTemplateEditor: React.FC<VisualTemplateEditorProps> = ({
                 const shapeDim = Math.min(box.width, box.height);
                 const offX = box.left + (box.width - shapeDim) / 2;
                 const offY = box.top + (box.height - shapeDim) / 2;
+                const vb = (shapeDef.viewBox || '0 0 100 100').split(' ').map(Number);
+                const vbW = vb[2] || 100;
+                const vbH = vb[3] || 100;
                 ctx.translate(offX, offY);
-                ctx.scale(shapeDim / 100, shapeDim / 100);
+                ctx.scale(shapeDim / vbW, shapeDim / vbH);
+                if (vb[0] || vb[1]) ctx.translate(-vb[0], -vb[1]);
                 const sp = new Path2D(shapeDef.svgPath);
-                ctx.strokeStyle = '#38BDF8';
-                ctx.lineWidth = 2.2 / Math.max(shapeDim / 100, 0.01);
+                ctx.strokeStyle = '#8B5CF6';
+                ctx.lineWidth = 2.0 / Math.max(shapeDim / vbW, 0.01);
                 ctx.setLineDash([5, 3]);
                 ctx.stroke(sp);
                 ctx.restore();
               }
+            } else if (slot?.borderRadius && slot.borderRadius > 0) {
+              const maxR = Math.min(box.width, box.height) / 2;
+              const r = (slot.borderRadius / 100) * maxR;
+              ctx.save();
+              ctx.strokeStyle = '#8B5CF6';
+              ctx.lineWidth = 2.0;
+              ctx.setLineDash([4, 3]);
+              ctx.beginPath();
+              if (typeof ctx.roundRect === 'function') {
+                ctx.roundRect(box.left, box.top, box.width, box.height, r);
+              } else {
+                ctx.rect(box.left, box.top, box.width, box.height);
+              }
+              ctx.stroke();
+              ctx.restore();
             }
           }
 
           // Connecting line to rotation handle
           ctx.beginPath();
           ctx.setLineDash([]);
-          ctx.strokeStyle = strokeColor;
+          ctx.strokeStyle = '#8B5CF6';
           ctx.lineWidth = 1.5;
           ctx.moveTo(cx, box.top);
           ctx.lineTo(cx, box.top - 22);
           ctx.stroke();
 
           // Rotation circular handle
-          ctx.fillStyle = strokeColor;
+          ctx.fillStyle = '#FFFFFF';
           ctx.beginPath();
           ctx.arc(cx, box.top - 22, 6, 0, Math.PI * 2);
           ctx.fill();
-          ctx.strokeStyle = '#FFFFFF';
-          ctx.lineWidth = 1.5;
+          ctx.strokeStyle = '#8B5CF6';
+          ctx.lineWidth = 2;
           ctx.stroke();
 
-          // 8 Bounding box resize handles
+          // 8 Bounding box resize handles (Canva Style: Pills on edges, circles on corners)
           const handles = getHandles(box, 0);
           ctx.fillStyle = '#FFFFFF';
-          ctx.strokeStyle = strokeColor;
-          ctx.lineWidth = 1.5;
+          ctx.strokeStyle = '#8B5CF6';
+          ctx.lineWidth = 1.8;
 
           for (const [key, pos] of Object.entries(handles)) {
             if (key === 'rotate') continue;
-            ctx.fillRect(pos.x - 4.5, pos.y - 4.5, 9, 9);
-            ctx.strokeRect(pos.x - 4.5, pos.y - 4.5, 9, 9);
+            if (key === 'tc' || key === 'bc') {
+              // Horizontal pill (18 x 6, radius 3)
+              const pw = 18;
+              const ph = 6;
+              ctx.beginPath();
+              if (typeof ctx.roundRect === 'function') {
+                ctx.roundRect(pos.x - pw / 2, pos.y - ph / 2, pw, ph, 3);
+              } else {
+                ctx.rect(pos.x - pw / 2, pos.y - ph / 2, pw, ph);
+              }
+              ctx.fill();
+              ctx.stroke();
+            } else if (key === 'ml' || key === 'mr') {
+              // Vertical pill (6 x 18, radius 3)
+              const pw = 6;
+              const ph = 18;
+              ctx.beginPath();
+              if (typeof ctx.roundRect === 'function') {
+                ctx.roundRect(pos.x - pw / 2, pos.y - ph / 2, pw, ph, 3);
+              } else {
+                ctx.rect(pos.x - pw / 2, pos.y - ph / 2, pw, ph);
+              }
+              ctx.fill();
+              ctx.stroke();
+            } else {
+              // Corner circular handle (radius 5.5)
+              ctx.beginPath();
+              ctx.arc(pos.x, pos.y, 5.5, 0, Math.PI * 2);
+              ctx.fill();
+              ctx.stroke();
+            }
           }
 
           ctx.restore();
@@ -644,24 +693,97 @@ export const VisualTemplateEditor: React.FC<VisualTemplateEditorProps> = ({
         return;
       }
 
-      // Handle Resize
+      // Handle Resize (Canva-Style: dragging an edge anchors the opposite edge; only the dragged edge expands/contracts)
       if (activeDrag.initialSlot) {
-        let nextW = activeDrag.initialSlot.width;
-        let nextH = activeDrag.initialSlot.height;
-        let nextX = activeDrag.initialSlot.x;
-        let nextY = activeDrag.initialSlot.y;
+        const initialW = activeDrag.initialSlot.width;
+        const initialH = activeDrag.initialSlot.height;
+        const initialX = activeDrag.initialSlot.x;
+        const initialY = activeDrag.initialSlot.y;
+        const rot = activeDrag.initialSlot.rotation || 0;
+
+        // Project canvas dx, dy into element's local coordinate space
+        const rad = (-rot * Math.PI) / 180;
+        const localDx = dx * Math.cos(rad) - dy * Math.sin(rad);
+        const localDy = dx * Math.sin(rad) + dy * Math.cos(rad);
+        const localDxPct = (localDx / canvas.width) * 100;
+        const localDyPct = (localDy / canvas.height) * 100;
+
+        const minW = 4;
+        const minH = 4;
+        let dW = 0;
+        let dH = 0;
+        let localShiftX = 0;
+        let localShiftY = 0;
 
         const handle = activeDrag.handle;
-        if (handle.includes('r')) nextW = clamp(Math.round(activeDrag.initialSlot.width + dxPct), 5, 95);
-        if (handle.includes('l')) {
-          nextW = clamp(Math.round(activeDrag.initialSlot.width - dxPct), 5, 95);
-          nextX = clamp(Math.round(activeDrag.initialSlot.x + dxPct / 2), 2, 98);
+
+        if (handle === 'mr') {
+          // Drag right handle: Left edge is pinned, right edge moves
+          const newW = Math.max(minW, initialW + localDxPct);
+          dW = newW - initialW;
+          localShiftX = dW / 2;
+        } else if (handle === 'ml') {
+          // Drag left handle: Right edge is pinned, left edge moves
+          const newW = Math.max(minW, initialW - localDxPct);
+          dW = newW - initialW;
+          localShiftX = -dW / 2;
+        } else if (handle === 'bc') {
+          // Drag bottom handle: Top edge is pinned, bottom edge moves
+          const newH = Math.max(minH, initialH + localDyPct);
+          dH = newH - initialH;
+          localShiftY = dH / 2;
+        } else if (handle === 'tc') {
+          // Drag top handle: Bottom edge is pinned, top edge moves
+          const newH = Math.max(minH, initialH - localDyPct);
+          dH = newH - initialH;
+          localShiftY = -dH / 2;
+        } else if (handle === 'br') {
+          // Drag bottom-right: Top-Left corner is pinned
+          const newW = Math.max(minW, initialW + localDxPct);
+          const newH = Math.max(minH, initialH + localDyPct);
+          dW = newW - initialW;
+          dH = newH - initialH;
+          localShiftX = dW / 2;
+          localShiftY = dH / 2;
+        } else if (handle === 'tl') {
+          // Drag top-left: Bottom-Right corner is pinned
+          const newW = Math.max(minW, initialW - localDxPct);
+          const newH = Math.max(minH, initialH - localDyPct);
+          dW = newW - initialW;
+          dH = newH - initialH;
+          localShiftX = -dW / 2;
+          localShiftY = -dH / 2;
+        } else if (handle === 'tr') {
+          // Drag top-right: Bottom-Left corner is pinned
+          const newW = Math.max(minW, initialW + localDxPct);
+          const newH = Math.max(minH, initialH - localDyPct);
+          dW = newW - initialW;
+          dH = newH - initialH;
+          localShiftX = dW / 2;
+          localShiftY = -dH / 2;
+        } else if (handle === 'bl') {
+          // Drag bottom-left: Top-Right corner is pinned
+          const newW = Math.max(minW, initialW - localDxPct);
+          const newH = Math.max(minH, initialH + localDyPct);
+          dW = newW - initialW;
+          dH = newH - initialH;
+          localShiftX = -dW / 2;
+          localShiftY = dH / 2;
         }
-        if (handle.includes('b')) nextH = clamp(Math.round(activeDrag.initialSlot.height + dyPct), 5, 95);
-        if (handle.includes('t')) {
-          nextH = clamp(Math.round(activeDrag.initialSlot.height - dyPct), 5, 95);
-          nextY = clamp(Math.round(activeDrag.initialSlot.y + dyPct / 2), 2, 98);
-        }
+
+        // Convert local center shift back to world canvas % coordinates
+        const worldRad = (rot * Math.PI) / 180;
+        const localShiftXPx = (localShiftX / 100) * canvas.width;
+        const localShiftYPx = (localShiftY / 100) * canvas.height;
+        const worldShiftXPx = localShiftXPx * Math.cos(worldRad) - localShiftYPx * Math.sin(worldRad);
+        const worldShiftYPx = localShiftXPx * Math.sin(worldRad) + localShiftYPx * Math.cos(worldRad);
+        const worldShiftXPct = (worldShiftXPx / canvas.width) * 100;
+        const worldShiftYPct = (worldShiftYPx / canvas.height) * 100;
+
+        const nextX = clamp(Math.round(initialX + worldShiftXPct), 1, 99);
+        const nextY = clamp(Math.round(initialY + worldShiftYPct), 1, 99);
+        const nextW = clamp(Math.round(initialW + dW), minW, 98);
+        const nextH = clamp(Math.round(initialH + dH), minH, 98);
 
         setTemplate((prev) => ({
           ...prev,
@@ -671,8 +793,10 @@ export const VisualTemplateEditor: React.FC<VisualTemplateEditorProps> = ({
         }));
       } else if (activeDrag.initialZone) {
         let nextMaxW = activeDrag.initialZone.maxWidth || 80;
-        if (activeDrag.handle.includes('r') || activeDrag.handle.includes('l')) {
-          nextMaxW = clamp(Math.round(nextMaxW + (activeDrag.handle.includes('r') ? dxPct * 2 : -dxPct * 2)), 15, 95);
+        if (activeDrag.handle === 'mr' || activeDrag.handle.includes('r')) {
+          nextMaxW = clamp(Math.round(nextMaxW + dxPct * 2), 15, 95);
+        } else if (activeDrag.handle === 'ml' || activeDrag.handle.includes('l')) {
+          nextMaxW = clamp(Math.round(nextMaxW - dxPct * 2), 15, 95);
         }
         setTemplate((prev) => ({
           ...prev,
@@ -681,17 +805,91 @@ export const VisualTemplateEditor: React.FC<VisualTemplateEditorProps> = ({
           ),
         }));
       } else if (activeDrag.initialArtwork) {
-        const initialScale = activeDrag.initialArtwork.scale ?? 60;
-        const scaleDelta = Math.round(dxPct * 1.5);
-        const nextScale = clamp(
-          initialScale + (activeDrag.handle.includes('r') || activeDrag.handle.includes('b') ? scaleDelta : -scaleDelta),
-          10,
-          250
-        );
+        const initialW = activeDrag.initialArtwork.width ?? activeDrag.initialArtwork.scale ?? 50;
+        const initialH = activeDrag.initialArtwork.height ?? activeDrag.initialArtwork.scale ?? 50;
+        const initialX = activeDrag.initialArtwork.x ?? 50;
+        const initialY = activeDrag.initialArtwork.y ?? 50;
+        const rot = activeDrag.initialArtwork.rotation || 0;
+
+        const rad = (-rot * Math.PI) / 180;
+        const localDx = dx * Math.cos(rad) - dy * Math.sin(rad);
+        const localDy = dx * Math.sin(rad) + dy * Math.cos(rad);
+        const localDxPct = (localDx / canvas.width) * 100;
+        const localDyPct = (localDy / canvas.height) * 100;
+
+        const minW = 4;
+        const minH = 4;
+        let dW = 0;
+        let dH = 0;
+        let localShiftX = 0;
+        let localShiftY = 0;
+
+        const handle = activeDrag.handle;
+        if (handle === 'mr') {
+          const newW = Math.max(minW, initialW + localDxPct);
+          dW = newW - initialW;
+          localShiftX = dW / 2;
+        } else if (handle === 'ml') {
+          const newW = Math.max(minW, initialW - localDxPct);
+          dW = newW - initialW;
+          localShiftX = -dW / 2;
+        } else if (handle === 'bc') {
+          const newH = Math.max(minH, initialH + localDyPct);
+          dH = newH - initialH;
+          localShiftY = dH / 2;
+        } else if (handle === 'tc') {
+          const newH = Math.max(minH, initialH - localDyPct);
+          dH = newH - initialH;
+          localShiftY = -dH / 2;
+        } else if (handle === 'br') {
+          const newW = Math.max(minW, initialW + localDxPct);
+          const newH = Math.max(minH, initialH + localDyPct);
+          dW = newW - initialW;
+          dH = newH - initialH;
+          localShiftX = dW / 2;
+          localShiftY = dH / 2;
+        } else if (handle === 'tl') {
+          const newW = Math.max(minW, initialW - localDxPct);
+          const newH = Math.max(minH, initialH - localDyPct);
+          dW = newW - initialW;
+          dH = newH - initialH;
+          localShiftX = -dW / 2;
+          localShiftY = -dH / 2;
+        } else if (handle === 'tr') {
+          const newW = Math.max(minW, initialW + localDxPct);
+          const newH = Math.max(minH, initialH - localDyPct);
+          dW = newW - initialW;
+          dH = newH - initialH;
+          localShiftX = dW / 2;
+          localShiftY = -dH / 2;
+        } else if (handle === 'bl') {
+          const newW = Math.max(minW, initialW - localDxPct);
+          const newH = Math.max(minH, initialH + localDyPct);
+          dW = newW - initialW;
+          dH = newH - initialH;
+          localShiftX = -dW / 2;
+          localShiftY = dH / 2;
+        }
+
+        const worldRad = (rot * Math.PI) / 180;
+        const localShiftXPx = (localShiftX / 100) * canvas.width;
+        const localShiftYPx = (localShiftY / 100) * canvas.height;
+        const worldShiftXPx = localShiftXPx * Math.cos(worldRad) - localShiftYPx * Math.sin(worldRad);
+        const worldShiftYPx = localShiftXPx * Math.sin(worldRad) + localShiftYPx * Math.cos(worldRad);
+        const worldShiftXPct = (worldShiftXPx / canvas.width) * 100;
+        const worldShiftYPct = (worldShiftYPx / canvas.height) * 100;
+
+        const nextX = clamp(Math.round(initialX + worldShiftXPct), 0, 100);
+        const nextY = clamp(Math.round(initialY + worldShiftYPct), 0, 100);
+        const nextW = clamp(Math.round(initialW + dW), minW, 100);
+        const nextH = clamp(Math.round(initialH + dH), minH, 100);
+
         setTemplate((prev) => ({
           ...prev,
           artworkLayers: (prev.artworkLayers || []).map((art) =>
-            art.id === activeDrag.initialArtwork!.id ? { ...art, scale: nextScale } : art
+            art.id === activeDrag.initialArtwork!.id
+              ? { ...art, x: nextX, y: nextY, width: nextW, height: nextH }
+              : art
           ),
         }));
       }
@@ -715,8 +913,60 @@ export const VisualTemplateEditor: React.FC<VisualTemplateEditorProps> = ({
     };
   }, [activeDrag, isPanning, panStart, template, pushHistory]);
 
-  const handleMouseMove = () => {
-    // Delegated to window-level listener
+  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (activeDrag || isPanning || isHandToolActive || isSpacePressed) return;
+    const canvas = canvasRef.current;
+    if (!canvas || !selectedLayer) {
+      if (canvas && !isHandToolActive && !isSpacePressed) {
+        canvas.style.cursor = 'default';
+      }
+      return;
+    }
+
+    const { x, y } = getCanvasMousePos(e);
+    let activeBox: BoundingBox | null = null;
+    let rot = 0;
+
+    if (selectedLayer.type === 'slot') {
+      const slot = template.photoSlots.find((s) => s.id === selectedLayer.id);
+      if (slot) {
+        activeBox = getSlotBoundingBox(slot, canvas.width, canvas.height);
+        rot = slot.rotation || 0;
+      }
+    } else if (selectedLayer.type === 'zone') {
+      const zone = template.textZones.find((z) => z.id === selectedLayer.id);
+      if (zone) {
+        activeBox = getTextZoneBoundingBox(zone, canvas.width, canvas.height);
+        rot = zone.rotation || 0;
+      }
+    } else if (selectedLayer.type === 'artwork') {
+      const art = template.artworkLayers?.find((a) => a.id === selectedLayer.id);
+      if (art) {
+        activeBox = getArtworkBoundingBox(art, canvas.width, canvas.height);
+        rot = art.rotation || 0;
+      }
+    }
+
+    if (activeBox) {
+      const hit = hitTestHandles(x, y, activeBox, 14, rot);
+      if (hit === 'rotate') {
+        canvas.style.cursor = 'grab';
+      } else if (hit === 'tc' || hit === 'bc') {
+        canvas.style.cursor = 'ns-resize';
+      } else if (hit === 'ml' || hit === 'mr') {
+        canvas.style.cursor = 'ew-resize';
+      } else if (hit === 'tl' || hit === 'br') {
+        canvas.style.cursor = 'nwse-resize';
+      } else if (hit === 'tr' || hit === 'bl') {
+        canvas.style.cursor = 'nesw-resize';
+      } else if (hit === 'move') {
+        canvas.style.cursor = 'move';
+      } else {
+        canvas.style.cursor = 'default';
+      }
+    } else {
+      canvas.style.cursor = 'default';
+    }
   };
 
   const handleMouseUp = () => {
@@ -2210,6 +2460,116 @@ export const VisualTemplateEditor: React.FC<VisualTemplateEditorProps> = ({
                       </div>
                     </div>
                   )}
+                </div>
+
+                {/* Canva-Style Corner Rounding Control */}
+                <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/80 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                      <Square className="w-3.5 h-3.5 text-indigo-400 rounded-xs" />
+                      <span>Corner Rounding</span>
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-mono text-slate-400">
+                        {(selectedSlot.borderRadius || 0) > 0 ? `${selectedSlot.borderRadius}` : '0 (Sharp)'}
+                      </span>
+                      {(selectedSlot.borderRadius || 0) > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = {
+                              ...template,
+                              photoSlots: template.photoSlots.map((s) =>
+                                s.id === selectedSlot.id ? { ...s, borderRadius: 0 } : s
+                              ),
+                            };
+                            setTemplate(next);
+                            pushHistory(next);
+                          }}
+                          className="text-[10px] text-slate-500 hover:text-indigo-400 font-medium cursor-pointer"
+                        >
+                          Reset
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Corner Rounding Slider & Input */}
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between items-center text-[10px] text-slate-400 font-medium">
+                      <span>Roundness</span>
+                      <div className="flex items-center gap-1 font-mono text-indigo-400 font-bold">
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={selectedSlot.borderRadius ?? 0}
+                          onChange={(e) => {
+                            const val = clamp(parseInt(e.target.value, 10) || 0, 0, 100);
+                            const next = {
+                              ...template,
+                              photoSlots: template.photoSlots.map((s) =>
+                                s.id === selectedSlot.id ? { ...s, borderRadius: val } : s
+                              ),
+                            };
+                            setTemplate(next);
+                          }}
+                          onBlur={() => pushHistory(template)}
+                          className="w-12 px-1.5 py-0.5 text-center text-xs font-mono font-bold bg-slate-900 border border-slate-700 rounded text-indigo-400 focus:outline-none focus:border-indigo-500"
+                        />
+                      </div>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      step="1"
+                      value={selectedSlot.borderRadius ?? 0}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value, 10);
+                        setTemplate((prev) => ({
+                          ...prev,
+                          photoSlots: prev.photoSlots.map((s) =>
+                            s.id === selectedSlot.id ? { ...s, borderRadius: val } : s
+                          ),
+                        }));
+                      }}
+                      onMouseUp={() => pushHistory(template)}
+                      className="w-full accent-indigo-500 cursor-pointer h-1.5 bg-slate-800 rounded-lg"
+                    />
+                  </div>
+
+                  {/* Quick Rounding Presets */}
+                  <div className="grid grid-cols-4 gap-1.5 pt-1">
+                    {[
+                      { label: '0 Sharp', val: 0 },
+                      { label: '15 Soft', val: 15 },
+                      { label: '35 Medium', val: 35 },
+                      { label: '100 Pill', val: 100 },
+                    ].map((preset) => (
+                      <button
+                        key={preset.val}
+                        type="button"
+                        onClick={() => {
+                          const next = {
+                            ...template,
+                            photoSlots: template.photoSlots.map((s) =>
+                              s.id === selectedSlot.id ? { ...s, borderRadius: preset.val } : s
+                            ),
+                          };
+                          setTemplate(next);
+                          pushHistory(next);
+                        }}
+                        className={`px-1.5 py-1 text-[10px] font-medium rounded-md border transition-all cursor-pointer ${
+                          (selectedSlot.borderRadius ?? 0) === preset.val
+                            ? 'bg-indigo-600/30 border-indigo-500 text-indigo-300 font-bold'
+                            : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                        }`}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Customer Controls */}
