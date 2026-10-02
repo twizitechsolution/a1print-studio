@@ -12,7 +12,7 @@ import {
   resolvePSDWebFontSpec,
   ensureWebFontsReady,
 } from '../utils/templateCompositor';
-import { getShapeById } from './shapeLibrary';
+import { getShapeById, isRectangularShape } from './shapeLibrary';
 
 /**
  * EXACT SINGLE SOURCE OF TRUTH FRAME COMPOSITOR
@@ -189,6 +189,7 @@ export async function renderFrameComposite(
         const rotation = slot.rotation || 0;
 
         const shape = getShapeById(slot.shapeId);
+        const isRect = isRectangularShape(slot.shapeId) || !shape || Boolean(slot.borderRadius && slot.borderRadius > 0);
 
         ctx.save();
         if (rotation) {
@@ -197,64 +198,8 @@ export async function renderFrameComposite(
           ctx.translate(-cx, -cy);
         }
 
-        if (shape) {
-          // Vector Shape Masking with Uniform Aspect Ratio (always perfect circle, heart, etc.)
-          const shapeDim = Math.min(sw, sw > 0 ? sh : sw);
-          const shapeLeft = cx - shapeDim / 2;
-          const shapeTop = cy - shapeDim / 2;
-          const vb = (shape.viewBox || '0 0 100 100').split(' ').map(Number);
-          const vbX = vb[0] || 0;
-          const vbY = vb[1] || 0;
-          const vbW = vb[2] || 100;
-          const vbH = vb[3] || 100;
-
-          ctx.save();
-          ctx.translate(shapeLeft, shapeTop);
-          ctx.scale(shapeDim / vbW, shapeDim / vbH);
-          if (vbX || vbY) ctx.translate(-vbX, -vbY);
-          const path = new Path2D(shape.svgPath);
-          ctx.clip(path);
-          if (vbX || vbY) ctx.translate(vbX, vbY);
-          ctx.scale(vbW / shapeDim, vbH / shapeDim);
-
-          // Calculate cover dimensions inside the shape bounding square
-          const imgW = photoImg.naturalWidth || shapeDim;
-          const imgH = photoImg.naturalHeight || shapeDim;
-          const coverScale = Math.max(shapeDim / imgW, shapeDim / imgH);
-          const zoom = Math.max(0.2, slot.photoScale ?? 1.0);
-          const drawW = imgW * coverScale * zoom;
-          const drawH = imgH * coverScale * zoom;
-
-          // Apply pan offsets (% of shape size)
-          const offsetX = ((slot.photoOffsetX ?? 0) / 100) * shapeDim;
-          const offsetY = ((slot.photoOffsetY ?? 0) / 100) * shapeDim;
-
-          // Draw photo centered in shape square + pan offset
-          ctx.drawImage(
-            photoImg,
-            shapeDim / 2 + offsetX - drawW / 2,
-            shapeDim / 2 + offsetY - drawH / 2,
-            drawW,
-            drawH
-          );
-          ctx.restore();
-
-          // Draw border around the shape contour if configured
-          if (slot.borderWidth && slot.borderWidth > 0) {
-            ctx.save();
-            ctx.translate(shapeLeft, shapeTop);
-            ctx.scale(shapeDim / vbW, shapeDim / vbH);
-            if (vbX || vbY) ctx.translate(-vbX, -vbY);
-            const borderPath = new Path2D(shape.svgPath);
-            ctx.strokeStyle = slot.borderColor || '#EF4444';
-            ctx.lineWidth = (slot.borderWidth * (targetWidth / 1200)) / (shapeDim / vbW);
-            ctx.lineJoin = 'round';
-            ctx.lineCap = 'round';
-            ctx.stroke(borderPath);
-            ctx.restore();
-          }
-        } else {
-          // Plain or Rounded Rectangle slot: check if custom corner rounding is set
+        if (isRect) {
+          // Plain or Rounded Rectangle slot: full independent sw and sh dimensions + Canva-style corner rounding
           const maxRadius = Math.min(sw, sh) / 2;
           const radius = slot.borderRadius && slot.borderRadius > 0 ? (slot.borderRadius / 100) * maxRadius : 0;
 
@@ -311,6 +256,62 @@ export async function renderFrameComposite(
               ctx.rect(cx - sw / 2, cy - sh / 2, sw, sh);
             }
             ctx.stroke();
+            ctx.restore();
+          }
+        } else if (shape) {
+          // Non-rectangular organic vector shape mask (Hearts, Blobs, Rosettes, etc.)
+          const shapeDim = Math.min(sw, sw > 0 ? sh : sw);
+          const shapeLeft = cx - shapeDim / 2;
+          const shapeTop = cy - shapeDim / 2;
+          const vb = (shape.viewBox || '0 0 100 100').split(' ').map(Number);
+          const vbX = vb[0] || 0;
+          const vbY = vb[1] || 0;
+          const vbW = vb[2] || 100;
+          const vbH = vb[3] || 100;
+
+          ctx.save();
+          ctx.translate(shapeLeft, shapeTop);
+          ctx.scale(shapeDim / vbW, shapeDim / vbH);
+          if (vbX || vbY) ctx.translate(-vbX, -vbY);
+          const path = new Path2D(shape.svgPath);
+          ctx.clip(path);
+          if (vbX || vbY) ctx.translate(vbX, vbY);
+          ctx.scale(vbW / shapeDim, vbH / shapeDim);
+
+          // Calculate cover dimensions inside the shape bounding square
+          const imgW = photoImg.naturalWidth || shapeDim;
+          const imgH = photoImg.naturalHeight || shapeDim;
+          const coverScale = Math.max(shapeDim / imgW, shapeDim / imgH);
+          const zoom = Math.max(0.2, slot.photoScale ?? 1.0);
+          const drawW = imgW * coverScale * zoom;
+          const drawH = imgH * coverScale * zoom;
+
+          // Apply pan offsets (% of shape size)
+          const offsetX = ((slot.photoOffsetX ?? 0) / 100) * shapeDim;
+          const offsetY = ((slot.photoOffsetY ?? 0) / 100) * shapeDim;
+
+          // Draw photo centered in shape square + pan offset
+          ctx.drawImage(
+            photoImg,
+            shapeDim / 2 + offsetX - drawW / 2,
+            shapeDim / 2 + offsetY - drawH / 2,
+            drawW,
+            drawH
+          );
+          ctx.restore();
+
+          // Draw border around the shape contour if configured
+          if (slot.borderWidth && slot.borderWidth > 0) {
+            ctx.save();
+            ctx.translate(shapeLeft, shapeTop);
+            ctx.scale(shapeDim / vbW, shapeDim / vbH);
+            if (vbX || vbY) ctx.translate(-vbX, -vbY);
+            const borderPath = new Path2D(shape.svgPath);
+            ctx.strokeStyle = slot.borderColor || '#EF4444';
+            ctx.lineWidth = (slot.borderWidth * (targetWidth / 1200)) / (shapeDim / vbW);
+            ctx.lineJoin = 'round';
+            ctx.lineCap = 'round';
+            ctx.stroke(borderPath);
             ctx.restore();
           }
         }

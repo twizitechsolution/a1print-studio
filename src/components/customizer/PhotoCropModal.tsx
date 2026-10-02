@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { ZoomIn, ZoomOut, Check, X, Move } from 'lucide-react';
-import { getShapeById } from '../../lib/shapeLibrary';
+import { getShapeById, isRectangularShape } from '../../lib/shapeLibrary';
 
 interface PhotoCropModalProps {
   isOpen: boolean;
@@ -28,7 +28,8 @@ export const PhotoCropModal: React.FC<PhotoCropModalProps> = ({
   onCancel,
 }) => {
   const shapeDef = getShapeById(shapeId);
-  const isShaped = Boolean(shapeDef || shape === 'circle');
+  const isRect = isRectangularShape(shapeId) || !shapeDef || Boolean(borderRadius && borderRadius > 0);
+  const isShaped = !isRect && Boolean(shapeDef || shape === 'circle');
   const effectiveRatio = isShaped ? 1.0 : (aspectRatio > 0 ? aspectRatio : 1);
 
   const [scale, setScale] = useState<number>(1.0);
@@ -171,7 +172,7 @@ export const PhotoCropModal: React.FC<PhotoCropModalProps> = ({
           />
 
           {/* Cutout Guide Overlay */}
-          {shapeDef ? (
+          {!isRect && shapeDef ? (
             <div className="absolute inset-0 pointer-events-none">
               <svg
                 viewBox={shapeVb}
@@ -223,10 +224,10 @@ export const PhotoCropModal: React.FC<PhotoCropModalProps> = ({
               }`}
               style={{
                 borderRadius: borderRadius && borderRadius > 0
-                  ? `${Math.round((borderRadius / 100) * 45)}%`
+                  ? (borderRadius === 100 ? '9999px' : `${Math.round((borderRadius / 100) * 45)}%`)
                   : shape === 'circle'
                   ? '9999px'
-                  : '14px',
+                  : '0px',
                 borderWidth: borderWidth > 0 ? `${Math.max(2, borderWidth * 0.7)}px` : undefined,
                 borderColor: borderWidth > 0 ? (borderColor || '#EF4444') : undefined,
                 borderStyle: borderWidth > 0 ? 'solid' : undefined,

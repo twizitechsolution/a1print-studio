@@ -62,6 +62,7 @@ import {
   ShapeThumbnail,
   getShapeById,
   ShapeDefinition,
+  isRectangularShape,
 } from '../../lib/shapeLibrary';
 
 interface VisualTemplateEditorProps {
@@ -355,7 +356,25 @@ export const VisualTemplateEditor: React.FC<VisualTemplateEditorProps> = ({
           // If shaped slot, also draw vector shape outline inside bounding box
           if (selectedLayer.type === 'slot') {
             const slot = template.photoSlots.find((s) => s.id === selectedLayer.id);
-            if (slot?.shapeId) {
+            const isRect = isRectangularShape(slot?.shapeId) || !slot?.shapeId || Boolean(slot?.borderRadius && slot.borderRadius > 0);
+            if (isRect) {
+              if (slot?.borderRadius && slot.borderRadius > 0) {
+                const maxR = Math.min(box.width, box.height) / 2;
+                const r = (slot.borderRadius / 100) * maxR;
+                ctx.save();
+                ctx.strokeStyle = '#8B5CF6';
+                ctx.lineWidth = 2.0;
+                ctx.setLineDash([4, 3]);
+                ctx.beginPath();
+                if (typeof ctx.roundRect === 'function') {
+                  ctx.roundRect(box.left, box.top, box.width, box.height, r);
+                } else {
+                  ctx.rect(box.left, box.top, box.width, box.height);
+                }
+                ctx.stroke();
+                ctx.restore();
+              }
+            } else if (slot?.shapeId) {
               const shapeDef = getShapeById(slot.shapeId);
               if (shapeDef) {
                 ctx.save();
@@ -375,21 +394,6 @@ export const VisualTemplateEditor: React.FC<VisualTemplateEditorProps> = ({
                 ctx.stroke(sp);
                 ctx.restore();
               }
-            } else if (slot?.borderRadius && slot.borderRadius > 0) {
-              const maxR = Math.min(box.width, box.height) / 2;
-              const r = (slot.borderRadius / 100) * maxR;
-              ctx.save();
-              ctx.strokeStyle = '#8B5CF6';
-              ctx.lineWidth = 2.0;
-              ctx.setLineDash([4, 3]);
-              ctx.beginPath();
-              if (typeof ctx.roundRect === 'function') {
-                ctx.roundRect(box.left, box.top, box.width, box.height, r);
-              } else {
-                ctx.rect(box.left, box.top, box.width, box.height);
-              }
-              ctx.stroke();
-              ctx.restore();
             }
           }
 

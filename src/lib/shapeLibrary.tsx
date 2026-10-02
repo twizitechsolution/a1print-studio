@@ -228,6 +228,23 @@ export function getShapeById(id?: string): ShapeDefinition | undefined {
   return SHAPES_LIBRARY.find((s) => s.id === id);
 }
 
+export const RECTANGULAR_SHAPE_IDS = new Set([
+  'classic-square',
+  'square-frame',
+  'square-inset',
+  'portrait-frame',
+  'rounded-rect',
+]);
+
+/**
+ * Checks if a shape ID represents a rectangular / box frame where
+ * independent width & height scaling and corner-rounding apply.
+ */
+export function isRectangularShape(shapeId?: string): boolean {
+  if (!shapeId) return true;
+  return RECTANGULAR_SHAPE_IDS.has(shapeId);
+}
+
 /**
  * Canva-Style Miniature Landscape Preview Thumbnail for Frame Shapes.
  * Displays the iconic blue sky, fluffy cloud, bright sun, and rolling green hills
